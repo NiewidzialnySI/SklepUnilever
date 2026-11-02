@@ -606,7 +606,13 @@ fun EkranWebViewSklepu(
     }
 
     BackHandler {
-        stan.obsluzWstecz()
+        val wv = stan.webView
+        when {
+            wv != null && wv.canGoBack() -> stan.obsluzWstecz()
+            !StaleSklepu.czyGlownaSklepu(stan.aktualnyUrl) -> stan.obsluzWstecz()
+            // Na stronie głównej sklepu — wróć do apki, nie zamykaj procesu
+            else -> onZamknij()
+        }
     }
 
     Box(

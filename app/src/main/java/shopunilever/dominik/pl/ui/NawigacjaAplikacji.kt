@@ -1,5 +1,6 @@
 package shopunilever.dominik.pl.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -48,6 +49,11 @@ fun NawigacjaAplikacji() {
     }
     var rola by remember {
         mutableStateOf(PreferencjeOnboardingu.rola(kontekst))
+    }
+
+    // Wstecz nie zamyka aplikacji (dziecięce BackHandlery, np. WebView, mają pierwszeństwo).
+    BackHandler {
+        // celowo puste
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
