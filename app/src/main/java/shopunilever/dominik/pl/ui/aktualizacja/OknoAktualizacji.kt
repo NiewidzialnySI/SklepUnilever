@@ -1,6 +1,5 @@
 package shopunilever.dominik.pl.ui.aktualizacja
 
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,9 +50,8 @@ import shopunilever.dominik.pl.ui.theme.TloWarstwa
 import shopunilever.dominik.pl.update.AktualizacjaAplikacji
 
 /**
- * Proste, nieprzezroczyste okno:
- * Aktualizuj (pobierz) → Zainstaluj.
- * Ikona terminala = obejście ADB bez uprawnień instalacji.
+ * Proste okno: Aktualizuj (pobierz) → Zainstaluj.
+ * Ikona terminala = od razu wybór instalatora (bez wymuszania uprawnień).
  */
 @Composable
 fun OknoAktualizacji(modifier: Modifier = Modifier) {
@@ -65,7 +63,6 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
         is AktualizacjaAplikacji.Stan.Dostepna,
         is AktualizacjaAplikacji.Stan.Pobieranie,
         is AktualizacjaAplikacji.Stan.GotowaDoInstalacji,
-        is AktualizacjaAplikacji.Stan.GotowaAdb,
         is AktualizacjaAplikacji.Stan.WymagaUprawnienia,
         is AktualizacjaAplikacji.Stan.Blad -> true
         else -> false
@@ -75,7 +72,6 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
         is AktualizacjaAplikacji.Stan.Dostepna -> s.info
         is AktualizacjaAplikacji.Stan.Pobieranie -> s.info
         is AktualizacjaAplikacji.Stan.GotowaDoInstalacji -> s.info
-        is AktualizacjaAplikacji.Stan.GotowaAdb -> s.info
         is AktualizacjaAplikacji.Stan.WymagaUprawnienia -> s.info
         else -> null
     }
@@ -112,25 +108,17 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
                     )
-                    // Obejście ADB — bez uprawnień „instaluj aplikacje”
                     IconButton(
                         onClick = {
                             val info = infoWersji ?: return@IconButton
                             zakres.launch {
-                                val ok = AktualizacjaAplikacji.przygotujAdb(kontekst, info)
-                                if (ok) {
-                                    Toast.makeText(
-                                        kontekst,
-                                        "APK w Pobranych · komenda ADB w schowku",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                                AktualizacjaAplikacji.otworzWyborInstalatora(kontekst, info)
                             }
                         }
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Terminal,
-                            contentDescription = "Instalacja przez ADB",
+                            contentDescription = "Wybierz instalator",
                             tint = AkcentNeon
                         )
                     }
@@ -188,50 +176,21 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
                         }
                     }
 
-                    is AktualizacjaAplikacji.Stan.GotowaAdb -> {
-                        Text(
-                            text = "Gotowe pod ADB",
-                            color = TekstGlowny,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = s.komenda,
-                            color = TekstDrugi,
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        PrzyciskGlowny("Kopiuj komendę ADB") {
-                            val cm = kontekst.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                                as android.content.ClipboardManager
-                            cm.setPrimaryClip(
-                                android.content.ClipData.newPlainText("adb", s.komenda)
-                            )
-                            Toast.makeText(kontekst, "Skopiowano", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-
                     is AktualizacjaAplikacji.Stan.WymagaUprawnienia -> {
                         PrzyciskGlowny("Zainstaluj") {
                             val plik = s.plik
                             if (plik != null && plik.exists()) {
-                                AktualizacjaAplikacji.zainstalujZWyborem(kontekst, plik)
+                                AktualizacjaAplikacji.zainstalujZWyborem(
+                                    kontekst,
+                                    plik,
+                                    pominSprawdzenieUprawnien = true
+                                )
                             } else {
                                 kontekst.startActivity(
                                     AktualizacjaAplikacji.intentUstawienNieznaneZrodla(kontekst)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Albo ikona terminala = ADB bez uprawnień",
-                            color = TekstDrugi,
-                            fontSize = 12.sp,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
                     }
 
                     is AktualizacjaAplikacji.Stan.Blad -> {
