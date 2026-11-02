@@ -123,7 +123,7 @@ private class StanLogowaniaSklepu(
         if (!hasloWstrzykniete.compareAndSet(false, true)) return
         oczekujeSms = false
         etap = EtapLogowania.HASLO
-        status = "Wpisuję hasło i zaznaczam zgodę…"
+        status = "Wpisuję hasło…"
         wstrzyknij(SkryptySklepu.skryptWypelnijHaslo(haslo))
     }
 
@@ -243,7 +243,14 @@ private class StanLogowaniaSklepu(
                             status = "Kod SMS wpisany — czekam na hasło…"
                             oczekujeSms = false
                         }
-                        "haslo" -> status = "Hasło wysłane — kończę logowanie…"
+                        "haslo" -> status = when (info) {
+                            "HASLO_WPISANE" -> "Hasło wpisane…"
+                            "CHECKBOX_ZAZNACZONY" -> "Zaznaczam zgodę…"
+                            "CAPTCHA_GOTOWA_CZEKAM" -> "Captcha załadowana — czekam przed Zaloguj…"
+                            "PRZYCISK_ZALOGUJ" -> "Klikam Zaloguj się…"
+                            "HASLO_WYSLANE" -> "Hasło wysłane — kończę logowanie…"
+                            else -> "Finalizowanie logowania…"
+                        }
                     }
                 }
             }

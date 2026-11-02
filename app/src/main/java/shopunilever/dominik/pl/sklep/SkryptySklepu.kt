@@ -196,9 +196,57 @@ true;
         val bezpieczny = haslo.replace("\\", "\\\\").replace("\"", "\\\"")
         return """
 (function() {
+    if (window.jQuery && !window.jQuery.fn.validation) {
+        window.jQuery.fn.validation = function() { return { valid: function() { return true; } }; };
+    }
     if (window.isProcessingLogin) return;
     window.isProcessingLogin = true;
+
+    function post(info) {
+        if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: info });
+    }
+    function znajdzCheckbox() {
+        return document.querySelector('input[id^="amprivacy-checkbox-"]') ||
+            document.querySelector('input[name="amgdpr_agreement[statute_ap]"]') ||
+            document.querySelector('input[type="checkbox"][name*="gdpr"]') ||
+            document.querySelector('input[type="checkbox"][name*="privacy"]') ||
+            document.querySelector('input[type="checkbox"][id*="privacy"]') ||
+            document.querySelector('.amprivacy-checkbox input[type="checkbox"]') ||
+            document.querySelector('form#login-form input[type="checkbox"]');
+    }
+    function zaznaczCheckbox() {
+        var gdpr = znajdzCheckbox();
+        if (!gdpr || gdpr.checked) return !!gdpr;
+        try {
+            gdpr.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
+        } catch (e) {}
+        gdpr.checked = true;
+        gdpr.dispatchEvent(new Event('input', { bubbles: true }));
+        gdpr.dispatchEvent(new Event('change', { bubbles: true }));
+        if (gdpr.id) {
+            var label = document.querySelector('label[for="' + gdpr.id + '"]');
+            if (label) try { label.click(); } catch (e) {}
+        }
+        return true;
+    }
+    function captchaGotowa() {
+        var ta = document.querySelector('textarea[name="g-recaptcha-response"]');
+        if (ta && ta.value && ta.value.length > 10) return true;
+        if (document.querySelector('.grecaptcha-badge')) return true;
+        if (document.querySelector('iframe[src*="recaptcha"]')) return true;
+        if (typeof grecaptcha !== 'undefined') return true;
+        return false;
+    }
+    function przyciskLogowania() {
+        return document.getElementById('send2') ||
+            document.querySelector('button.action.login.primary') ||
+            document.querySelector('#login-form button.action.primary') ||
+            document.querySelector('#login-form button[type="submit"]') ||
+            document.querySelector('button[type="submit"].action.login');
+    }
+
     try {
+        // 1) Najpierw hasło
         var passField = document.getElementById('pass') ||
             document.querySelector('input[name="login[password]"]') ||
             document.querySelector('input[type="password"]');
@@ -207,40 +255,61 @@ true;
             if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: 'PASS_FIELD_NOT_FOUND' });
             return;
         }
+        passField.focus();
         passField.value = "$bezpieczny";
         passField.dispatchEvent(new Event('input', { bubbles: true }));
         passField.dispatchEvent(new Event('change', { bubbles: true }));
-        var gdpr = document.querySelector('input[id^="amprivacy-checkbox-"]') ||
-            document.querySelector('input[name="amgdpr_agreement[statute_ap]"]') ||
-            document.querySelector('input[type="checkbox"][name*="gdpr"]') ||
-            document.querySelector('input[type="checkbox"][name*="privacy"]') ||
-            document.querySelector('input[type="checkbox"][id*="privacy"]');
-        if (gdpr && !gdpr.checked) {
-            try {
-                gdpr.click();
-            } catch (e) {}
-            gdpr.checked = true;
-            gdpr.dispatchEvent(new Event('change', { bubbles: true }));
-            var label = gdpr.id ? document.querySelector('label[for="' + gdpr.id + '"]') : null;
-            if (label) try { label.click(); } catch (e) {}
-        }
+        post('HASLO_WPISANE');
+
+        // 2) Potem checkbox (po krótkiej pauzie)
         setTimeout(function() {
-            var submitBtn = document.getElementById('send2') ||
-                document.querySelector('button.action.login.primary') ||
-                document.querySelector('#login-form button[type="submit"]') ||
-                document.querySelector('button[type="submit"]');
-            if (submitBtn) {
-                submitBtn.focus();
-                submitBtn.click();
-                window.isProcessingLogin = false;
-                if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true });
-            } else {
-                var form = document.getElementById('login-form') || document.getElementById('customer-login-form');
-                if (form) form.submit();
-                window.isProcessingLogin = false;
-                if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: 'FORM_SUBMIT' });
-            }
-        }, 2500);
+            zaznaczCheckbox();
+            post('CHECKBOX_ZAZNACZONY');
+
+            // 3) Czekaj aż captcha się dociągnie, dopiero potem Zaloguj
+            setTimeout(function() {
+                var checkCount = 0;
+                var trySubmit = setInterval(function() {
+                    checkCount++;
+                    var submitBtn = przyciskLogowania();
+                    var isBtnReady = submitBtn && !submitBtn.disabled && !submitBtn.classList.contains('disabled');
+                    var isCaptchaLoaded = captchaGotowa();
+
+                    if ((isBtnReady && isCaptchaLoaded) || checkCount >= 40) {
+                        clearInterval(trySubmit);
+                        post('CAPTCHA_GOTOWA_CZEKAM');
+                        // dodatkowa pauza po pełnym załadowaniu captcha
+                        setTimeout(function() {
+                            zaznaczCheckbox();
+                            submitBtn = przyciskLogowania();
+                            if (!submitBtn) {
+                                window.isProcessingLogin = false;
+                                if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: 'SEND2_NOT_FOUND' });
+                                return;
+                            }
+                            submitBtn.focus();
+                            setTimeout(function() {
+                                try {
+                                    submitBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                                } catch (e) {}
+                                submitBtn.click();
+                                post('PRZYCISK_ZALOGUJ');
+                                setTimeout(function() {
+                                    window.isProcessingLogin = false;
+                                    if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: 'HASLO_WYSLANE' });
+                                }, 1200);
+                                setTimeout(function() {
+                                    if (document.getElementById('pass')) {
+                                        var loginForm = document.getElementById('login-form') || document.getElementById('customer-login-form');
+                                        if (loginForm) try { loginForm.submit(); } catch (e) {}
+                                    }
+                                }, 5000);
+                            }, 500);
+                        }, 3000);
+                    }
+                }, 500);
+            }, 4500);
+        }, 900);
     } catch (err) {
         window.isProcessingLogin = false;
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: String(err.message) });
