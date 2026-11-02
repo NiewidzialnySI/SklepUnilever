@@ -1,8 +1,13 @@
 # Autoaktualizacja — Sklep Unilever
 
-Przy każdym uruchomieniu apka pobiera `update.json` i — jeśli `versionCode` jest wyższy —
-pokazuje okno na środku ekranu. Zamknięcie okna działa tylko w bieżącej sesji;
-przy następnym starcie okno wraca.
+Przy **każdym wejściu / powrocie** do aplikacji (pracownik i rodzina) apka pobiera
+`update.json`. Gdy `versionCode` jest wyższy, pokazuje okno na środku.
+
+**Aktualizuj aplikację** → pobiera APK → otwiera **chooser instalatorów**
+(Package Installer, menedżer plików, inne aplikacje obsługujące APK).
+
+Zamknięcie okna działa tylko w bieżącej sesji; przy następnym starcie wraca,
+jeśli nadal jest nowsza wersja.
 
 URL:
 
@@ -11,8 +16,8 @@ URL:
 ## Jak wypuścić wersję
 
 1. Podnieś `versionCode` / `versionName` w `app/build.gradle.kts`.
-2. Zbuduj APK: `.\gradlew.bat :app:assembleRelease` (lub debug).
-3. Utwórz GitHub Release z tagiem np. `v1.0.1` i dołącz `.apk`.
+2. Zbuduj APK podpisany **tym samym kluczem** co instalacje użytkowników.
+3. Utwórz GitHub Release (tag np. `v1.0.1`) i dołącz `.apk`.
 4. Zaktualizuj `update.json` w `main`:
 
 ```json
@@ -24,7 +29,6 @@ URL:
 }
 ```
 
-5. Commit + push.
+5. Commit + push na `main` (apka czyta raw z `main`).
 
-Repo powinno być **publiczne**, żeby `raw.githubusercontent.com` działał bez tokena
-(albo ustaw token GitHub w prefs debug — jak w dialerze).
+Repo powinno być **publiczne**, żeby `raw.githubusercontent.com` działał bez tokena.

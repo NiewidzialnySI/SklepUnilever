@@ -25,10 +25,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Autoaktualizacja z GitHub (`update.json` + APK z Releases).
+ * Autoaktualizacja (jak SelfUpdatingApp / hermes-mobile / riffle):
+ * start aplikacji → update.json → okno → jeden przycisk → pobierz APK →
+ * systemowy chooser instalatorów (Package Installer / menedżer plików / …).
  *
- * Przy starcie: zawsze sprawdza (gdy auto włączone). Zamknięcie okna = tylko sesja —
- * przy kolejnym uruchomieniu okno wraca, jeśli nadal jest nowsza wersja.
+ * Działa niezależnie od roli (pracownik / rodzina).
  */
 object AktualizacjaAplikacji {
 
@@ -53,12 +54,14 @@ object AktualizacjaAplikacji {
         data object Aktualna : Stan()
         data class Pobieranie(val postep01: Float, val info: InfoWersji) : Stan()
         data class GotowaDoInstalacji(val plik: File, val info: InfoWersji) : Stan()
+        data class WymagaUprawnienia(val plik: File?, val info: InfoWersji) : Stan()
         data class Blad(val komunikat: String) : Stan()
     }
 
     private val _stan = MutableStateFlow<Stan>(Stan.Bezczynny)
     val stan: StateFlow<Stan> = _stan.asStateFlow()
     private val mutex = Mutex()
+    @Volatile private var ostatnieSprawdzenieMs = 0L
 
     fun lokalnaWersja(): String =
         "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
@@ -79,13 +82,42 @@ object AktualizacjaAplikacji {
     fun manifestUrl(): String =
         BuildConfig.UPDATE_MANIFEST_URL.ifBlank { DOMYSLNY_MANIFEST }
 
-    /** Zamknięcie okna w tej sesji — bez trwałego pomijania wersji. */
     fun zamknijNaTeSesje() {
         _stan.value = Stan.Bezczynny
     }
 
+    /**
+     * Zawsze przy wejściu do aplikacji (onCreate / onResume).
+     * Nie zależy od roli użytkownika.
+     */
     suspend fun sprawdzPrzyStarcie(context: Context) {
+        // Domyślnie włączone; wyłączenie tylko jawne w prefs
         if (!autoSprawdzaj(context)) return
+        val teraz = System.currentTimeMillis()
+        // Nie spamuj przy szybkim onResume (np. powrót z ustawień instalacji)
+        if (teraz - ostatnieSprawdzenieMs < 8_000L) {
+            when (val s = _stan.value) {
+                is Stan.GotowaDoInstalacji -> {
+                    if (czyMoznaInstalowac(context)) {
+                        zainstalujZWyborem(context, s.plik)
+                    }
+                }
+                is Stan.WymagaUprawnienia -> {
+                    if (czyMoznaInstalowac(context)) {
+                        val plik = s.plik
+                        if (plik != null && plik.exists()) {
+                            _stan.value = Stan.GotowaDoInstalacji(plik, s.info)
+                            zainstalujZWyborem(context, plik)
+                        } else {
+                            sprawdz(context, cichyGdyAktualna = true)
+                        }
+                    }
+                }
+                else -> Unit
+            }
+            return
+        }
+        ostatnieSprawdzenieMs = teraz
         sprawdz(context, cichyGdyAktualna = true)
     }
 
@@ -118,10 +150,26 @@ object AktualizacjaAplikacji {
                 wynik
             } catch (e: Exception) {
                 val blad = Stan.Blad(e.message?.takeIf { it.isNotBlank() } ?: "Błąd sprawdzania")
+                // Przy starcie nie zasłaniaj UI błędem sieci — cicho
                 _stan.value = if (cichyGdyAktualna) Stan.Bezczynny else blad
                 blad
             }
         }
+    }
+
+    /** Jeden przycisk: pobierz APK, potem otwórz wybór instalatora. */
+    suspend fun pobierzIZainstaluj(context: Context, info: InfoWersji): Boolean {
+        if (!czyMoznaInstalowac(context)) {
+            _stan.value = Stan.WymagaUprawnienia(plik = null, info = info)
+            return false
+        }
+        val ok = pobierz(context, info)
+        if (!ok) return false
+        val gotowa = _stan.value as? Stan.GotowaDoInstalacji ?: return false
+        withContext(Dispatchers.Main) {
+            zainstalujZWyborem(context, gotowa.plik)
+        }
+        return true
     }
 
     suspend fun pobierz(context: Context, info: InfoWersji): Boolean =
@@ -155,9 +203,20 @@ object AktualizacjaAplikacji {
             Uri.parse("package:${context.packageName}")
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-    fun zainstalujSystemowo(context: Context, plik: File) {
+    /**
+     * Otwiera systemowy chooser: „Package installer”, menedżer plików itd.
+     * Wzorowane na ACTION_VIEW + FileProvider (hermes / riffle / Nacre).
+     */
+    fun zainstalujZWyborem(context: Context, plik: File) {
         if (!plik.exists() || plik.length() < 1024L) {
             _stan.value = Stan.Blad("Brak pobranego APK — pobierz ponownie")
+            return
+        }
+        if (!czyMoznaInstalowac(context)) {
+            val info = (_stan.value as? Stan.GotowaDoInstalacji)?.info
+                ?: (_stan.value as? Stan.WymagaUprawnienia)?.info
+                ?: InfoWersji(BuildConfig.VERSION_CODE, BuildConfig.VERSION_NAME, "", "")
+            _stan.value = Stan.WymagaUprawnienia(plik, info)
             return
         }
         try {
@@ -167,18 +226,19 @@ object AktualizacjaAplikacji {
                 "${context.packageName}.fileprovider",
                 plik
             )
-            val view = Intent(Intent.ACTION_VIEW).apply {
+            val bazowy = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                        Intent.FLAG_ACTIVITY_NEW_TASK
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
                 )
                 clipData = ClipData.newRawUri("apk", uri)
             }
-            val handlery = context.packageManager.queryIntentActivities(
-                view,
-                PackageManager.MATCH_DEFAULT_ONLY
-            )
+
+            val pm = context.packageManager
+            @Suppress("DEPRECATION")
+            val handlery = pm.queryIntentActivities(bazowy, PackageManager.MATCH_DEFAULT_ONLY)
             for (ri in handlery) {
                 context.grantUriPermission(
                     ri.activityInfo.packageName,
@@ -186,19 +246,23 @@ object AktualizacjaAplikacji {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }
-            context.startActivity(
-                Intent.createChooser(view, "Zainstaluj APK").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    clipData = ClipData.newRawUri("apk", uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-            )
+
+            // Systemowy chooser: Package Installer, Files, inne aplikacje od APK
+            val chooser = Intent.createChooser(bazowy, "Wybierz aplikację do instalacji").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                clipData = ClipData.newRawUri("apk", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(chooser)
         } catch (e: Exception) {
             _stan.value = Stan.Blad(
                 e.message?.takeIf { it.isNotBlank() } ?: "Nie udało się otworzyć instalatora"
             )
         }
     }
+
+    /** Alias pod stare wywołania. */
+    fun zainstalujSystemowo(context: Context, plik: File) = zainstalujZWyborem(context, plik)
 
     private fun parsujManifest(json: String): InfoWersji {
         val o = JSONObject(json)

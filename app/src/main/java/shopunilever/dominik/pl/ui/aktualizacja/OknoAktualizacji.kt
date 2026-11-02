@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.ui.components.SzkloKarta
+import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
@@ -49,8 +51,8 @@ import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
 import shopunilever.dominik.pl.update.AktualizacjaAplikacji
 
 /**
- * Centralne okno aktualizacji. Zamknięcie tylko na tę sesję —
- * przy kolejnym starcie pojawi się ponownie, gdy nadal jest nowsza wersja.
+ * Overlay nad całą apką (pracownik i rodzina).
+ * Start → auto-check → okno → „Aktualizuj” = pobierz + chooser instalatora.
  */
 @Composable
 fun OknoAktualizacji(modifier: Modifier = Modifier) {
@@ -62,6 +64,7 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
         is AktualizacjaAplikacji.Stan.Dostepna,
         is AktualizacjaAplikacji.Stan.Pobieranie,
         is AktualizacjaAplikacji.Stan.GotowaDoInstalacji,
+        is AktualizacjaAplikacji.Stan.WymagaUprawnienia,
         is AktualizacjaAplikacji.Stan.Blad -> true
         else -> false
     }
@@ -107,7 +110,12 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
                             letterSpacing = 1.6.sp
                         )
                         Text(
-                            text = "Dostępna nowa wersja",
+                            text = when (stan) {
+                                is AktualizacjaAplikacji.Stan.Pobieranie -> "Pobieranie…"
+                                is AktualizacjaAplikacji.Stan.GotowaDoInstalacji -> "Gotowe do instalacji"
+                                is AktualizacjaAplikacji.Stan.WymagaUprawnienia -> "Wymagane uprawnienie"
+                                else -> "Dostępna nowa wersja"
+                            },
                             color = TekstGlowny,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
@@ -127,9 +135,18 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
                 when (val s = stan) {
                     is AktualizacjaAplikacji.Stan.Dostepna -> {
                         TekstWersji(s.info)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Po pobraniu wybierzesz instalator (Package Installer lub inna aplikacja).",
+                            color = TekstDrugi,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
-                        PrzyciskAkcji("Pobierz aktualizację") {
-                            zakres.launch { AktualizacjaAplikacji.pobierz(kontekst, s.info) }
+                        PrzyciskAkcji("Aktualizuj aplikację") {
+                            zakres.launch {
+                                AktualizacjaAplikacji.pobierzIZainstaluj(kontekst, s.info)
+                            }
                         }
                     }
 
@@ -155,15 +172,33 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
 
                     is AktualizacjaAplikacji.Stan.GotowaDoInstalacji -> {
                         TekstWersji(s.info)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Wybierz aplikację, która zainstaluje aktualizację.",
+                            color = TekstDrugi,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
-                        PrzyciskAkcji("Zainstaluj") {
-                            if (!AktualizacjaAplikacji.czyMoznaInstalowac(kontekst)) {
-                                kontekst.startActivity(
-                                    AktualizacjaAplikacji.intentUstawienNieznaneZrodla(kontekst)
-                                )
-                            } else {
-                                AktualizacjaAplikacji.zainstalujSystemowo(kontekst, s.plik)
-                            }
+                        PrzyciskAkcji("Zainstaluj — wybór aplikacji") {
+                            AktualizacjaAplikacji.zainstalujZWyborem(kontekst, s.plik)
+                        }
+                    }
+
+                    is AktualizacjaAplikacji.Stan.WymagaUprawnienia -> {
+                        TekstWersji(s.info)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Zezwól tej aplikacji na instalację z nieznanych źródeł, potem wróć — instalacja wystartuje sama.",
+                            color = TekstDrugi,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        PrzyciskAkcji("Otwórz ustawienia instalacji") {
+                            kontekst.startActivity(
+                                AktualizacjaAplikacji.intentUstawienNieznaneZrodla(kontekst)
+                            )
                         }
                     }
 
@@ -188,7 +223,7 @@ fun OknoAktualizacji(modifier: Modifier = Modifier) {
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Możesz zamknąć okno — przypomnimy przy następnym uruchomieniu.",
+                    text = "Sprawdzanie przy każdym uruchomieniu — dla pracownika i rodziny.",
                     color = TekstDrugi.copy(alpha = 0.85f),
                     fontSize = 12.sp,
                     lineHeight = 16.sp
@@ -224,7 +259,7 @@ private fun PrzyciskAkcji(etykieta: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(AkcentNeon)
+            .background(Brush.horizontalGradient(listOf(AkcentNeon, AkcentMorski)))
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center

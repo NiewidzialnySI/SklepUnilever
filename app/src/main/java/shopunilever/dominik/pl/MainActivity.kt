@@ -15,15 +15,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Każdy start: sprawdź update.json. Jeśli jest nowsza wersja — okno na środku.
-        lifecycleScope.launch {
-            AktualizacjaAplikacji.sprawdzPrzyStarcie(this@MainActivity)
-        }
-
         setContent {
             SklepUnileverTheme {
                 NawigacjaAplikacji()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Każde wejście / powrót do apki — pracownik i rodzina (overlay globalny).
+        lifecycleScope.launch {
+            AktualizacjaAplikacji.sprawdzPrzyStarcie(this@MainActivity)
         }
     }
 }
