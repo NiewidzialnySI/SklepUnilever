@@ -335,7 +335,7 @@ fun EkranUrzadzen(
             if (kod.isNotBlank()) {
                 val trescQr = "${StaleFirebase.PREFIX_QR}$kod"
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    KodQrParowania(tresc = trescQr, rozmiar = 220.dp)
+                    KodQrParowania(tresc = trescQr, rozmiar = 200.dp)
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(

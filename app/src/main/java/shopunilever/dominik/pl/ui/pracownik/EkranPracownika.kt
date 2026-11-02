@@ -6,9 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
@@ -23,7 +21,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeParowania
@@ -43,6 +43,8 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
     var prosbyOczekujace by remember { mutableIntStateOf(0) }
     var restartNasluchu by remember { mutableIntStateOf(0) }
     val juzPowiadomione = remember { mutableSetOf<String>() }
+    // Po pierwszym wejściu zakładka zostaje w pamięci — bez zimnego startu (QR + Firebase).
+    var odwiedzone by remember { mutableStateOf(setOf(ZakladkaPracownika.DOM)) }
 
     val chceUrzadzenia by IntentyNawigacji.otworzUrzadzenia.collectAsState()
     LaunchedEffect(chceUrzadzenia) {
@@ -51,6 +53,10 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
             zakladka = ZakladkaPracownika.URZADZENIA
             IntentyNawigacji.skonsumujOtworzUrzadzenia()
         }
+    }
+
+    LaunchedEffect(zakladka) {
+        odwiedzone = odwiedzone + zakladka
     }
 
     // Tło SMS + badge w aplikacji (bez spamowania powiadomieniami / skoków zakładek).
@@ -78,7 +84,6 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                 val pending = lista.filter { it.status == "pending" }
                 pendingParowanie = pending.size
                 odswiezBadge()
-                // Tylko pierwsze pojawienie się — ciche przypomnienie, bez wymuszania ekranu.
                 pending.forEach { p ->
                     if (juzPowiadomione.add("pair:${p.id}")) {
                         PowiadomieniaParowania.pokazCichePrzypomnienie(
@@ -145,29 +150,21 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
             TloAplikacji(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f)) {
-                        AnimatedContent(
-                            targetState = zakladka,
-                            transitionSpec = {
-                                val wPrawo = targetState.ordinal > initialState.ordinal
-                                val enterOffset = { szer: Int -> if (wPrawo) szer / 6 else -szer / 6 }
-                                val exitOffset = { szer: Int -> if (wPrawo) -szer / 8 else szer / 8 }
-                                (
-                                    slideInHorizontally(tween(150), enterOffset) + fadeIn(tween(120))
-                                    ) togetherWith (
-                                    slideOutHorizontally(tween(130), exitOffset) + fadeOut(tween(100))
-                                    )
-                            },
-                            label = "przelaczenie_zakladek",
-                            modifier = Modifier.fillMaxSize()
-                        ) { cel ->
-                            when (cel) {
-                                ZakladkaPracownika.DOM -> EkranHomePracownika(
-                                    onOtworzSklep = { pokazSklep = true }
-                                )
-                                ZakladkaPracownika.URZADZENIA -> EkranUrzadzen(
+                        if (ZakladkaPracownika.DOM in odwiedzone) {
+                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.DOM) {
+                                EkranHomePracownika(onOtworzSklep = { pokazSklep = true })
+                            }
+                        }
+                        if (ZakladkaPracownika.URZADZENIA in odwiedzone) {
+                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.URZADZENIA) {
+                                EkranUrzadzen(
                                     onParowanieZmienione = { restartNasluchu++ }
                                 )
-                                ZakladkaPracownika.USTAWIENIA -> EkranUstawien()
+                            }
+                        }
+                        if (ZakladkaPracownika.USTAWIENIA in odwiedzone) {
+                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.USTAWIENIA) {
+                                EkranUstawien()
                             }
                         }
                     }
@@ -179,5 +176,21 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+/** Zachowuje composition zakładki — widoczna warstwa dostaje touch (wyższy zIndex). */
+@Composable
+private fun ZakladkaWarstwa(
+    widoczna: Boolean,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (widoczna) 1f else 0f)
+            .graphicsLayer { alpha = if (widoczna) 1f else 0f }
+    ) {
+        content()
     }
 }

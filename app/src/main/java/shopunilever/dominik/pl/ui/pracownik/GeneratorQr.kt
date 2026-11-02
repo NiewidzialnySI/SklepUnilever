@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
@@ -22,10 +26,13 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import shopunilever.dominik.pl.ui.theme.AkcentNeon
 
 fun wygenerujBitmapQr(
     tresc: String,
-    rozmiarPx: Int = 512
+    rozmiarPx: Int = 320
 ): Bitmap? {
     if (tresc.isBlank()) return null
     return runCatching {
@@ -63,21 +70,36 @@ fun KodQrParowania(
     modifier: Modifier = Modifier,
     rozmiar: Dp = 200.dp
 ) {
-    val bitmap = remember(tresc) { wygenerujBitmapQr(tresc) }
+    // Generacja poza UI thread — wcześniej blokowała zakładkę Parowanie.
+    val obraz by produceState<ImageBitmap?>(initialValue = null, tresc) {
+        value = null
+        value = withContext(Dispatchers.Default) {
+            wygenerujBitmapQr(tresc)?.asImageBitmap()
+        }
+    }
+    val placeholder = remember(rozmiar) { rozmiar }
+
     Box(
         modifier = modifier
-            .size(rozmiar)
+            .size(placeholder)
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
             .padding(10.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (bitmap != null) {
+        val bmp = obraz
+        if (bmp != null) {
             Image(
-                bitmap = bitmap.asImageBitmap(),
+                bitmap = bmp,
                 contentDescription = "Kod QR parowania",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.size(rozmiar - 20.dp)
+            )
+        } else {
+            CircularProgressIndicator(
+                color = AkcentNeon,
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.dp
             )
         }
     }

@@ -2,8 +2,6 @@ package shopunilever.dominik.pl.dane
 
 import android.content.Context
 import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import shopunilever.dominik.pl.firebase.StaleFirebase
 import kotlin.random.Random
 
@@ -13,20 +11,7 @@ object PreferencjeParowania {
     private const val K_UID = "firebase_uid"
     private const val K_AKTYWNY = "parowanie_aktywne"
 
-    private fun prefs(context: Context) = try {
-        val master = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            PREFS,
-            master,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (_: Exception) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }
+    private fun prefs(context: Context) = SzyfrowanePrefs.pobierz(context, PREFS)
 
     fun kod(context: Context): String =
         prefs(context).getString(K_KOD, "") ?: ""

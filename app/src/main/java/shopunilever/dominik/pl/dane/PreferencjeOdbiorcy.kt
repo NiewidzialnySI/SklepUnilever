@@ -2,8 +2,6 @@ package shopunilever.dominik.pl.dane
 
 import android.content.Context
 import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 object PreferencjeOdbiorcy {
     private const val PREFS = "sklep_odbiorca_secure"
@@ -13,20 +11,7 @@ object PreferencjeOdbiorcy {
     private const val K_STATUS = "status" // pending | approved | rejected
     private const val K_NAZWA = "nazwa_urzadzenia"
 
-    private fun prefs(context: Context) = try {
-        val master = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            PREFS,
-            master,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (_: Exception) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }
+    private fun prefs(context: Context) = SzyfrowanePrefs.pobierz(context, PREFS)
 
     fun kod(context: Context): String = prefs(context).getString(K_KOD, "") ?: ""
     fun uid(context: Context): String = prefs(context).getString(K_UID, "") ?: ""

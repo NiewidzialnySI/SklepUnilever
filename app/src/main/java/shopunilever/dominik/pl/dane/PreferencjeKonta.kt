@@ -2,8 +2,6 @@ package shopunilever.dominik.pl.dane
 
 import android.content.Context
 import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 /**
  * Dane służbowe do auto-logowania sklepiku (jak SecureStore w Harmonogramie).
@@ -14,20 +12,7 @@ object PreferencjeKonta {
     private const val K_HASLO = "haslo_sklepiku"
     private const val K_DANE_ZAPISANE = "dane_zapisane"
 
-    private fun prefs(context: Context) = try {
-        val master = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            PREFS,
-            master,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
-    } catch (_: Exception) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }
+    private fun prefs(context: Context) = SzyfrowanePrefs.pobierz(context, PREFS)
 
     fun czyDaneZapisane(context: Context): Boolean {
         val p = prefs(context)

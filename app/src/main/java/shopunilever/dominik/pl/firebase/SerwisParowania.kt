@@ -94,8 +94,12 @@ object SerwisParowania {
     /**
      * Utrzymuje sesję Auth = UID nadajnika z preferencji.
      * Bez tego reguły RTDB blokują odczyt próśb (auth.uid musi = transmitterUid).
+     * Domyślnie bez zapisu updatedAt — wcześniejszy await przy każdym wejściu w zakładkę lagował UI.
      */
-    suspend fun upewnijSesjeNadajnika(context: Context): String? {
+    suspend fun upewnijSesjeNadajnika(
+        context: Context,
+        odswiezAktywnosc: Boolean = false
+    ): String? {
         val kod = PreferencjeParowania.kod(context)
         if (kod.isBlank()) return null
         FirebaseSklepik.upewnijSie(context)
@@ -104,14 +108,15 @@ object SerwisParowania {
         if (zapisany.isBlank() || zapisany != authUid) {
             return uruchomJakoNadajnik(context)
         }
-        // Odśwież znacznik aktywności — bez zmiany kodu.
-        FirebaseSklepik.baza(context).reference
-            .child(StaleFirebase.Sciezki.TRANSMITTERS)
-            .child(authUid)
-            .child("updatedAt")
-            .setValue(System.currentTimeMillis())
-            .await()
-        PreferencjeParowania.zapisz(context, kod, authUid)
+        if (odswiezAktywnosc) {
+            FirebaseSklepik.baza(context).reference
+                .child(StaleFirebase.Sciezki.TRANSMITTERS)
+                .child(authUid)
+                .child("updatedAt")
+                .setValue(System.currentTimeMillis())
+                .await()
+            PreferencjeParowania.zapisz(context, kod, authUid)
+        }
         return authUid
     }
 
