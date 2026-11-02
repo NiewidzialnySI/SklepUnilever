@@ -114,19 +114,17 @@ object SkryptySklepu {
 true;
 """
 
-    /** Wykrycie etapu formularza — tylko WIDOCZNE pola (ukryty #pass w popupie Magento nie liczy się). */
-    const val WYKRYJ = """
-(function() {
-    function widoczny(el) {
+    /** Wspólne helpery widoczności / „czy to sklep zalogowany”. */
+    private const val JS_HELPERY = """
+    function sklepikWidoczny(el) {
         if (!el) return false;
         var st = window.getComputedStyle(el);
         if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false;
         var r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) return false;
-        // ukryty w nested display:none
         var p = el;
         while (p) {
-            if (p.id === 'authenticationPopup' || (p.getAttribute && p.getAttribute('data-bind') && String(p.getAttribute('data-bind')).indexOf('authenticationPopup') >= 0)) {
+            if (p.id === 'authenticationPopup') {
                 var pst = window.getComputedStyle(p);
                 if (pst.display === 'none' || p.style.display === 'none') return false;
             }
@@ -134,6 +132,43 @@ true;
         }
         return true;
     }
+    function sklepikCzyZalogowanySklep() {
+        var href = (location.href || '').toLowerCase();
+        var bodyCls = (document.body && document.body.className) || '';
+        if (href.indexOf('/access') >= 0 || bodyCls.indexOf('cms-access') >= 0) {
+            // Strona bramki — zalogowany tylko gdy NIE ma widocznego formularza dostępu
+            if (sklepikWidoczny(document.getElementById('access_email'))) return false;
+            if (sklepikWidoczny(document.getElementById('access_token'))) return false;
+            if (sklepikWidoczny(document.querySelector('input[name="access_token"]'))) return false;
+        }
+        var logout = document.querySelector('a[href*="customer/account/logout"], a[href*="/logout"]');
+        if (sklepikWidoczny(logout)) return true;
+        var welcome = document.querySelector('.customer-welcome, .header.links li.welcome, .logged-in, .customer-name');
+        if (sklepikWidoczny(welcome)) return true;
+        // Katalog / koszyk / produkty = jesteśmy w sklepie po bramce
+        if (document.querySelector('.product-item, .products-grid, .category-products, .page-products, .minicart-wrapper, .block-search, .navigation')) {
+            if (!sklepikWidoczny(document.getElementById('access_email')) &&
+                !sklepikWidoczny(document.getElementById('access_token'))) {
+                return true;
+            }
+        }
+        // Root sklepu bez formularza access
+        if (href.indexOf('/access') < 0 && href.indexOf('login') < 0 &&
+            !sklepikWidoczny(document.getElementById('access_email')) &&
+            !sklepikWidoczny(document.querySelector('#access_email_form'))) {
+            // Nie mylić z pustą/404
+            if (bodyCls.indexOf('cms-no-route') < 0 && bodyCls.indexOf('noroute') < 0) {
+                if (document.querySelector('.page-wrapper, .page-header, #maincontent')) return true;
+            }
+        }
+        return false;
+    }
+"""
+
+    /** Wykrycie etapu formularza — tylko WIDOCZNE pola (ukryty #pass w popupie Magento nie liczy się). */
+    val WYKRYJ = """
+(function() {
+$JS_HELPERY
     try {
         if (document.querySelector('.amgdprcookie-modal-container._show') ||
             (document.querySelector('button.amgdprcookie-button.-allow') && document.querySelector('.modals-overlay, .amgdprcookie-modal-container._show'))) {
@@ -141,31 +176,31 @@ true;
             return;
         }
         var meet = document.getElementById('m-cookienotice');
-        if (meet && widoczny(meet) && document.querySelector('a.m-button.m-accept')) {
+        if (meet && sklepikWidoczny(meet) && document.querySelector('a.m-button.m-accept')) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'COOKIE_BANNER' });
+            return;
+        }
+        // Najpierw: już w sklepie / sesja aktywna
+        if (sklepikCzyZalogowanySklep()) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="access_token"]') ||
             document.querySelector('input[name="token"]');
-        if (widoczny(tokenField)) {
+        if (sklepikWidoczny(tokenField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'SMS_TOKEN_FIELD' });
             return;
         }
         var emailField = document.getElementById('access_email');
-        if (widoczny(emailField)) {
+        if (sklepikWidoczny(emailField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'EMAIL_FIELD' });
             return;
         }
         var passwordField = document.getElementById('pass') ||
             document.querySelector('input[name="login[password]"]');
-        if (widoczny(passwordField)) {
+        if (sklepikWidoczny(passwordField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
-            return;
-        }
-        var logoutLink = document.querySelector('a[href*="logout"], a[href*="customer/account/logout"]');
-        if (logoutLink && widoczny(logoutLink)) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
         if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'NO_RECOGNIZED_ELEMENTS' });
@@ -174,44 +209,38 @@ true;
     }
 })();
 true;
-"""
+""".trimIndent()
 
-    const val SESJA = """
+    val SESJA = """
 (function() {
-    function widoczny(el) {
-        if (!el) return false;
-        var st = window.getComputedStyle(el);
-        if (st.display === 'none' || st.visibility === 'hidden') return false;
-        var r = el.getBoundingClientRect();
-        return r.width > 2 && r.height > 2;
-    }
+$JS_HELPERY
     try {
-        // 404 Magento
         var bodyCls = (document.body && document.body.className) || '';
         if (bodyCls.indexOf('cms-no-route') >= 0 || bodyCls.indexOf('noroute') >= 0) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NOT_FOUND' });
             return;
         }
-        var logoutLink = document.querySelector('a[href*="customer/account/logout"]');
-        var welcome = document.querySelector('.customer-welcome, .header.links li.welcome, .logged-in');
-        var emailField = document.querySelector('#access_email');
-        var passField = document.querySelector('#pass');
-        // Tylko widoczny logout / welcome = naprawdę zalogowany (nie ukryty link w DOM)
-        if ((logoutLink && widoczny(logoutLink)) || (welcome && widoczny(welcome))) {
+        if (sklepikCzyZalogowanySklep()) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'LOGGED_IN' });
-        } else if (widoczny(passField)) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
-        } else if (widoczny(emailField) || location.href.indexOf('access') >= 0) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NEEDS_LOGIN' });
-        } else {
-            if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'UNKNOWN' });
+            return;
         }
+        if (sklepikWidoczny(document.querySelector('#pass'))) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
+            return;
+        }
+        if (sklepikWidoczny(document.getElementById('access_email')) ||
+            sklepikWidoczny(document.getElementById('access_token')) ||
+            (location.href || '').toLowerCase().indexOf('access') >= 0) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NEEDS_LOGIN' });
+            return;
+        }
+        if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'UNKNOWN' });
     } catch (e) {
         if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'UNKNOWN' });
     }
 })();
 true;
-"""
+""".trimIndent()
 
     fun skryptPrzekieruj(url: String): String {
         val bezpieczny = url.replace("\\", "\\\\").replace("\"", "\\\"")

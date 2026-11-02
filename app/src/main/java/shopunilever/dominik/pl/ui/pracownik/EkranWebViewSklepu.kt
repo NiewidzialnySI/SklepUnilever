@@ -190,35 +190,38 @@ private class StanLogowaniaSklepu(
         }
     }
 
-    /** Po załadowaniu strony — najpierw ciasteczka / „Przejdź do sklepu”, potem DOM. */
+    /** Po załadowaniu: cookies, potem szybkie sprawdzenie sesji (już zalogowany?). */
     fun poZaladowaniuStrony(url: String?) {
         wstrzyknij(SkryptySklepu.MOSTEK)
         wstrzyknij(SkryptySklepu.CIASTECZKA)
 
-        if (zalogowany.get()) return
+        if (zalogowany.get()) {
+            ukryjNakladke = true
+            etap = EtapLogowania.GOTOWE
+            return
+        }
 
         val u = url?.lowercase().orEmpty()
-        // Amasty modal ładuje się z opóźnieniem — kilka prób + potem wykrycie formularza
-        listOf(600L, 1600L, 3200L).forEach { opoznienie ->
+        val toBramka = u.contains("access") || u.contains("login")
+        status = if (toBramka) "Sprawdzam bramkę logowania…" else "Sprawdzam, czy jesteś już zalogowany…"
+
+        // Szybkie sprawdzenie sesji (nie czekaj 4 s na nakładce)
+        webView?.postDelayed({
+            if (zalogowany.get()) return@postDelayed
+            wstrzyknij(SkryptySklepu.CIASTECZKA)
+            wstrzyknij(SkryptySklepu.SESJA)
+            wstrzyknij(SkryptySklepu.WYKRYJ)
+        }, 500)
+
+        // Amasty / Knockout — powtórka cookies + sesja
+        listOf(1200L, 2500L).forEach { opoznienie ->
             webView?.postDelayed({
                 if (zalogowany.get()) return@postDelayed
                 wstrzyknij(SkryptySklepu.CIASTECZKA)
+                wstrzyknij(SkryptySklepu.SESJA)
+                wstrzyknij(SkryptySklepu.WYKRYJ)
             }, opoznienie)
         }
-        webView?.postDelayed({
-            if (zalogowany.get()) return@postDelayed
-            if (u.startsWith(StaleSklepu.URL_SKLEPU.lowercase()) &&
-                !u.contains("access") &&
-                !u.contains("login") &&
-                !u.contains("customer/account/login")
-            ) {
-                etap = EtapLogowania.LADOWANIE
-                status = "Sprawdzanie sesji…"
-                wstrzyknij(SkryptySklepu.SESJA)
-            } else {
-                wstrzyknij(SkryptySklepu.WYKRYJ)
-            }
-        }, 3800)
     }
 
     fun obsluzWiadomosc(json: String) {
@@ -256,9 +259,18 @@ private class StanLogowaniaSklepu(
                         // Powrót sesji / po SMS: od razu hasło → checkbox → captcha → Zaloguj
                         wstrzyknijHaslo()
                     }
-                    "ALREADY_LOGGED_IN" -> poZalogowaniu()
+                    "ALREADY_LOGGED_IN" -> {
+                        status = "Jesteś już zalogowany…"
+                        poZalogowaniu()
+                    }
                     "NO_RECOGNIZED_ELEMENTS" -> {
-                        if (etap == EtapLogowania.LADOWANIE) {
+                        val naSklepie = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
+                            !aktualnyUrl.contains("access", ignoreCase = true) &&
+                            !aktualnyUrl.contains("login", ignoreCase = true)
+                        if (naSklepie) {
+                            status = "Sesja aktywna — otwieram sklep…"
+                            poZalogowaniu()
+                        } else {
                             status = "Nie rozpoznano formularza — sprawdzam sesję…"
                             wstrzyknij(SkryptySklepu.SESJA)
                         }
@@ -266,18 +278,27 @@ private class StanLogowaniaSklepu(
                 }
 
                 "SESJA" -> when (obj.optString("wynik")) {
-                    "LOGGED_IN" -> poZalogowaniu()
+                    "LOGGED_IN" -> {
+                        status = "Jesteś już zalogowany…"
+                        poZalogowaniu()
+                    }
                     "NOT_FOUND" -> {
                         status = "Strona nie istnieje — wracam na główną sklepu…"
                         webView?.loadUrl(StaleSklepu.URL_GLOWNA)
                     }
                     "NEEDS_LOGIN" -> {
                         if (!aktualnyUrl.contains("access", ignoreCase = true)) {
-                            status = "Przekierowanie do logowania…"
+                            status = "Brak sesji — przechodzę do logowania…"
                             wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
                         } else {
                             wstrzyknij(SkryptySklepu.WYKRYJ)
                         }
+                    }
+                    "UNKNOWN" -> {
+                        // Na katalogu bez jasnych znaczników — traktuj jako zalogowany
+                        val naSklepie = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
+                            !aktualnyUrl.contains("access", ignoreCase = true)
+                        if (naSklepie) poZalogowaniu() else wstrzyknij(SkryptySklepu.WYKRYJ)
                     }
                     else -> wstrzyknij(SkryptySklepu.WYKRYJ)
                 }
@@ -478,7 +499,8 @@ fun EkranWebViewSklepu(
                             }
                         }
                         stan.webView = this
-                        loadUrl(StaleSklepu.URL_LOGOWANIA)
+                        // Najpierw strona główna — jeśli sesja żyje, nakładka znika od razu
+                        loadUrl(StaleSklepu.URL_GLOWNA)
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
