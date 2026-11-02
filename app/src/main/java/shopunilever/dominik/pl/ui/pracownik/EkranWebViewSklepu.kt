@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import android.webkit.WebResourceRequest
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,9 +100,34 @@ private class StanLogowaniaSklepu(
     var oczekujeSms by mutableStateOf(false)
     var kodSms by mutableStateOf("")
     var ukryjNakladke by mutableStateOf(false)
+    var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
 
     fun wstrzyknij(skrypt: String) {
         webView?.evaluateJavascript(skrypt, null)
+    }
+
+    fun odswiez() {
+        webView?.reload()
+    }
+
+    /** Wstecz w obrębie sklepu — nigdy nie zamyka ekranu. */
+    fun obsluzWstecz() {
+        val wv = webView ?: return
+        if (wv.canGoBack()) {
+            wv.goBack()
+            // Po cofnięciu poza domenę sklepu wracamy na market
+            wv.postDelayed({
+                val url = wv.url
+                if (!StaleSklepu.czyUrlSklepu(url)) {
+                    wv.loadUrl(StaleSklepu.URL_MARKET)
+                }
+            }, 350)
+            return
+        }
+        if (!StaleSklepu.czyGlownaSklepu(aktualnyUrl)) {
+            wv.loadUrl(StaleSklepu.URL_MARKET)
+        }
+        // Już na głównej sklepu — zostajemy (bez wyjścia z aplikacji)
     }
 
     fun poZalogowaniu() {
@@ -290,143 +318,191 @@ fun EkranWebViewSklepu(
     }
 
     BackHandler {
-        val wv = stan.webView
-        if (wv != null && wv.canGoBack()) {
-            wv.goBack()
-        } else {
-            onZamknij()
-        }
+        stan.obsluzWstecz()
     }
 
-    Box(modifier = modifier.fillMaxSize().background(TloAmoled)) {
-        AndroidView(
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    webChromeClient = WebChromeClient()
-                    addJavascriptInterface(
-                        object {
-                            @JavascriptInterface
-                            fun onWiadomosc(dane: String) {
-                                post { stan.obsluzWiadomosc(dane) }
-                            }
-                        },
-                        "AndroidBridge"
-                    )
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            if (!stan.zalogowany.get() &&
-                                stan.etap != EtapLogowania.SMS &&
-                                stan.etap != EtapLogowania.HASLO
-                            ) {
-                                stan.etap = EtapLogowania.LADOWANIE
-                                stan.status = "Ładowanie…"
-                            }
-                            view?.evaluateJavascript(SkryptySklepu.MOSTEK, null)
-                        }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            stan.poZaladowaniuStrony(url)
-                        }
-                    }
-                    stan.webView = this
-                    // Start od strony logowania — WYKRYJ zdecyduje: email vs hasło (sesja)
-                    loadUrl(StaleSklepu.URL_LOGOWANIA)
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-            update = { stan.webView = it }
-        )
-
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(TloAmoled)
+    ) {
+        // Pasek pod status/wycięciem — spycha WebView w dół
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(TloWarstwa)
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.End
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onZamknij) {
-                Icon(Icons.Rounded.Close, contentDescription = "Zamknij", tint = TekstGlowny)
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Wyjdź ze sklepu",
+                    tint = TekstGlowny
+                )
+            }
+            IconButton(onClick = { stan.obsluzWstecz() }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Wstecz",
+                    tint = TekstDrugi
+                )
+            }
+            Text(
+                text = "Sklep firmowy",
+                color = TekstGlowny,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+                maxLines = 1
+            )
+            IconButton(onClick = { stan.odswiez() }) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = "Odśwież",
+                    tint = AkcentNeon
+                )
             }
         }
 
-        if (!stan.ukryjNakladke && stan.etap != EtapLogowania.GOTOWE) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(28.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(TloWarstwa)
-                        .padding(22.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (stan.etap != EtapLogowania.BLAD) {
-                        CircularProgressIndicator(color = AkcentNeon)
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    Text(
-                        text = "Auto-logowanie",
-                        color = TekstGlowny,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(text = stan.status, color = TekstDrugi, fontSize = 13.sp)
-                    stan.blad?.let {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = it, color = Color(0xFFF87171), fontSize = 12.sp)
-                    }
-
-                    if (stan.oczekujeSms) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Kod z SMS wpisze się automatycznie. Pole poniżej tylko awaryjnie:",
-                            color = TekstDrugi,
-                            fontSize = 12.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = stan.kodSms,
-                            onValueChange = { nowy ->
-                                stan.kodSms = nowy.filter { c -> c.isDigit() }.take(8)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Kod SMS") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AkcentNeon,
-                                unfocusedBorderColor = TekstDrugi.copy(alpha = 0.35f),
-                                focusedTextColor = TekstGlowny,
-                                unfocusedTextColor = TekstGlowny,
-                                cursorColor = AkcentNeon,
-                                focusedLabelColor = AkcentNeon,
-                                unfocusedLabelColor = TekstDrugi
-                            ),
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        TextButton(
-                            onClick = {
-                                if (stan.kodSms.length >= 4) {
-                                    stan.smsWstrzykniety.set(false)
-                                    stan.naKodSms(stan.kodSms)
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        webChromeClient = WebChromeClient()
+                        addJavascriptInterface(
+                            object {
+                                @JavascriptInterface
+                                fun onWiadomosc(dane: String) {
+                                    post { stan.obsluzWiadomosc(dane) }
                                 }
+                            },
+                            "AndroidBridge"
+                        )
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val url = request?.url?.toString().orEmpty()
+                                if (url.isBlank()) return false
+                                // Zostajemy w sklepie — obce domeny blokujemy / wracamy na market
+                                if (!StaleSklepu.czyUrlSklepu(url)) {
+                                    view?.loadUrl(StaleSklepu.URL_MARKET)
+                                    return true
+                                }
+                                return false
                             }
-                        ) {
-                            Text("Wyślij kod", color = AkcentNeon, fontWeight = FontWeight.Bold)
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TextButton(onClick = { stan.ukryjNakladke = true }) {
-                        Text("Pokaż stronę", color = TekstDrugi)
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                if (!url.isNullOrBlank()) stan.aktualnyUrl = url
+                                if (!stan.zalogowany.get() &&
+                                    stan.etap != EtapLogowania.SMS &&
+                                    stan.etap != EtapLogowania.HASLO
+                                ) {
+                                    stan.etap = EtapLogowania.LADOWANIE
+                                    stan.status = "Ładowanie…"
+                                }
+                                view?.evaluateJavascript(SkryptySklepu.MOSTEK, null)
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                if (!url.isNullOrBlank()) stan.aktualnyUrl = url
+                                if (!StaleSklepu.czyUrlSklepu(url) && stan.zalogowany.get()) {
+                                    view?.loadUrl(StaleSklepu.URL_MARKET)
+                                    return
+                                }
+                                stan.poZaladowaniuStrony(url)
+                            }
+                        }
+                        stan.webView = this
+                        loadUrl(StaleSklepu.URL_LOGOWANIA)
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+                update = { stan.webView = it }
+            )
+
+            if (!stan.ukryjNakladke && stan.etap != EtapLogowania.GOTOWE) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(TloWarstwa)
+                            .padding(22.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (stan.etap != EtapLogowania.BLAD) {
+                            CircularProgressIndicator(color = AkcentNeon)
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                        Text(
+                            text = "Auto-logowanie",
+                            color = TekstGlowny,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = stan.status, color = TekstDrugi, fontSize = 13.sp)
+                        stan.blad?.let {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = it, color = Color(0xFFF87171), fontSize = 12.sp)
+                        }
+
+                        if (stan.oczekujeSms) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Kod z SMS wpisze się automatycznie. Pole poniżej tylko awaryjnie:",
+                                color = TekstDrugi,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = stan.kodSms,
+                                onValueChange = { nowy ->
+                                    stan.kodSms = nowy.filter { c -> c.isDigit() }.take(8)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Kod SMS") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AkcentNeon,
+                                    unfocusedBorderColor = TekstDrugi.copy(alpha = 0.35f),
+                                    focusedTextColor = TekstGlowny,
+                                    unfocusedTextColor = TekstGlowny,
+                                    cursorColor = AkcentNeon,
+                                    focusedLabelColor = AkcentNeon,
+                                    unfocusedLabelColor = TekstDrugi
+                                ),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            TextButton(
+                                onClick = {
+                                    if (stan.kodSms.length >= 4) {
+                                        stan.smsWstrzykniety.set(false)
+                                        stan.naKodSms(stan.kodSms)
+                                    }
+                                }
+                            ) {
+                                Text("Wyślij kod", color = AkcentNeon, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = { stan.ukryjNakladke = true }) {
+                            Text("Pokaż stronę", color = TekstDrugi)
+                        }
                     }
                 }
             }
