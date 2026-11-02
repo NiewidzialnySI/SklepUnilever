@@ -34,6 +34,12 @@
             ".write": "auth != null && (auth.uid == $uid || auth.uid == $reqId)"
           }
         },
+        "loginRequests": {
+          "$reqId": {
+            ".read": "auth != null && (auth.uid == $uid || auth.uid == $reqId)",
+            ".write": "auth != null && (auth.uid == $uid || auth.uid == $reqId)"
+          }
+        },
         "receivers": {
           "$receiverId": {
             ".read": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)",

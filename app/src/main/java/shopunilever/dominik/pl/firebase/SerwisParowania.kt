@@ -23,13 +23,28 @@ data class ProsbaDostepu(
 data class OdbiorcaPolaczony(
     val id: String,
     val nazwa: String,
-    val zablokowany: Boolean
+    val zablokowany: Boolean,
+    val autoLogowanie: Boolean = true
+)
+
+data class ProsbaLogowania(
+    val id: String,
+    val nazwaUrzadzenia: String,
+    val createdAt: Long,
+    val status: String
 )
 
 data class DaneLogowaniaZdalne(
     val email: String,
     val haslo: String
 )
+
+/** Wynik próby wejścia do sklepu z profilu rodziny. */
+sealed class WynikWejsciaSklepu {
+    data object MoznaWejsc : WynikWejsciaSklepu()
+    data object CzekaNaAkceptacje : WynikWejsciaSklepu()
+    data class Blad(val komunikat: String) : WynikWejsciaSklepu()
+}
 
 /**
  * Nadajnik (pracownik) + odbiorca (rodzina): kod, credentials, SMS relay.
@@ -199,7 +214,8 @@ object SerwisParowania {
             mapOf(
                 "deviceName" to nazwa,
                 "approvedAt" to System.currentTimeMillis(),
-                "blocked" to false
+                "blocked" to false,
+                "autoLogowanie" to true
             )
         ).await()
         // Upewnij się, że rodzina ma świeże dane logowania
@@ -221,6 +237,31 @@ object SerwisParowania {
             ).await()
     }
 
+    suspend fun zmienNazweOdbiorcy(context: Context, odbiorcaId: String, nazwa: String) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        val czysta = nazwa.trim().ifBlank { "Urządzenie" }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("receivers")
+            .child(odbiorcaId)
+            .child("deviceName")
+            .setValue(czysta)
+            .await()
+    }
+
+    suspend fun ustawAutoLogowanie(context: Context, odbiorcaId: String, wlacz: Boolean) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("receivers")
+            .child(odbiorcaId)
+            .child("autoLogowanie")
+            .setValue(wlacz)
+            .await()
+    }
+
     suspend fun usunOdbiorce(context: Context, odbiorcaId: String) {
         val uid = PreferencjeParowania.uid(context).ifBlank { return }
         val ref = FirebaseSklepik.baza(context).reference
@@ -228,6 +269,93 @@ object SerwisParowania {
             .child(uid)
         ref.child("receivers").child(odbiorcaId).removeValue().await()
         ref.child("accessRequests").child(odbiorcaId).removeValue().await()
+        ref.child("loginRequests").child(odbiorcaId).removeValue().await()
+    }
+
+    /**
+     * Rodzina chce wejść do sklepu.
+     * autoLogowanie=true → od razu; false → prośba do pracownika.
+     */
+    suspend fun przygotujWejscieDoSklepu(context: Context): WynikWejsciaSklepu {
+        val tx = PreferencjeOdbiorcy.uidNadajnika(context).ifBlank {
+            return WynikWejsciaSklepu.Blad("Brak połączenia z pracownikiem")
+        }
+        val uid = PreferencjeOdbiorcy.uid(context).ifBlank {
+            return WynikWejsciaSklepu.Blad("Brak identyfikatora urządzenia")
+        }
+        val refOdb = FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(tx)
+            .child("receivers")
+            .child(uid)
+        val snap = runCatching { refOdb.get().await() }.getOrNull()
+            ?: return WynikWejsciaSklepu.Blad("Brak dostępu — zeskanuj nowy kod")
+        if (!snap.exists() || snap.child("blocked").getValue(Boolean::class.java) == true) {
+            return WynikWejsciaSklepu.Blad("Urządzenie odłączone — zeskanuj nowy kod")
+        }
+        val auto = snap.child("autoLogowanie").getValue(Boolean::class.java) ?: true
+        if (auto) return WynikWejsciaSklepu.MoznaWejsc
+
+        val nazwa = PreferencjeOdbiorcy.nazwaUrzadzenia(context).ifBlank {
+            snap.child("deviceName").getValue(String::class.java) ?: "Urządzenie rodziny"
+        }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(tx)
+            .child("loginRequests")
+            .child(uid)
+            .setValue(
+                mapOf(
+                    "deviceName" to nazwa,
+                    "status" to "pending",
+                    "createdAt" to System.currentTimeMillis()
+                )
+            ).await()
+        return WynikWejsciaSklepu.CzekaNaAkceptacje
+    }
+
+    suspend fun zatwierdzLogowanie(context: Context, odbiorcaId: String) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("loginRequests")
+            .child(odbiorcaId)
+            .updateChildren(
+                mapOf(
+                    "status" to "approved",
+                    "approvedAt" to System.currentTimeMillis()
+                )
+            ).await()
+        runCatching { publikujDaneLogowania(context) }
+    }
+
+    suspend fun odrzucLogowanie(context: Context, odbiorcaId: String) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("loginRequests")
+            .child(odbiorcaId)
+            .updateChildren(
+                mapOf(
+                    "status" to "rejected",
+                    "rejectedAt" to System.currentTimeMillis()
+                )
+            ).await()
+    }
+
+    /** Po wejściu do sklepu — jednorazowa zgoda zużyta. */
+    suspend fun zuzyjZgodeLogowania(context: Context) {
+        val tx = PreferencjeOdbiorcy.uidNadajnika(context).ifBlank { return }
+        val uid = PreferencjeOdbiorcy.uid(context).ifBlank { return }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(tx)
+            .child("loginRequests")
+            .child(uid)
+            .removeValue()
+            .await()
     }
 
     fun obserwujProsby(context: Context): Flow<List<ProsbaDostepu>> = callbackFlow {
@@ -284,7 +412,8 @@ object SerwisParowania {
                         nazwa = dziecko.child("deviceName").getValue(String::class.java)
                             ?: dziecko.child("name").getValue(String::class.java)
                             ?: "Urządzenie",
-                        zablokowany = dziecko.child("blocked").getValue(Boolean::class.java) == true
+                        zablokowany = dziecko.child("blocked").getValue(Boolean::class.java) == true,
+                        autoLogowanie = dziecko.child("autoLogowanie").getValue(Boolean::class.java) ?: true
                     )
                 }
                 trySend(lista)
@@ -292,6 +421,68 @@ object SerwisParowania {
 
             override fun onCancelled(error: DatabaseError) {
                 trySend(emptyList())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    fun obserwujProsbyLogowania(context: Context): Flow<List<ProsbaLogowania>> = callbackFlow {
+        val uid = PreferencjeParowania.uid(context)
+        if (uid.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val ref = FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("loginRequests")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val lista = snapshot.children.mapNotNull { dziecko ->
+                    val id = dziecko.key ?: return@mapNotNull null
+                    ProsbaLogowania(
+                        id = id,
+                        nazwaUrzadzenia = dziecko.child("deviceName").getValue(String::class.java)
+                            ?: "Urządzenie",
+                        createdAt = dziecko.child("createdAt").getValue(Long::class.java) ?: 0L,
+                        status = dziecko.child("status").getValue(String::class.java) ?: "pending"
+                    )
+                }.sortedByDescending { it.createdAt }
+                trySend(lista)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    /** Status prośby o logowanie (rodzina, gdy autoLogowanie=false). */
+    fun obserwujStatusLogowania(context: Context): Flow<String> = callbackFlow {
+        val tx = PreferencjeOdbiorcy.uidNadajnika(context)
+        val uid = PreferencjeOdbiorcy.uid(context)
+        if (tx.isBlank() || uid.isBlank()) {
+            trySend("brak")
+            close()
+            return@callbackFlow
+        }
+        val ref = FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(tx)
+            .child("loginRequests")
+            .child(uid)
+            .child("status")
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                trySend(snapshot.getValue(String::class.java) ?: "brak")
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend("brak")
             }
         }
         ref.addValueEventListener(listener)

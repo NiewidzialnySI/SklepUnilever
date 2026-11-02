@@ -25,9 +25,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.PowiadomieniaParowania
 import shopunilever.dominik.pl.firebase.ProsbaDostepu
+import shopunilever.dominik.pl.firebase.ProsbaLogowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.ui.IntentyNawigacji
 import shopunilever.dominik.pl.ui.components.TloAplikacji
@@ -50,7 +52,7 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
         }
     }
 
-    // Globalny nasłuch próśb — poza zakładką Urządzenia i w sklepie.
+    // Globalny nasłuch: parowanie + prośby o logowanie.
     LaunchedEffect(restartNasluchu) {
         val kod = PreferencjeParowania.kod(kontekst)
         if (kod.isBlank()) {
@@ -58,25 +60,56 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
             return@LaunchedEffect
         }
         runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
-        SerwisParowania.obserwujProsby(kontekst).collectLatest { lista: List<ProsbaDostepu> ->
-            val pending = lista.filter { it.status == "pending" }
-            prosbyOczekujace = pending.size
-            var nowaProsba = false
-            pending.forEach { p ->
-                if (juzPowiadomione.add(p.id)) {
-                    nowaProsba = true
-                    PowiadomieniaParowania.pokazanowaProsbe(
-                        kontekst,
-                        p.nazwaUrzadzenia,
-                        p.id
-                    )
+        var pendingParowanie = 0
+        var pendingLogin = 0
+        fun odswiezBadge() {
+            prosbyOczekujace = pendingParowanie + pendingLogin
+        }
+        launch {
+            SerwisParowania.obserwujProsby(kontekst).collectLatest { lista: List<ProsbaDostepu> ->
+                val pending = lista.filter { it.status == "pending" }
+                pendingParowanie = pending.size
+                odswiezBadge()
+                var nowa = false
+                pending.forEach { p ->
+                    if (juzPowiadomione.add("pair:${p.id}")) {
+                        nowa = true
+                        PowiadomieniaParowania.pokazanowaProsbe(kontekst, p.nazwaUrzadzenia, p.id)
+                    }
+                }
+                if (nowa) {
+                    pokazSklep = false
+                    zakladka = ZakladkaPracownika.URZADZENIA
+                }
+                juzPowiadomione.removeAll { klucz ->
+                    klucz.startsWith("pair:") && pending.none { "pair:${it.id}" == klucz }
                 }
             }
-            if (nowaProsba) {
-                pokazSklep = false
-                zakladka = ZakladkaPracownika.URZADZENIA
+        }
+        launch {
+            SerwisParowania.obserwujProsbyLogowania(kontekst).collectLatest { lista: List<ProsbaLogowania> ->
+                val pending = lista.filter { it.status == "pending" }
+                pendingLogin = pending.size
+                odswiezBadge()
+                var nowa = false
+                pending.forEach { p ->
+                    if (juzPowiadomione.add("login:${p.id}")) {
+                        nowa = true
+                        PowiadomieniaParowania.pokazanowaProsbe(
+                            kontekst,
+                            "${p.nazwaUrzadzenia} chce się zalogować",
+                            "login-${p.id}"
+                        )
+                    }
+                }
+                if (nowa) {
+                    pokazSklep = false
+                    zakladka = ZakladkaPracownika.URZADZENIA
+                }
+                juzPowiadomione.removeAll { klucz ->
+                    klucz.startsWith("login:") && pending.none { "login:${it.id}" == klucz }
+                }
             }
-            juzPowiadomione.retainAll(pending.map { it.id }.toSet())
         }
     }
 

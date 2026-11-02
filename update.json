@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.0.4",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.4/sklep-unilever-v1.0.4.apk",
-  "changelog": "Rodzina: bez Odłącz, natychmiastowa utrata dostępu po odłączeniu przez pracownika, kafelek Paczki."
+  "versionCode": 6,
+  "versionName": "1.0.5",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.5/sklep-unilever-v1.0.5.apk",
+  "changelog": "Nazwa urządzeń, przełącznik auto-logowania, potwierdzenie odłączenia, prośby o logowanie."
 }

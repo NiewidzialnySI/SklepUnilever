@@ -57,6 +57,7 @@ import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeOdbiorcy
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.firebase.StaleFirebase
+import shopunilever.dominik.pl.firebase.WynikWejsciaSklepu
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.components.TloAplikacji
 import shopunilever.dominik.pl.ui.pracownik.EkranWebViewSklepu
@@ -79,15 +80,29 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
     var blad by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
     var pokazSklep by remember { mutableStateOf(false) }
+    var czekaNaLogowanie by remember { mutableStateOf(false) }
 
     fun poOdlaczeniuPrzezPracownika(komunikat: String) {
         PreferencjeOdbiorcy.wyczysc(kontekst)
         PreferencjeKonta.wyczysc(kontekst)
         pokazSklep = false
+        czekaNaLogowanie = false
         status = ""
         kodWpisywany = ""
         info = null
         blad = komunikat
+    }
+
+    suspend fun otworzSklepPoZgodzie() {
+        val dane = SerwisParowania.pobierzDaneLogowania(kontekst)
+        if (dane == null || dane.email.isBlank() || dane.haslo.isBlank()) {
+            blad = "Brak danych logowania — pracownik musi zapisać email i hasło w Ustawieniach."
+            return
+        }
+        PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
+        runCatching { SerwisParowania.zuzyjZgodeLogowania(kontekst) }
+        czekaNaLogowanie = false
+        pokazSklep = true
     }
 
     LaunchedEffect(PreferencjeOdbiorcy.uidNadajnika(kontekst)) {
@@ -119,6 +134,28 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                     if (st == "brak") {
                         status = PreferencjeOdbiorcy.status(kontekst).ifBlank { "" }
                     }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(status, czekaNaLogowanie) {
+        if (status != "approved" || !czekaNaLogowanie) return@LaunchedEffect
+        SerwisParowania.obserwujStatusLogowania(kontekst).collectLatest { st ->
+            when (st) {
+                "approved" -> {
+                    info = "Pracownik zezwolił — otwieram sklep…"
+                    blad = null
+                    runCatching { otworzSklepPoZgodzie() }
+                        .onFailure { blad = it.message }
+                }
+                "rejected" -> {
+                    czekaNaLogowanie = false
+                    blad = "Pracownik odrzucił logowanie."
+                    info = null
+                }
+                "pending" -> {
+                    info = "Czekam na zgodę pracownika na logowanie…"
                 }
             }
         }
@@ -223,20 +260,29 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Brush.horizontalGradient(listOf(AkcentNeon, AkcentMorski)))
-                                .clickable {
+                                .clickable(enabled = !ladowanie && !czekaNaLogowanie) {
                                     zakres.launch {
                                         ladowanie = true
                                         blad = null
+                                        info = null
                                         runCatching {
-                                            val dane = SerwisParowania.pobierzDaneLogowania(kontekst)
-                                            if (dane == null || dane.email.isBlank() || dane.haslo.isBlank()) {
-                                                blad = "Brak danych logowania — pracownik musi zapisać email i hasło w Ustawieniach."
-                                            } else {
-                                                PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
-                                                pokazSklep = true
+                                            when (val wynik = SerwisParowania.przygotujWejscieDoSklepu(kontekst)) {
+                                                is WynikWejsciaSklepu.MoznaWejsc -> otworzSklepPoZgodzie()
+                                                is WynikWejsciaSklepu.CzekaNaAkceptacje -> {
+                                                    czekaNaLogowanie = true
+                                                    info = "Wysłano prośbę o logowanie — czekaj na akceptację pracownika."
+                                                }
+                                                is WynikWejsciaSklepu.Blad -> {
+                                                    if (wynik.komunikat.contains("odłącz", ignoreCase = true) ||
+                                                        wynik.komunikat.contains("kod", ignoreCase = true)
+                                                    ) {
+                                                        poOdlaczeniuPrzezPracownika(wynik.komunikat)
+                                                    } else {
+                                                        blad = wynik.komunikat
+                                                    }
+                                                }
                                             }
                                         }.onFailure {
-                                            // Brak read = zwykle odłączono
                                             val msg = it.message.orEmpty()
                                             if (msg.contains("Permission", ignoreCase = true) ||
                                                 msg.contains("denied", ignoreCase = true)
@@ -255,13 +301,38 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Rounded.Login, null, tint = TekstNaAkcencie)
-                                Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    "Zaloguj do sklepu",
-                                    color = TekstNaAkcencie,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                if (czekaNaLogowanie) {
+                                    CircularProgressIndicator(
+                                        color = TekstNaAkcencie,
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.size(8.dp))
+                                    Text(
+                                        "Czekam na zgodę…",
+                                        color = TekstNaAkcencie,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                } else {
+                                    Icon(Icons.Rounded.Login, null, tint = TekstNaAkcencie)
+                                    Spacer(modifier = Modifier.size(8.dp))
+                                    Text(
+                                        "Zaloguj do sklepu",
+                                        color = TekstNaAkcencie,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        if (czekaNaLogowanie) {
+                            TextButton(onClick = {
+                                czekaNaLogowanie = false
+                                info = null
+                                zakres.launch {
+                                    runCatching { SerwisParowania.zuzyjZgodeLogowania(kontekst) }
+                                }
+                            }) {
+                                Text("Anuluj prośbę", color = TekstDrugi)
                             }
                         }
                     }
