@@ -91,14 +91,26 @@ fun EkranHomePracownika(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(id = R.mipmap.ic_launcher_round),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                // Adaptive mipmap XML nie działa z painterResource — warstwy drawable
+                Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .clip(CircleShape)
-                )
+                        .clip(CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_background),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = if (maDane) "Gotowy do logowania" else "Najpierw podaj dane służbowe",

@@ -1,6 +1,6 @@
 {
-  "versionCode": 12,
-  "versionName": "1.0.11",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.11/sklep-unilever-v1.0.11.apk",
-  "changelog": "Szybsze logowanie (bez pustych pauz captcha). Home: ikona appki. Parowanie: tap QR = kopiuj, reset w rogu. Bez dopisków HOME/URZĄDZENIA/USTAWIENIA."
+  "versionCode": 13,
+  "versionName": "1.0.12",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.12/sklep-unilever-v1.0.12.apk",
+  "changelog": "Hotfix: crash przy starcie (ikona Home). Ikona aplikacji z warstw drawable zamiast adaptive mipmap."
 }
