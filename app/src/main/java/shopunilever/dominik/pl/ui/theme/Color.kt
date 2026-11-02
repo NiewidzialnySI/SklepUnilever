@@ -2,20 +2,30 @@ package shopunilever.dominik.pl.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/** AMOLED tło — jak dialer / sklepik Harmonogram. */
-val TloAmoled = Color(0xFF05070F)
-val TloWarstwa = Color(0xFF0B1224)
-val TloKarty = Color(0x14FFFFFF)
-val RamkaKarty = Color(0x33FFFFFF)
+/**
+ * Paleta marki Sklep Unilever:
+ * #1F51FF · #1F8AFF · #1660B3 · #C7E2FF · #8FC4FF
+ */
+val NiebieskiGlowny = Color(0xFF1F51FF)
+val NiebieskiJasny = Color(0xFF1F8AFF)
+val NiebieskiGleboki = Color(0xFF1660B3)
+val NiebieskiPastel = Color(0xFFC7E2FF)
+val NiebieskiMiet = Color(0xFF8FC4FF)
 
-/** Akcent Unilever / sklep firmowy. */
-val AkcentNeon = Color(0xFF38BDF8)
-val AkcentMorski = Color(0xFF0EA5E9)
-val AkcentFiolet = Color(0xFF818CF8)
+/** Tło ciemne, podszyte głębokim niebieskim. */
+val TloAmoled = Color(0xFF07101F)
+val TloWarstwa = Color(0xFF0C1A33)
+val TloKarty = Color(0x1A8FC4FF)
+val RamkaKarty = Color(0x338FC4FF)
 
-val TekstGlowny = Color(0xFFF8FAFC)
-val TekstDrugi = Color(0xFF94A3B8)
-val TekstNaAkcencie = Color(0xFF04101A)
+/** Alias akcentów używanych w UI. */
+val AkcentNeon = NiebieskiGlowny
+val AkcentMorski = NiebieskiJasny
+val AkcentFiolet = NiebieskiGleboki
+
+val TekstGlowny = NiebieskiPastel
+val TekstDrugi = NiebieskiMiet
+val TekstNaAkcencie = Color(0xFFFFFFFF)
 
 val Sukces = Color(0xFF34D399)
 val Ostrzezenie = Color(0xFFFBBF24)
