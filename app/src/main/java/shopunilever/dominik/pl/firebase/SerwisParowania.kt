@@ -216,21 +216,22 @@ object SerwisParowania {
         val ref = FirebaseSklepik.baza(context).reference
             .child(StaleFirebase.Sciezki.TRANSMITTERS)
             .child(uid)
-        ref.child("accessRequests").child(prosbaId).updateChildren(
-            mapOf(
-                "status" to "approved",
-                "approvedAt" to System.currentTimeMillis()
-            )
-        ).await()
-
+        // Najpierw receivers, potem status — inaczej rodzina widzi approved bez receivers → fałszywy „revoked”
         val snap = ref.child("accessRequests").child(prosbaId).get().await()
         val nazwa = snap.child("deviceName").getValue(String::class.java) ?: "Urządzenie"
+        val ts = System.currentTimeMillis()
         ref.child("receivers").child(prosbaId).setValue(
             mapOf(
                 "deviceName" to nazwa,
-                "approvedAt" to System.currentTimeMillis(),
+                "approvedAt" to ts,
                 "blocked" to false,
                 "autoLogowanie" to true
+            )
+        ).await()
+        ref.child("accessRequests").child(prosbaId).updateChildren(
+            mapOf(
+                "status" to "approved",
+                "approvedAt" to ts
             )
         ).await()
         // Upewnij się, że rodzina ma świeże dane logowania
@@ -622,8 +623,9 @@ object SerwisParowania {
                 istniejeOdbiorca && !zablokowany -> "approved"
                 istniejeOdbiorca && zablokowany -> "revoked"
                 stProsby == "pending" -> "pending"
+                // Race przy akceptacji: status już approved, receivers jeszcze nie — to NIE revoked
+                stProsby == "approved" && !istniejeOdbiorca -> "pending"
                 stProsby == "rejected" -> "rejected"
-                stProsby == "approved" && !istniejeOdbiorca -> "revoked"
                 prosba?.exists() != true -> {
                     // Usunięte przez pracownika — nie mylić z „pending”
                     val lokalny = PreferencjeOdbiorcy.status(context)

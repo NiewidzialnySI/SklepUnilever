@@ -118,7 +118,7 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                         }
                     }
                     blad = null
-                    info = "Połączono — możesz zalogować się do sklepu."
+                    info = null
                 }
                 "pending" -> {
                     status = "pending"
