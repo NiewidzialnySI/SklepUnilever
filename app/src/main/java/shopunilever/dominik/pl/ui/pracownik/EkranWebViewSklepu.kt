@@ -584,7 +584,7 @@ private class StanLogowaniaSklepu(
             val typ = obj.optString("type")
             when (typ) {
                 "DIAG" -> {
-                    Log.i(TAG_LOGIN, "DIAG ${obj.toString(2)}")
+                    if (diagWlaczone) Log.i(TAG_LOGIN, "DIAG ${obj.toString(2)}")
                     return
                 }
                 "EMAIL_WYNIK" -> {
