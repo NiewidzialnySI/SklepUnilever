@@ -118,18 +118,16 @@ fun EkranHomePracownika(
                     fontSize = 17.sp,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (maDane) {
-                        "Auto-logowanie do Sklepiku Fabrycznego"
-                    } else {
-                        "Uzupełnij email i hasło w Ustawieniach albo tutaj przy pierwszym logowaniu."
-                    },
-                    color = TekstDrugi,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp,
-                    textAlign = TextAlign.Center
-                )
+                if (!maDane) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Uzupełnij email i hasło w Ustawieniach albo tutaj przy pierwszym logowaniu.",
+                        color = TekstDrugi,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 Spacer(modifier = Modifier.height(18.dp))
 
                 Box(
@@ -207,13 +205,6 @@ fun EkranHomePracownika(
                 color = TekstDrugi,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Tu pojawią się statusy zamówień i śledzenie przesyłek ze sklepu firmowego.",
-                color = TekstDrugi.copy(alpha = 0.85f),
-                fontSize = 12.sp,
-                lineHeight = 17.sp
             )
         }
     }

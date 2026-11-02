@@ -1,34 +1,50 @@
 package shopunilever.dominik.pl.ui.pracownik
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
 import shopunilever.dominik.pl.ui.theme.RamkaKarty
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
-import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TloKarty
+import kotlin.math.roundToInt
 
+/**
+ * Ikony-only bottom bar ze sliding pill (w stylu AnimatedBottomBar / canopas).
+ */
 @Composable
 fun DolnyPasekPracownika(
     aktywna: ZakladkaPracownika,
@@ -36,6 +52,15 @@ fun DolnyPasekPracownika(
     modifier: Modifier = Modifier
 ) {
     val ksztalt = RoundedCornerShape(22.dp)
+    val zakladki = ZakladkaPracownika.entries
+    val indeksAnim by animateFloatAsState(
+        targetValue = aktywna.ordinal.toFloat(),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "wskaznik_zakladki"
+    )
 
     Box(
         modifier = modifier
@@ -43,9 +68,10 @@ fun DolnyPasekPracownika(
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(58.dp)
                 .clip(ksztalt)
                 .background(TloKarty)
                 .border(
@@ -55,37 +81,76 @@ fun DolnyPasekPracownika(
                     ),
                     shape = ksztalt
                 )
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 6.dp, vertical = 6.dp)
         ) {
-            ZakladkaPracownika.entries.forEach { zakladka ->
-                val zaznaczona = zakladka == aktywna
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (zaznaczona) AkcentNeon.copy(alpha = 0.16f)
-                            else Color.Transparent
+            val szerokoscSlotu = maxWidth / zakladki.size
+            val gestosc = LocalDensity.current
+            val offsetPx = with(gestosc) { (szerokoscSlotu * indeksAnim).toPx() }
+
+            // Płynny wskaźnik pod aktywną ikoną
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(offsetPx.roundToInt(), 0) }
+                    .width(szerokoscSlotu)
+                    .fillMaxHeight()
+                    .padding(horizontal = 4.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                AkcentNeon.copy(alpha = 0.22f),
+                                AkcentNeon.copy(alpha = 0.10f)
+                            )
                         )
-                        .clickable { onZmiana(zakladka) }
-                        .padding(vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = zakladka.ikona,
-                        contentDescription = zakladka.etykieta,
-                        tint = if (zaznaczona) AkcentNeon else TekstDrugi,
-                        modifier = Modifier.size(22.dp)
                     )
-                    Text(
-                        text = zakladka.etykieta,
-                        color = if (zaznaczona) TekstGlowny else TekstDrugi,
-                        fontSize = 11.sp,
-                        fontWeight = if (zaznaczona) FontWeight.Bold else FontWeight.Medium
+            )
+
+            Row(modifier = Modifier.fillMaxSize()) {
+                zakladki.forEach { zakladka ->
+                    val zaznaczona = zakladka == aktywna
+                    val skala by animateFloatAsState(
+                        targetValue = if (zaznaczona) 1.18f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "skala_${zakladka.name}"
                     )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(bounded = true, color = AkcentNeon),
+                                role = Role.Tab,
+                                onClick = { onZmiana(zakladka) }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .graphicsLayer {
+                                    scaleX = skala
+                                    scaleY = skala
+                                }
+                                .clip(CircleShape)
+                                .background(
+                                    if (zaznaczona) AkcentNeon.copy(alpha = 0.12f)
+                                    else Color.Transparent
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = zakladka.ikona,
+                                contentDescription = zakladka.etykieta,
+                                tint = if (zaznaczona) AkcentNeon else TekstDrugi,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

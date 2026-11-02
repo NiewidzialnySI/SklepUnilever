@@ -1,5 +1,12 @@
 package shopunilever.dominik.pl.ui.pracownik
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,12 +34,34 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
     TloAplikacji(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
-                when (zakladka) {
-                    ZakladkaPracownika.DOM -> EkranHomePracownika(
-                        onOtworzSklep = { pokazSklep = true }
-                    )
-                    ZakladkaPracownika.URZADZENIA -> EkranUrzadzen()
-                    ZakladkaPracownika.USTAWIENIA -> EkranUstawien()
+                AnimatedContent(
+                    targetState = zakladka,
+                    transitionSpec = {
+                        val wPrawo = targetState.ordinal > initialState.ordinal
+                        val enterOffset = { szer: Int -> if (wPrawo) szer / 4 else -szer / 4 }
+                        val exitOffset = { szer: Int -> if (wPrawo) -szer / 5 else szer / 5 }
+                        (
+                            slideInHorizontally(
+                                animationSpec = tween(280),
+                                initialOffsetX = enterOffset
+                            ) + fadeIn(tween(220))
+                        ) togetherWith (
+                            slideOutHorizontally(
+                                animationSpec = tween(240),
+                                targetOffsetX = exitOffset
+                            ) + fadeOut(tween(180))
+                        )
+                    },
+                    label = "przelaczenie_zakladek",
+                    modifier = Modifier.fillMaxSize()
+                ) { cel ->
+                    when (cel) {
+                        ZakladkaPracownika.DOM -> EkranHomePracownika(
+                            onOtworzSklep = { pokazSklep = true }
+                        )
+                        ZakladkaPracownika.URZADZENIA -> EkranUrzadzen()
+                        ZakladkaPracownika.USTAWIENIA -> EkranUstawien()
+                    }
                 }
             }
             DolnyPasekPracownika(
