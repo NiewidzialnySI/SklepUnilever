@@ -67,6 +67,7 @@ import shopunilever.dominik.pl.sklep.SkryptySklepu
 import shopunilever.dominik.pl.sklep.StaleSklepu
 import androidx.compose.runtime.LaunchedEffect
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
+import shopunilever.dominik.pl.ui.theme.Ostrzezenie
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TloAmoled
