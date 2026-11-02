@@ -54,14 +54,17 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import shopunilever.dominik.pl.dane.PozycjaKoszyka
+import kotlinx.coroutines.flow.collectLatest
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeKoszykow
+import shopunilever.dominik.pl.dane.PreferencjeOdbiorcy
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.sklep.NasluchSms
 import shopunilever.dominik.pl.sklep.SkryptyKoszyka
 import shopunilever.dominik.pl.sklep.SkryptySklepu
 import shopunilever.dominik.pl.sklep.StaleSklepu
+import androidx.compose.runtime.LaunchedEffect
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
@@ -100,6 +103,7 @@ private class StanLogowaniaSklepu(
     val oczekujeEksportuKoszyka = AtomicBoolean(false)
     private val kolejkaDodawania = ArrayDeque<String>()
     private val dodawanieTrwa = AtomicBoolean(false)
+    private val oczekujeDodaniaDoKoszyka = AtomicBoolean(false)
 
     var etap by mutableStateOf(EtapLogowania.LADOWANIE)
     var status by mutableStateOf("Ładowanie sklepu…")
@@ -164,7 +168,13 @@ private class StanLogowaniaSklepu(
     }
 
     fun dodajZapisaneDoKoszyka(pozycje: List<PozycjaKoszyka>) {
-        val urlki = pozycje.map { it.url.trim() }.filter { it.isNotBlank() }
+        if (dodawanieTrwa.get()) {
+            toast("Dodawanie już trwa…")
+            return
+        }
+        val urlki = pozycje.map { it.url.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
         if (urlki.isEmpty()) {
             toast("Brak linków produktów — nie da się dodać automatycznie")
             return
@@ -178,19 +188,33 @@ private class StanLogowaniaSklepu(
 
     private fun nastepnyProduktZKolejki() {
         val wv = webView ?: return
+        if (!dodawanieTrwa.get()) return
         val url = kolejkaDodawania.pollFirst()
         if (url == null) {
             dodawanieTrwa.set(false)
+            oczekujeDodaniaDoKoszyka.set(false)
             toast("Gotowe — otwieram koszyk")
             wv.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
             return
         }
+        oczekujeDodaniaDoKoszyka.set(true)
         wv.loadUrl(url)
         wv.postDelayed({
+            if (!dodawanieTrwa.get() || !oczekujeDodaniaDoKoszyka.get()) return@postDelayed
             wstrzyknij(SkryptySklepu.MOSTEK)
             wstrzyknij(SkryptyKoszyka.KLIKNIJ_DODAJ_DO_KOSZYKA)
-            wv.postDelayed({ nastepnyProduktZKolejki() }, 1600)
-        }, 1100)
+            // Awaryjne przejście dalej, jeśli JS nie odpowie
+            wv.postDelayed({
+                if (oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) {
+                    nastepnyProduktZKolejki()
+                }
+            }, 2800)
+        }, 1400)
+    }
+
+    fun poDodaniuDoKoszyka() {
+        if (!oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) return
+        webView?.postDelayed({ nastepnyProduktZKolejki() }, 900)
     }
 
     fun poZalogowaniu() {
@@ -326,7 +350,7 @@ private class StanLogowaniaSklepu(
                 }
 
                 "KOSZYK_DODANO" -> {
-                    // Informacyjnie — kolejka i tak idzie dalej po timeoutach
+                    poDodaniuDoKoszyka()
                     return
                 }
 
@@ -464,6 +488,7 @@ private class StanLogowaniaSklepu(
 @Composable
 fun EkranWebViewSklepu(
     onZamknij: () -> Unit,
+    trybOdbiorcy: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val kontekst = LocalContext.current
@@ -475,9 +500,9 @@ fun EkranWebViewSklepu(
         )
     }
 
-    // Auto-odczyt SMS gdy czekamy na token
-    DisposableEffect(stan.oczekujeSms) {
-        if (!stan.oczekujeSms) {
+    // Pracownik: lokalny SMS. Rodzina: kod z Firebase (relay z telefonu pracownika).
+    DisposableEffect(stan.oczekujeSms, trybOdbiorcy) {
+        if (!stan.oczekujeSms || trybOdbiorcy) {
             return@DisposableEffect onDispose { }
         }
         val od = stan.smsOdKiedyMs.get().takeIf { it > 0L } ?: System.currentTimeMillis()
@@ -488,6 +513,16 @@ fun EkranWebViewSklepu(
         )
         nasluch.start()
         onDispose { nasluch.stop() }
+    }
+
+    LaunchedEffect(stan.oczekujeSms, trybOdbiorcy) {
+        if (!trybOdbiorcy || !stan.oczekujeSms) return@LaunchedEffect
+        if (!PreferencjeOdbiorcy.czyZatwierdzony(kontekst) &&
+            PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()
+        ) return@LaunchedEffect
+        SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
+            stan.naKodSms(kod)
+        }
     }
 
     BackHandler {

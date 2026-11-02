@@ -4,18 +4,18 @@
     ".write": false,
     "transmitters": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
+        ".read": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists() || root.child('transmitters').child($uid).child('accessRequests').child(auth.uid).exists())",
         ".write": "auth != null && auth.uid == $uid",
         "accessRequests": {
           "$reqId": {
-            ".read": "auth != null && (auth.uid == $uid || data.child('requesterUid').val() == auth.uid)",
-            ".write": "auth != null && (auth.uid == $uid || (!data.exists() && newData.child('requesterUid').val() == auth.uid))"
+            ".read": "auth != null && (auth.uid == $uid || auth.uid == $reqId)",
+            ".write": "auth != null && (auth.uid == $uid || (auth.uid == $reqId && (!data.exists() || data.child('requesterUid').val() == auth.uid)))"
           }
         },
         "receivers": {
           "$receiverId": {
             ".read": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)",
-            ".write": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)"
+            ".write": "auth != null && auth.uid == $uid"
           }
         },
         "credentials": {

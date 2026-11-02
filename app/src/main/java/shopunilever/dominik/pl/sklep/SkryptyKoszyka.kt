@@ -65,35 +65,41 @@ true;
         return """window.location.href="$bezpieczny"; true;"""
     }
 
-    /** Po wejściu na kartę produktu — kliknij „Dodaj do koszyka” (Magento). */
+    /** Po wejściu na kartę produktu — jedno kliknięcie „Dodaj do koszyka” (bez podwójnego submit). */
     const val KLIKNIJ_DODAJ_DO_KOSZYKA = """
 (function() {
-    function kliknij(el) {
+    if (window.__sklepikDodajeTeraz) {
+        if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: true, info: 'SKIP_DUP' });
+        return true;
+    }
+    window.__sklepikDodajeTeraz = true;
+    function kliknijRaz(el) {
         if (!el) return false;
         try {
-            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
             el.click();
             return true;
         } catch (e) { return false; }
     }
     var btn = document.querySelector('#product-addtocart-button') ||
-        document.querySelector('button.action.tocart') ||
-        document.querySelector('button[data-role="tocart"]') ||
-        document.querySelector('form#product_addtocart_form button[type="submit"]');
-    if (btn && kliknij(btn)) {
-        if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: true });
-        return true;
-    }
-    var all = document.querySelectorAll('button, a.action');
-    for (var i = 0; i < all.length; i++) {
-        var t = ((all[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
-        if (t.indexOf('dodaj do koszyka') >= 0 || t.indexOf('add to cart') >= 0) {
-            if (kliknij(all[i])) {
-                if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: true });
-                return true;
+        document.querySelector('form#product_addtocart_form button.action.tocart') ||
+        document.querySelector('button.action.tocart#product-addtocart-button') ||
+        document.querySelector('button[data-role="tocart"]');
+    if (!btn) {
+        var all = document.querySelectorAll('button.action.tocart, button[type="submit"]');
+        for (var i = 0; i < all.length; i++) {
+            var t = ((all[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (t.indexOf('dodaj do koszyka') >= 0 || t.indexOf('add to cart') >= 0) {
+                btn = all[i];
+                break;
             }
         }
     }
+    if (btn && kliknijRaz(btn)) {
+        setTimeout(function() { window.__sklepikDodajeTeraz = false; }, 2500);
+        if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: true });
+        return true;
+    }
+    window.__sklepikDodajeTeraz = false;
     if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: false, info: 'BRAK_PRZYCISKU' });
     true;
 })();

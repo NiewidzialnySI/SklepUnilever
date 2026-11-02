@@ -19,11 +19,11 @@ import androidx.compose.ui.platform.LocalContext
 import shopunilever.dominik.pl.onboarding.PreferencjeOnboardingu
 import shopunilever.dominik.pl.onboarding.RolaUzytkownika
 import shopunilever.dominik.pl.ui.aktualizacja.OknoAktualizacji
-import shopunilever.dominik.pl.ui.ekrany.EkranGlownyPlaceholder
 import shopunilever.dominik.pl.ui.ekrany.EkranPowitalny
 import shopunilever.dominik.pl.ui.ekrany.EkranUprawnien
 import shopunilever.dominik.pl.ui.ekrany.EkranWyboruRoli
 import shopunilever.dominik.pl.ui.pracownik.EkranPracownika
+import shopunilever.dominik.pl.ui.rodzina.EkranRodziny
 
 private enum class KrokAplikacji {
     POWITALNY,
@@ -90,7 +90,7 @@ fun NawigacjaAplikacji() {
 
                 KrokAplikacji.GLOWNY -> when (rola) {
                     RolaUzytkownika.PRACOWNIK -> EkranPracownika()
-                    else -> EkranGlownyPlaceholder(rola = rola)
+                    else -> EkranRodziny()
                 }
             }
         }
