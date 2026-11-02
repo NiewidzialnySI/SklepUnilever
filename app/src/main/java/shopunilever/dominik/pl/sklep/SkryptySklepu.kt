@@ -312,6 +312,71 @@ true;
         return """window.location.href="$bezpieczny"; true;"""
     }
 
+    /**
+     * Diagnostyka logowania — zrzut URL + kluczowych pól DOM (widoczność, wartość).
+     * Filtr Logcat: tag `SklepLogin`.
+     */
+    val DIAG_STRONY = """
+(function() {
+$JS_HELPERY
+    function opisPola(el) {
+        if (!el) return { jest: false };
+        var val = '';
+        try {
+            if (el.type === 'password') val = el.value ? ('***(' + el.value.length + ')') : '';
+            else if (el.type === 'checkbox') val = el.checked ? 'checked' : 'unchecked';
+            else val = (el.value || '').toString().slice(0, 80);
+        } catch (e) { val = '?'; }
+        return {
+            jest: true,
+            id: el.id || '',
+            name: el.name || '',
+            type: el.type || el.tagName || '',
+            widoczny: sklepikWidoczny(el),
+            wartosc: val,
+            disabled: !!el.disabled
+        };
+    }
+    function opisSelektor(sel) {
+        try { return opisPola(document.querySelector(sel)); } catch (e) { return { jest: false, blad: String(e) }; }
+    }
+    try {
+        var href = location.href || '';
+        var bodyCls = (document.body && document.body.className) || '';
+        var linkSms = document.querySelector('a[href*="access-email"]');
+        var dump = {
+            type: 'DIAG',
+            href: href,
+            path: location.pathname || '',
+            title: document.title || '',
+            bodyClass: bodyCls.slice(0, 200),
+            czyStronaHasla: sklepikCzyStronaHasla(),
+            czyZalogowany: sklepikCzyZalogowanySklep(),
+            pola: {
+                access_email: opisPola(document.getElementById('access_email')),
+                access_token: opisPola(document.getElementById('access_token') || document.querySelector('input[name="access_token"]')),
+                pass: opisPola(document.getElementById('pass')),
+                login_password: opisSelektor('input[name="login[password]"]'),
+                email_login: opisPola(document.getElementById('email') || document.querySelector('input[name="login[username]"]')),
+                ad_login: opisPola(document.getElementById('ad_login')),
+                send2: opisPola(document.getElementById('send2')),
+                form_login: opisSelektor('form#login-form, form.form-login, #customer-login-form'),
+                checkbox_privacy: opisSelektor('input[id^="amprivacy-checkbox-"], input[name*="amgdpr_agreement"], input[type="checkbox"][name*="privacy"]'),
+                link_access_email: linkSms ? { jest: true, href: linkSms.getAttribute('href') || '', tekst: (linkSms.textContent || '').trim().slice(0, 40), widoczny: sklepikWidoczny(linkSms) } : { jest: false },
+                azure: !!document.querySelector('.access-azure-login, .autologin-content'),
+                navigation: !!document.querySelector('.navigation'),
+                minicart: !!document.querySelector('.minicart-wrapper'),
+                logout: !!document.querySelector('a[href*="customer/account/logout"]')
+            }
+        };
+        if (window.SklepikPost) window.SklepikPost(dump);
+    } catch (e) {
+        if (window.SklepikPost) window.SklepikPost({ type: 'DIAG', blad: String(e && e.message || e) });
+    }
+})();
+true;
+""".trimIndent()
+
     /** Na /access wybierz „Kod SMS” → /access-email (nie Azure / nie karta). */
     val WYBIERZ_KOD_SMS = """
 (function() {

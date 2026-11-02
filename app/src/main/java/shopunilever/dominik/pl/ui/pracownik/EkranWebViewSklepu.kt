@@ -2,6 +2,7 @@ package shopunilever.dominik.pl.ui.pracownik
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -83,9 +84,15 @@ private enum class EtapLogowania {
     BLAD
 }
 
+/** Tag Logcat — filtr: `SklepLogin` */
+private const val TAG_LOGIN = "SklepLogin"
+
 /**
  * Maszyna stanów auto-logowania.
  * Decyzje po DOM (WYKRYJ), nie po samym URL — jak w Harmonogramie.
+ *
+ * trybReczny = true → nie klika / nie wypełnia; tylko WYKRYJ + DIAG do Logcat
+ * (przechodzimy flow ręcznie i patrzymy co się odpala).
  */
 private class StanLogowaniaSklepu(
     val kontekstAplikacji: android.content.Context,
@@ -105,12 +112,15 @@ private class StanLogowaniaSklepu(
     private val dodawanieTrwa = AtomicBoolean(false)
     private val oczekujeDodaniaDoKoszyka = AtomicBoolean(false)
 
+    /** Tymczasowo: Ty wpisujesz, ja loguję DOM. Ustaw false żeby wrócić auto-login. */
+    val trybReczny = true
+
     var etap by mutableStateOf(EtapLogowania.LADOWANIE)
     var status by mutableStateOf("Ładowanie sklepu…")
     var blad by mutableStateOf<String?>(null)
     var oczekujeSms by mutableStateOf(false)
     var kodSms by mutableStateOf("")
-    var ukryjNakladke by mutableStateOf(false)
+    var ukryjNakladke by mutableStateOf(true) // tryb ręczny: od razu widać stronę
     var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
 
     fun toast(tekst: String) {
@@ -260,6 +270,10 @@ private class StanLogowaniaSklepu(
     }
 
     fun wstrzyknijEmail() {
+        if (trybReczny) {
+            Log.i(TAG_LOGIN, "POMINIĘTO wstrzyknijEmail (trybReczny) url=$aktualnyUrl")
+            return
+        }
         if (emailWyslany.get() || !emailWstrzykniety.compareAndSet(false, true)) return
         etap = EtapLogowania.EMAIL
         status = "Wpisuję email służbowy…"
@@ -268,6 +282,10 @@ private class StanLogowaniaSklepu(
     }
 
     fun wstrzyknijHaslo() {
+        if (trybReczny) {
+            Log.i(TAG_LOGIN, "POMINIĘTO wstrzyknijHaslo (trybReczny) url=$aktualnyUrl")
+            return
+        }
         if (!hasloWstrzykniete.compareAndSet(false, true)) return
         oczekujeSms = false
         emailWyslany.set(true)
@@ -282,6 +300,10 @@ private class StanLogowaniaSklepu(
         if (!StaleSklepu.czyStronaHasla(url) || zalogowany.get()) return
         emailWyslany.set(true)
         smsWstrzykniety.set(true)
+        if (trybReczny) {
+            Log.i(TAG_LOGIN, "POMINIĘTO naStronieHaslaWymusz (trybReczny) url=$url")
+            return
+        }
         if (haslo.isBlank()) {
             etap = EtapLogowania.BLAD
             blad = "Brak hasła w aplikacji"
@@ -305,6 +327,16 @@ private class StanLogowaniaSklepu(
 
     fun naKodSms(kod: String) {
         if (kod.length < 4 || zalogowany.get()) return
+        if (trybReczny) {
+            Log.i(TAG_LOGIN, "POMINIĘTO naKodSms (trybReczny) kodLen=${kod.length} url=$aktualnyUrl")
+            // Relay do pary nadal OK — sam kod, bez auto-wpisywania w WebView
+            if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
+                zakresTla.launch {
+                    runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+                }
+            }
+            return
+        }
         if (!smsWstrzykniety.compareAndSet(false, true)) return
         kodSms = kod
         status = "Wpisuję kod SMS ($kod)…"
@@ -317,8 +349,9 @@ private class StanLogowaniaSklepu(
         }
     }
 
-    /** Po załadowaniu: cookies, potem szybkie sprawdzenie sesji (już zalogowany?). */
+    /** Po załadowaniu: cookies + diagnostyka; auto-akcje tylko gdy !trybReczny. */
     fun poZaladowaniuStrony(url: String?) {
+        Log.i(TAG_LOGIN, "onPageFinished url=$url trybReczny=$trybReczny")
         wstrzyknij(SkryptySklepu.MOSTEK)
         wstrzyknij(SkryptySklepu.RESPONSYWNOSC)
         wstrzyknij(SkryptySklepu.CIASTECZKA)
@@ -330,6 +363,29 @@ private class StanLogowaniaSklepu(
         }
 
         val u = url?.lowercase().orEmpty()
+        val toBramka = u.contains("access") || u.contains("login")
+        status = when {
+            trybReczny -> "Tryb ręczny — wpisuj sam (Logcat: SklepLogin)"
+            toBramka -> "Sprawdzam bramkę logowania…"
+            else -> "Sprawdzam, czy jesteś już zalogowany…"
+        }
+
+        // Zawsze: WYKRYJ + DIAG (obserwacja) — w trybie ręcznym BEZ klikania/wypełniania
+        fun skanDiagnostyczny() {
+            if (zalogowany.get()) return
+            wstrzyknij(SkryptySklepu.CIASTECZKA)
+            wstrzyknij(SkryptySklepu.SESJA)
+            wstrzyknij(SkryptySklepu.WYKRYJ)
+            wstrzyknij(SkryptySklepu.DIAG_STRONY)
+        }
+
+        if (trybReczny) {
+            listOf(500L, 1500L, 3000L).forEach { opoznienie ->
+                webView?.postDelayed({ skanDiagnostyczny() }, opoznienie)
+            }
+            return
+        }
+
         // Po SMS od razu celuj w hasło — nie czekaj na fałszywe LOGGED_IN z headera Magento
         if (StaleSklepu.czyStronaHasla(u)) {
             status = "Strona hasła — przygotowuję logowanie…"
@@ -339,31 +395,16 @@ private class StanLogowaniaSklepu(
                 webView?.postDelayed({
                     if (zalogowany.get() || hasloWstrzykniete.get()) return@postDelayed
                     wstrzyknij(SkryptySklepu.CIASTECZKA)
+                    wstrzyknij(SkryptySklepu.DIAG_STRONY)
                     naStronieHaslaWymusz(aktualnyUrl)
                 }, opoznienie)
             }
             return
         }
 
-        val toBramka = u.contains("access") || u.contains("login")
-        status = if (toBramka) "Sprawdzam bramkę logowania…" else "Sprawdzam, czy jesteś już zalogowany…"
-
-        // Szybkie sprawdzenie sesji (nie czekaj 4 s na nakładce)
-        webView?.postDelayed({
-            if (zalogowany.get()) return@postDelayed
-            wstrzyknij(SkryptySklepu.CIASTECZKA)
-            wstrzyknij(SkryptySklepu.SESJA)
-            wstrzyknij(SkryptySklepu.WYKRYJ)
-        }, 500)
-
-        // Amasty / Knockout — powtórka cookies + sesja
+        webView?.postDelayed({ skanDiagnostyczny() }, 500)
         listOf(1200L, 2500L).forEach { opoznienie ->
-            webView?.postDelayed({
-                if (zalogowany.get()) return@postDelayed
-                wstrzyknij(SkryptySklepu.CIASTECZKA)
-                wstrzyknij(SkryptySklepu.SESJA)
-                wstrzyknij(SkryptySklepu.WYKRYJ)
-            }, opoznienie)
+            webView?.postDelayed({ skanDiagnostyczny() }, opoznienie)
         }
     }
 
@@ -422,7 +463,9 @@ private class StanLogowaniaSklepu(
                     return
                 }
 
-                "LOG" -> { /* debug */ }
+                "LOG" -> {
+                    Log.d(TAG_LOGIN, "JS: ${obj.optString("msg")}")
+                }
             }
         } catch (_: Exception) {
             return
@@ -432,15 +475,32 @@ private class StanLogowaniaSklepu(
 
         try {
             val obj = JSONObject(json)
-            when (obj.optString("type")) {
+            val typ = obj.optString("type")
+            when (typ) {
+                "DIAG" -> {
+                    Log.i(TAG_LOGIN, "DIAG ${obj.toString(2)}")
+                    return
+                }
                 "EMAIL_WYNIK" -> {
+                    Log.i(TAG_LOGIN, "EMAIL_WYNIK wynik=${obj.optString("wynik")} trybReczny=$trybReczny")
+                    if (trybReczny) return
                     if (obj.optString("wynik") == "EMAIL_SENT" && emailWyslany.compareAndSet(false, true)) {
                         smsOdKiedyMs.set(System.currentTimeMillis())
                         zacznijOczekiwanieSms()
                     }
                 }
 
-                "WYKRYJ" -> when (obj.optString("wynik")) {
+                "WYKRYJ" -> {
+                    val wynik = obj.optString("wynik")
+                    Log.i(TAG_LOGIN, "WYKRYJ=$wynik url=$aktualnyUrl etap=$etap trybReczny=$trybReczny")
+                    if (trybReczny) {
+                        // Tylko obserwacja — cookies nadal zamykamy, reszty nie ruszamy
+                        if (wynik == "COOKIE_BANNER") {
+                            wstrzyknij(SkryptySklepu.CIASTECZKA)
+                        }
+                        return
+                    }
+                    when (wynik) {
                     "COOKIE_BANNER" -> {
                         status = "Akceptuję cookies…"
                         wstrzyknij(SkryptySklepu.CIASTECZKA)
@@ -546,9 +606,14 @@ private class StanLogowaniaSklepu(
                             }
                         }
                     }
-                }
+                    } // when (wynik)
+                } // WYKRYJ
 
-                "SESJA" -> when (obj.optString("wynik")) {
+                "SESJA" -> {
+                    val wynik = obj.optString("wynik")
+                    Log.i(TAG_LOGIN, "SESJA=$wynik url=$aktualnyUrl trybReczny=$trybReczny")
+                    if (trybReczny) return
+                    when (wynik) {
                     "LOGGED_IN" -> {
                         status = "Jesteś już zalogowany…"
                         poZalogowaniu()
@@ -590,12 +655,15 @@ private class StanLogowaniaSklepu(
                         if (naSklepie) poZalogowaniu() else wstrzyknij(SkryptySklepu.WYKRYJ)
                     }
                     else -> wstrzyknij(SkryptySklepu.WYKRYJ)
+                    }
                 }
 
                 "KROK" -> {
                     val krok = obj.optString("krok")
                     val sukces = obj.optBoolean("sukces", true)
                     val info = obj.optString("info")
+                    Log.i(TAG_LOGIN, "KROK krok=$krok sukces=$sukces info=$info")
+                    if (trybReczny) return
                     if (!sukces) {
                         if (info in setOf(
                                 "PASS_FIELD_NOT_FOUND",
@@ -740,8 +808,8 @@ fun EkranWebViewSklepu(
                 onClick = { stan.obsluzWstecz() }
             )
             Text(
-                text = "Sklep firmowy",
-                color = TekstGlowny,
+                text = if (stan.trybReczny) "Sklep — tryb ręczny" else "Sklep firmowy",
+                color = if (stan.trybReczny) Ostrzezenie else TekstGlowny,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 modifier = Modifier.weight(1f),
