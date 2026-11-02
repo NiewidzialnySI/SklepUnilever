@@ -18,15 +18,17 @@ object PowiadomieniaParowania {
         val mgr = context.getSystemService(NotificationManager::class.java) ?: return
         val kanal = NotificationChannel(
             KANAL,
-            "Prośby o parowanie",
-            NotificationManager.IMPORTANCE_HIGH
+            "Prośby o dostęp",
+            NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Gdy ktoś chce połączyć telefon z Twoim kontem sklepu"
+            description = "Ciche przypomnienie o oczekującej prośbie (bez dźwięku)"
+            setShowBadge(true)
         }
         mgr.createNotificationChannel(kanal)
     }
 
-    fun pokazanowaProsbe(context: Context, nazwaUrzadzenia: String, prosbaId: String) {
+    /** Ciche — bez dźwięku/wibracji, bez wymuszania otwarcia ekranu. */
+    fun pokazCichePrzypomnienie(context: Context, nazwaUrzadzenia: String, prosbaId: String) {
         upewnijKanal(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -40,13 +42,10 @@ object PowiadomieniaParowania {
         )
         val notyfikacja = NotificationCompat.Builder(context, KANAL)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Nowa prośba o dostęp")
-            .setContentText("$nazwaUrzadzenia chce połączyć się ze sklepem")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("$nazwaUrzadzenia prosi o dostęp. Otwórz zakładkę Urządzenia i zaakceptuj lub odrzuć.")
-            )
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentTitle(nazwaUrzadzenia)
+            .setContentText("Czeka na akceptację")
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
             .setContentIntent(pending)
             .build()
@@ -54,5 +53,10 @@ object PowiadomieniaParowania {
             NotificationManagerCompat.from(context)
                 .notify(ID_BAZA + (prosbaId.hashCode() and 0xFF), notyfikacja)
         }
+    }
+
+    @Deprecated("Użyj pokazCichePrzypomnienie", ReplaceWith("pokazCichePrzypomnienie(context, nazwaUrzadzenia, prosbaId)"))
+    fun pokazanowaProsbe(context: Context, nazwaUrzadzenia: String, prosbaId: String) {
+        pokazCichePrzypomnienie(context, nazwaUrzadzenia, prosbaId)
     }
 }

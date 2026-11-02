@@ -31,6 +31,7 @@ import shopunilever.dominik.pl.firebase.PowiadomieniaParowania
 import shopunilever.dominik.pl.firebase.ProsbaDostepu
 import shopunilever.dominik.pl.firebase.ProsbaLogowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
+import shopunilever.dominik.pl.tlo.SerwisTlaNadajnika
 import shopunilever.dominik.pl.ui.IntentyNawigacji
 import shopunilever.dominik.pl.ui.components.TloAplikacji
 
@@ -52,8 +53,15 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
         }
     }
 
-    // Globalny nasłuch: parowanie + prośby o logowanie.
+    // Tło SMS + badge w aplikacji (bez spamowania powiadomieniami / skoków zakładek).
     LaunchedEffect(restartNasluchu) {
+        if (PreferencjeParowania.czyAktywne(kontekst)) {
+            runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
+        } else {
+            runCatching { SerwisTlaNadajnika.zatrzymaj(kontekst) }
+            prosbyOczekujace = 0
+            return@LaunchedEffect
+        }
         val kod = PreferencjeParowania.kod(kontekst)
         if (kod.isBlank()) {
             prosbyOczekujace = 0
@@ -70,16 +78,15 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                 val pending = lista.filter { it.status == "pending" }
                 pendingParowanie = pending.size
                 odswiezBadge()
-                var nowa = false
+                // Tylko pierwsze pojawienie się — ciche przypomnienie, bez wymuszania ekranu.
                 pending.forEach { p ->
                     if (juzPowiadomione.add("pair:${p.id}")) {
-                        nowa = true
-                        PowiadomieniaParowania.pokazanowaProsbe(kontekst, p.nazwaUrzadzenia, p.id)
+                        PowiadomieniaParowania.pokazCichePrzypomnienie(
+                            kontekst,
+                            p.nazwaUrzadzenia,
+                            p.id
+                        )
                     }
-                }
-                if (nowa) {
-                    pokazSklep = false
-                    zakladka = ZakladkaPracownika.URZADZENIA
                 }
                 juzPowiadomione.removeAll { klucz ->
                     klucz.startsWith("pair:") && pending.none { "pair:${it.id}" == klucz }
@@ -91,20 +98,14 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                 val pending = lista.filter { it.status == "pending" }
                 pendingLogin = pending.size
                 odswiezBadge()
-                var nowa = false
                 pending.forEach { p ->
                     if (juzPowiadomione.add("login:${p.id}")) {
-                        nowa = true
-                        PowiadomieniaParowania.pokazanowaProsbe(
+                        PowiadomieniaParowania.pokazCichePrzypomnienie(
                             kontekst,
-                            "${p.nazwaUrzadzenia} chce się zalogować",
+                            p.nazwaUrzadzenia,
                             "login-${p.id}"
                         )
                     }
-                }
-                if (nowa) {
-                    pokazSklep = false
-                    zakladka = ZakladkaPracownika.URZADZENIA
                 }
                 juzPowiadomione.removeAll { klucz ->
                     klucz.startsWith("login:") && pending.none { "login:${it.id}" == klucz }

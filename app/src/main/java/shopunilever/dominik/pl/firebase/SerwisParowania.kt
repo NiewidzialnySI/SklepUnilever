@@ -86,7 +86,7 @@ object SerwisParowania {
         PreferencjeParowania.zapisz(context, kod, uid)
         publikujDaneLogowania(context)
         runCatching {
-            shopunilever.dominik.pl.tlo.SerwisTlaNadajnika.uruchomJesliTrzeba(context)
+            shopunilever.dominik.pl.tlo.SerwisTlaNadajnika.uruchomJesliTrzeba(context.applicationContext)
         }
         return kod
     }

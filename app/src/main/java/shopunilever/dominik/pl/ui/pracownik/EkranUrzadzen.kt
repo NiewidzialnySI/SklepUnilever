@@ -72,6 +72,7 @@ import shopunilever.dominik.pl.firebase.ProsbaDostepu
 import shopunilever.dominik.pl.firebase.ProsbaLogowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.firebase.StaleFirebase
+import shopunilever.dominik.pl.tlo.SerwisTlaNadajnika
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
@@ -124,7 +125,11 @@ fun EkranUrzadzen(
             }.onSuccess {
                 kod = it
                 aktywne = true
+                runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
                 onParowanieZmienione()
+                if (odlaczWszystkich) {
+                    Toast.makeText(kontekst, "Nowy kod — urządzenia odłączone", Toast.LENGTH_SHORT).show()
+                }
             }.onFailure {
                 Toast.makeText(kontekst, it.message ?: "Błąd parowania", Toast.LENGTH_SHORT).show()
             }

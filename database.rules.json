@@ -45,6 +45,14 @@
             ".read": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)",
             ".write": "auth != null && auth.uid == $uid"
           }
+        },
+        "loginLogs": {
+          ".indexOn": ["ts"],
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists())",
+          "$logId": {
+            ".write": "auth != null && (auth.uid == $uid || (root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists() && (!newData.exists() || newData.child('deviceId').val() == auth.uid)))"
+          }
         }
       }
     },

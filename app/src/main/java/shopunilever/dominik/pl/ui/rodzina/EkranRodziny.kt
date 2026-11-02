@@ -101,6 +101,7 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
         }
         PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
         runCatching { SerwisParowania.zuzyjZgodeLogowania(kontekst) }
+        runCatching { SerwisParowania.zapiszLogWejscia(kontekst) }
         czekaNaLogowanie = false
         pokazSklep = true
     }

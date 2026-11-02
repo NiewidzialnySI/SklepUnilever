@@ -16,19 +16,26 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,19 +64,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeParowania
+import shopunilever.dominik.pl.firebase.LogWejsciaUrzadzenia
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
+import shopunilever.dominik.pl.ui.theme.Blad
+import shopunilever.dominik.pl.ui.theme.RamkaKarty
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun EkranUstawien(modifier: Modifier = Modifier) {
@@ -85,8 +100,21 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
     var edycjaHasla by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var blad by remember { mutableStateOf<String?>(null) }
+    var logi by remember { mutableStateOf<List<LogWejsciaUrzadzenia>>(emptyList()) }
     val emailZapisany = PreferencjeKonta.email(kontekst)
     val emailZmieniony = email.trim() != emailZapisany
+    val formatCzasu = remember {
+        SimpleDateFormat("dd.MM HH:mm", Locale("pl", "PL"))
+    }
+
+    LaunchedEffect(PreferencjeParowania.czyAktywne(kontekst)) {
+        if (!PreferencjeParowania.czyAktywne(kontekst)) {
+            logi = emptyList()
+            return@LaunchedEffect
+        }
+        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
+        SerwisParowania.obserwujLogiWejsc(kontekst).collectLatest { logi = it }
+    }
 
     val koloryPola = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = AkcentNeon,
@@ -324,6 +352,85 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SzkloKarta {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.History, null, tint = AkcentNeon, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.size(10.dp))
+                Text(
+                    "Logi",
+                    color = TekstGlowny,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                if (logi.isNotEmpty()) {
+                    IconButton(
+                        onClick = {
+                            zakres.launch {
+                                runCatching { SerwisParowania.wyczyscLogiWejsc(kontekst) }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, "Wyczyść", tint = Blad, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            if (logi.isEmpty()) {
+                Text("Brak", color = TekstDrugi, fontSize = 13.sp)
+            } else {
+                logi.forEachIndexed { indeks, wpis ->
+                    if (indeks > 0) {
+                        HorizontalDivider(
+                            color = RamkaKarty,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(AkcentMorski.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.PhoneAndroid,
+                                null,
+                                tint = AkcentMorski,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Text(
+                            wpis.nazwa,
+                            color = TekstGlowny,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            if (wpis.ts > 0L) formatCzasu.format(Date(wpis.ts)) else "—",
+                            color = TekstDrugi,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
