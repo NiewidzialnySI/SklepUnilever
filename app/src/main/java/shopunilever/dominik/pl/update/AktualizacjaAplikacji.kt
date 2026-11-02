@@ -33,9 +33,9 @@ import java.net.URL
  */
 object AktualizacjaAplikacji {
 
-    // jsDelivr — raw.githubusercontent.com czasem trzyma stary update.json w CDN
+    // GitHub Contents API — bez cache CDN raw.githubusercontent / jsDelivr
     const val DOMYSLNY_MANIFEST =
-        "https://cdn.jsdelivr.net/gh/NiewidzialnySI/SklepUnilever@main/update.json"
+        "https://api.github.com/repos/NiewidzialnySI/SklepUnilever/contents/update.json?ref=main"
 
     private const val PREFS = "aktualizacja_prefs"
     private const val K_AUTO = "auto_sprawdzaj"
@@ -138,7 +138,7 @@ object AktualizacjaAplikacji {
                 val bazowy = manifestUrl()
                 val sep = if (bazowy.contains('?')) '&' else '?'
                 val url = "$bazowy${sep}_=${System.currentTimeMillis()}"
-                val json = pobierzTekst(url, githubToken(context))
+                val json = normalizujManifestJson(pobierzTekst(url, githubToken(context)))
                 val info = parsujManifest(json)
                 val wynik = if (info.versionCode > BuildConfig.VERSION_CODE) {
                     Stan.Dostepna(info)
@@ -297,6 +297,19 @@ object AktualizacjaAplikacji {
 
     /** Alias pod stare wywołania. */
     fun zainstalujSystemowo(context: Context, plik: File) = zainstalujZWyborem(context, plik)
+
+    /** raw JSON albo odpowiedź GitHub Contents API (base64). */
+    private fun normalizujManifestJson(surowy: String): String {
+        val trim = surowy.trim()
+        if (!trim.startsWith("{")) return trim
+        val o = JSONObject(trim)
+        if (o.has("versionCode")) return trim
+        if (o.optString("encoding") == "base64" && o.has("content")) {
+            val b64 = o.getString("content").replace("\\s".toRegex(), "")
+            return String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT), Charsets.UTF_8)
+        }
+        return trim
+    }
 
     private fun parsujManifest(json: String): InfoWersji {
         val o = JSONObject(json)

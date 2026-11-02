@@ -14,15 +14,15 @@ android {
         applicationId = "shopunilever.dominik.pl"
         minSdk = 31
         targetSdk = 37
-        versionCode = 17
-        versionName = "1.0.16"
+        versionCode = 18
+        versionName = "1.0.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "UPDATE_MANIFEST_URL",
-            "\"https://cdn.jsdelivr.net/gh/NiewidzialnySI/SklepUnilever@main/update.json\""
+            "\"https://api.github.com/repos/NiewidzialnySI/SklepUnilever/contents/update.json?ref=main\""
         )
     }
 
