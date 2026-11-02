@@ -115,19 +115,17 @@ private class StanLogowaniaSklepu(
         val wv = webView ?: return
         if (wv.canGoBack()) {
             wv.goBack()
-            // Po cofnięciu poza domenę sklepu wracamy na market
             wv.postDelayed({
                 val url = wv.url
-                if (!StaleSklepu.czyUrlSklepu(url)) {
-                    wv.loadUrl(StaleSklepu.URL_MARKET)
+                if (!StaleSklepu.czyUrlSklepu(url) || StaleSklepu.czyPodejrzany404(url)) {
+                    wv.loadUrl(StaleSklepu.URL_GLOWNA)
                 }
             }, 350)
             return
         }
         if (!StaleSklepu.czyGlownaSklepu(aktualnyUrl)) {
-            wv.loadUrl(StaleSklepu.URL_MARKET)
+            wv.loadUrl(StaleSklepu.URL_GLOWNA)
         }
-        // Już na głównej sklepu — zostajemy (bez wyjścia z aplikacji)
     }
 
     fun poZalogowaniu() {
@@ -136,7 +134,20 @@ private class StanLogowaniaSklepu(
         etap = EtapLogowania.GOTOWE
         status = "Zalogowano"
         ukryjNakladke = true
-        wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_MARKET))
+        // Nie pchamy na /market (404). Zostaw aktualną stronę albo wejdź na root sklepu.
+        val teraz = aktualnyUrl.lowercase()
+        if (StaleSklepu.czyPodejrzany404(teraz) ||
+            teraz.contains("access") ||
+            teraz.contains("login")
+        ) {
+            wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_GLOWNA))
+        }
+    }
+
+    fun napraw404JesliTrzeba(url: String?) {
+        if (!StaleSklepu.czyPodejrzany404(url)) return
+        status = "Błędny adres sklepu — wracam na stronę główną…"
+        webView?.loadUrl(StaleSklepu.URL_GLOWNA)
     }
 
     fun wstrzyknijEmail() {
@@ -256,9 +267,17 @@ private class StanLogowaniaSklepu(
 
                 "SESJA" -> when (obj.optString("wynik")) {
                     "LOGGED_IN" -> poZalogowaniu()
+                    "NOT_FOUND" -> {
+                        status = "Strona nie istnieje — wracam na główną sklepu…"
+                        webView?.loadUrl(StaleSklepu.URL_GLOWNA)
+                    }
                     "NEEDS_LOGIN" -> {
-                        status = "Przekierowanie do logowania…"
-                        wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                        if (!aktualnyUrl.contains("access", ignoreCase = true)) {
+                            status = "Przekierowanie do logowania…"
+                            wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                        } else {
+                            wstrzyknij(SkryptySklepu.WYKRYJ)
+                        }
                     }
                     else -> wstrzyknij(SkryptySklepu.WYKRYJ)
                 }
@@ -412,9 +431,12 @@ fun EkranWebViewSklepu(
                             ): Boolean {
                                 val url = request?.url?.toString().orEmpty()
                                 if (url.isBlank()) return false
-                                // Zostajemy w sklepie — obce domeny blokujemy / wracamy na market
                                 if (!StaleSklepu.czyUrlSklepu(url)) {
-                                    view?.loadUrl(StaleSklepu.URL_MARKET)
+                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
+                                    return true
+                                }
+                                if (StaleSklepu.czyPodejrzany404(url)) {
+                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
                                     return true
                                 }
                                 return false
@@ -434,9 +456,23 @@ fun EkranWebViewSklepu(
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 if (!url.isNullOrBlank()) stan.aktualnyUrl = url
-                                if (!StaleSklepu.czyUrlSklepu(url) && stan.zalogowany.get()) {
-                                    view?.loadUrl(StaleSklepu.URL_MARKET)
+                                if (StaleSklepu.czyPodejrzany404(url)) {
+                                    stan.napraw404JesliTrzeba(url)
                                     return
+                                }
+                                if (!StaleSklepu.czyUrlSklepu(url) && stan.zalogowany.get()) {
+                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
+                                    return
+                                }
+                                // Po udanym logowaniu Magento samo prowadzi na sklep —
+                                // jeśli jesteśmy poza access/login, schowaj nakładkę.
+                                val u = url?.lowercase().orEmpty()
+                                if (stan.hasloWstrzykniete.get() &&
+                                    StaleSklepu.czyUrlSklepu(u) &&
+                                    !u.contains("access") &&
+                                    !u.contains("login")
+                                ) {
+                                    stan.poZalogowaniu()
                                 }
                                 stan.poZaladowaniuStrony(url)
                             }

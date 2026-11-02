@@ -178,17 +178,30 @@ true;
 
     const val SESJA = """
 (function() {
+    function widoczny(el) {
+        if (!el) return false;
+        var st = window.getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden') return false;
+        var r = el.getBoundingClientRect();
+        return r.width > 2 && r.height > 2;
+    }
     try {
-        var logoutLink = document.querySelector('a[href*="logout"], a[href*="customer/account/logout"]');
-        var accountLink = document.querySelector('.header.links li.welcome, .customer-welcome, .authorization-link');
-        var loginLink = document.querySelector('a[href*="login"], a[href*="access-email"], a[href*="/access"]');
+        // 404 Magento
+        var bodyCls = (document.body && document.body.className) || '';
+        if (bodyCls.indexOf('cms-no-route') >= 0 || bodyCls.indexOf('noroute') >= 0) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NOT_FOUND' });
+            return;
+        }
+        var logoutLink = document.querySelector('a[href*="customer/account/logout"]');
+        var welcome = document.querySelector('.customer-welcome, .header.links li.welcome, .logged-in');
         var emailField = document.querySelector('#access_email');
         var passField = document.querySelector('#pass');
-        if (logoutLink || (accountLink && accountLink.offsetParent !== null)) {
+        // Tylko widoczny logout / welcome = naprawdę zalogowany (nie ukryty link w DOM)
+        if ((logoutLink && widoczny(logoutLink)) || (welcome && widoczny(welcome))) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'LOGGED_IN' });
-        } else if (passField && passField.offsetParent !== null) {
+        } else if (widoczny(passField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
-        } else if (loginLink || emailField) {
+        } else if (widoczny(emailField) || location.href.indexOf('access') >= 0) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NEEDS_LOGIN' });
         } else {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'UNKNOWN' });
