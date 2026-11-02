@@ -579,28 +579,14 @@ function filtrujZagniezdzoneNumery(wyniki) {
 }
 
 function wyciagnijLinkSledzenia(tekst, kurier, numer) {
-  var norm = normalizujTrescMaila(tekst);
-  var urls = norm.match(/https?:\/\/[^\s"'<>]+/gi);
-  if (urls) {
-    for (var i = 0; i < urls.length; i++) {
-      var u = urls[i].toLowerCase();
-      if (
-        kurier === 'ups' &&
-        u.indexOf('ups.com') >= 0 &&
-        u.indexOf('track') >= 0 &&
-        u.indexOf(numer.toLowerCase()) >= 0
-      ) {
-        return urls[i];
-      }
-      if (kurier === 'dhl' && u.indexOf('mojdhl.pl') >= 0 && u.indexOf(numer) >= 0) {
-        return urls[i];
-      }
-    }
-  }
+  // Kanoniczne deep-linki PL (Shoper / najszybsza.pl) — apka i tak przebudowuje link przy otwarciu
   if (kurier === 'ups') {
-    return 'https://www.ups.com/track?tracknum=' + encodeURIComponent(numer) + '&loc=pl_PL';
+    return 'https://wwwapps.ups.com/WebTracking?loc=pl_PL&tracknum=' + encodeURIComponent(numer);
   }
-  return 'https://mojdhl.pl/paczki/dostawa/' + encodeURIComponent(numer);
+  if (/^JJD/i.test(numer) || /^\d{10,14}$/.test(numer)) {
+    return 'https://mojdhl.pl/paczki/dostawa/' + encodeURIComponent(numer);
+  }
+  return 'https://sprawdz.dhl.com.pl/szukaj.aspx?m=0&sn=' + encodeURIComponent(numer);
 }
 
 function wyciagnijSzacowanaDostawe(tekst) {

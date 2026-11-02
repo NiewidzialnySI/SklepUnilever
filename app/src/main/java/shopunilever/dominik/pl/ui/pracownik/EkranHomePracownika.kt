@@ -1,7 +1,5 @@
 package shopunilever.dominik.pl.ui.pracownik
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,19 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.LocalShipping
 import androidx.compose.material.icons.rounded.Login
-import androidx.compose.material.icons.rounded.OpenInNew
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,22 +36,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.R
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeParowania
-import shopunilever.dominik.pl.firebase.PrzesylkaPaczki
-import shopunilever.dominik.pl.firebase.SerwisParowania
-import shopunilever.dominik.pl.firebase.SerwisPrzesylek
 import shopunilever.dominik.pl.ui.components.SzkloKarta
+import shopunilever.dominik.pl.ui.paczki.KartaPaczek
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
-import shopunilever.dominik.pl.ui.theme.Ostrzezenie
-import shopunilever.dominik.pl.ui.theme.RamkaKarty
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
@@ -70,21 +55,10 @@ fun EkranHomePracownika(
     modifier: Modifier = Modifier
 ) {
     val kontekst = LocalContext.current
-    val zakres = rememberCoroutineScope()
     var maDane by remember { mutableStateOf(PreferencjeKonta.czyDaneZapisane(kontekst)) }
     var pokazDialog by remember { mutableStateOf(false) }
-    var paczki by remember { mutableStateOf<List<PrzesylkaPaczki>>(emptyList()) }
     val parowanieAktywne = remember { PreferencjeParowania.czyAktywne(kontekst) }
     val kodParowania = remember { PreferencjeParowania.kod(kontekst) }
-
-    LaunchedEffect(parowanieAktywne) {
-        if (!parowanieAktywne) {
-            paczki = emptyList()
-            return@LaunchedEffect
-        }
-        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
-        SerwisPrzesylek.obserwujPrzesylki(kontekst).collectLatest { paczki = it }
-    }
 
     if (pokazDialog) {
         DialogDanychSluzbowych(
@@ -120,7 +94,6 @@ fun EkranHomePracownika(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Adaptive mipmap XML nie działa z painterResource — warstwy drawable
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -193,172 +166,9 @@ fun EkranHomePracownika(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        SzkloKarta {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(AkcentMorski.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = AkcentMorski,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "PACZKI",
-                        color = AkcentNeon,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = when {
-                            !parowanieAktywne -> "Włącz parowanie, aby odbierać"
-                            paczki.isEmpty() -> "Brak aktywnych paczek"
-                            else -> "${paczki.size} · ${paczki.count { !it.odczytano }} nowych"
-                        },
-                        color = TekstGlowny,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            when {
-                !parowanieAktywne -> {
-                    Text(
-                        text = "Uruchom kod QR w zakładce Urządzenia. Maile UPS/DHL na adres z +KOD trafią tu automatycznie.",
-                        color = TekstDrugi,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
-                }
-                paczki.isEmpty() -> {
-                    Text(
-                        text = if (kodParowania.isNotBlank()) {
-                            "Brak paczek. Powiadomienia kuriera kieruj na Gmail z +$kodParowania w adresie."
-                        } else {
-                            "Brak aktywnych paczek"
-                        },
-                        color = TekstDrugi,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
-                }
-                else -> {
-                    paczki.take(12).forEachIndexed { indeks, p ->
-                        if (indeks > 0) {
-                            HorizontalDivider(
-                                color = RamkaKarty,
-                                modifier = Modifier.padding(vertical = 6.dp)
-                            )
-                        }
-                        WierszPaczki(
-                            przesylka = p,
-                            onOtworz = {
-                                val link = p.linkSledzenia?.takeIf { it.isNotBlank() }
-                                if (link != null) {
-                                    runCatching {
-                                        kontekst.startActivity(
-                                            Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                                        )
-                                    }
-                                }
-                                if (!p.odczytano) {
-                                    zakres.launch {
-                                        runCatching {
-                                            SerwisPrzesylek.oznaczOdczytana(kontekst, p.id)
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
-                    if (paczki.size > 12) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "+${paczki.size - 12} starszych",
-                            color = TekstDrugi,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WierszPaczki(
-    przesylka: PrzesylkaPaczki,
-    onOtworz: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onOtworz)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(
-                    if (przesylka.odczytano) AkcentMorski.copy(alpha = 0.12f)
-                    else Ostrzezenie.copy(alpha = 0.18f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.LocalShipping,
-                null,
-                tint = if (przesylka.odczytano) AkcentMorski else Ostrzezenie,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.size(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "${przesylka.kurier.uppercase()} · ${przesylka.numer}",
-                color = TekstGlowny,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            val podtytul = listOfNotNull(
-                przesylka.statusTekst?.takeIf { it.isNotBlank() },
-                przesylka.szacowanaDostawa?.takeIf { it.isNotBlank() }?.let { "Dostawa: $it" },
-                przesylka.nadawcaPaczki?.takeIf { it.isNotBlank() }
-            ).firstOrNull() ?: przesylka.temat.ifBlank { "Śledzenie" }
-            Text(
-                text = podtytul,
-                color = TekstDrugi,
-                fontSize = 12.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp
-            )
-        }
-        if (!przesylka.linkSledzenia.isNullOrBlank()) {
-            Icon(
-                Icons.Rounded.OpenInNew,
-                contentDescription = "Otwórz śledzenie",
-                tint = TekstDrugi,
-                modifier = Modifier.size(18.dp)
-            )
-        }
+        KartaPaczek(
+            aktywneParowanie = parowanieAktywne,
+            podpowiedzKod = kodParowania
+        )
     }
 }

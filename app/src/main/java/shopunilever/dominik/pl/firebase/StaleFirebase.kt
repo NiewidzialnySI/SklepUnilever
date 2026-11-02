@@ -25,5 +25,6 @@ object StaleFirebase {
         const val RECEIVER_SESSIONS = "receiver_sessions"
         const val ANNOUNCEMENTS = "announcements"
         const val SHIPMENTS = "shipments"
+        const val SHIPMENTS_ARCHIWUM = "shipmentsArchived"
     }
 }

@@ -60,6 +60,7 @@ import shopunilever.dominik.pl.firebase.StaleFirebase
 import shopunilever.dominik.pl.firebase.WynikWejsciaSklepu
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.components.TloAplikacji
+import shopunilever.dominik.pl.ui.paczki.KartaPaczek
 import shopunilever.dominik.pl.ui.pracownik.EkranWebViewSklepu
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
@@ -340,7 +341,7 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    KafelekPaczek()
+                    KartaPaczek(aktywneParowanie = true)
                 }
 
                 "pending" -> {
@@ -464,50 +465,3 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun KafelekPaczek() {
-    SzkloKarta {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(AkcentMorski.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Inventory2,
-                    contentDescription = null,
-                    tint = AkcentMorski,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "PACZKI",
-                    color = AkcentNeon,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.4.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Informacje o przesyłkach",
-                    color = TekstGlowny,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = "Brak aktywnych paczek",
-            color = TekstDrugi,
-            fontSize = 14.sp,
-            lineHeight = 20.sp
-        )
-    }
-}
