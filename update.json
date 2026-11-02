@@ -1,6 +1,6 @@
 {
-  "versionCode": 16,
-  "versionName": "1.0.15",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.15/sklep-unilever-v1.0.15.apk",
-  "changelog": "Paczki UPS/DHL, archiwum, znajomi, poprawione linki. Zamknij apke calkowicie i otworz ponownie."
+  "versionCode": 17,
+  "versionName": "1.0.16",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.16/sklep-unilever-v1.0.16.apk",
+  "changelog": "Fix auto-update (CDN) + paczki/archiwum. Jak nie widzisz okna: zainstaluj APK z GitHub Releases."
 }
