@@ -179,25 +179,30 @@ private class StanLogowaniaSklepu(
         }
     }
 
-    /** Po załadowaniu strony — zawsze najpierw wykryj elementy DOM. */
+    /** Po załadowaniu strony — najpierw ciasteczka / „Przejdź do sklepu”, potem DOM. */
     fun poZaladowaniuStrony(url: String?) {
-        if (zalogowany.get()) return
         wstrzyknij(SkryptySklepu.MOSTEK)
+        wstrzyknij(SkryptySklepu.CIASTECZKA)
+
+        if (zalogowany.get()) return
 
         val u = url?.lowercase().orEmpty()
-        if (u.startsWith(StaleSklepu.URL_SKLEPU.lowercase()) &&
-            !u.contains("access") &&
-            !u.contains("login") &&
-            !u.contains("customer/account/login")
-        ) {
-            etap = EtapLogowania.LADOWANIE
-            status = "Sprawdzanie sesji…"
-            wstrzyknij(SkryptySklepu.SESJA)
-            return
-        }
-
-        // Główna ścieżka: wykryj formularz na stronie (email / SMS / hasło)
-        wstrzyknij(SkryptySklepu.WYKRYJ)
+        // Daj banerowi chwilę zniknąć, potem wykryj formularz
+        webView?.postDelayed({
+            if (zalogowany.get()) return@postDelayed
+            wstrzyknij(SkryptySklepu.CIASTECZKA)
+            if (u.startsWith(StaleSklepu.URL_SKLEPU.lowercase()) &&
+                !u.contains("access") &&
+                !u.contains("login") &&
+                !u.contains("customer/account/login")
+            ) {
+                etap = EtapLogowania.LADOWANIE
+                status = "Sprawdzanie sesji…"
+                wstrzyknij(SkryptySklepu.SESJA)
+            } else {
+                wstrzyknij(SkryptySklepu.WYKRYJ)
+            }
+        }, 700)
     }
 
     fun obsluzWiadomosc(json: String) {
@@ -215,6 +220,11 @@ private class StanLogowaniaSklepu(
                 }
 
                 "WYKRYJ" -> when (obj.optString("wynik")) {
+                    "COOKIE_BANNER" -> {
+                        status = "Akceptuję politykę — Przejdź do sklepu…"
+                        wstrzyknij(SkryptySklepu.CIASTECZKA)
+                        webView?.postDelayed({ wstrzyknij(SkryptySklepu.WYKRYJ) }, 800)
+                    }
                     "EMAIL_FIELD" -> {
                         if (!emailWyslany.get()) wstrzyknijEmail()
                     }
@@ -224,7 +234,7 @@ private class StanLogowaniaSklepu(
                         zacznijOczekiwanieSms()
                     }
                     "PASSWORD_FIELD" -> {
-                        // Powrót sesji / po SMS: od razu hasło + checkbox, bez SMS
+                        // Powrót sesji / po SMS: od razu hasło → checkbox → captcha → Zaloguj
                         wstrzyknijHaslo()
                     }
                     "ALREADY_LOGGED_IN" -> poZalogowaniu()
@@ -267,13 +277,18 @@ private class StanLogowaniaSklepu(
                         blad = info.ifBlank { "Błąd kroku: $krok" }
                         status = "Nie udało się dokończyć logowania"
                     } else when (krok) {
+                        "ciasteczka" -> {
+                            if (info.contains("PRZEJDZ") || info.contains("TEKST:przejd")) {
+                                status = "Kliknięto Przejdź do sklepu…"
+                            }
+                        }
                         "sms" -> {
                             status = "Kod SMS wpisany — czekam na hasło…"
                             oczekujeSms = false
                         }
                         "haslo" -> status = when (info) {
                             "HASLO_WPISANE" -> "Hasło wpisane…"
-                            "CHECKBOX_ZAZNACZONY" -> "Zaznaczam zgodę…"
+                            "CHECKBOX_ZAZNACZONY" -> "Zaznaczam zgodę / politykę…"
                             "CAPTCHA_GOTOWA_CZEKAM" -> "Captcha załadowana — czekam przed Zaloguj…"
                             "PRZYCISK_ZALOGUJ" -> "Klikam Zaloguj się…"
                             "HASLO_WYSLANE" -> "Hasło wysłane — kończę logowanie…"

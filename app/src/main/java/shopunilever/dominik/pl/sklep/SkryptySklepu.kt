@@ -24,10 +24,88 @@ object SkryptySklepu {
 })();
 """
 
+    /**
+     * Baner Meetanshi CookieNotice: przycisk „PRZEJDŹ DO SKLEPU” (a.m-button.m-accept)
+     * + Amasty „Akceptuj wszystkie”.
+     */
+    const val CIASTECZKA = """
+(function() {
+    function post(info) {
+        if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'ciasteczka', sukces: true, info: info });
+    }
+    function kliknij(el) {
+        if (!el) return false;
+        try { el.click(); return true; } catch (e) { return false; }
+    }
+    try {
+        // 1) Natywna funkcja sklepu
+        if (typeof window.cookieNoticeAccept === 'function') {
+            try { window.cookieNoticeAccept(); } catch (e) {}
+        }
+
+        // 2) Przycisk „PRZEJDŹ DO SKLEPU”
+        var przejdz = document.querySelector('a.m-button.m-accept') ||
+            document.querySelector('#action-custom-css a.m-accept') ||
+            document.querySelector('#m-cookienotice a.m-accept') ||
+            document.querySelector('a[href*="cookieNoticeAccept"]');
+        if (przejdz && kliknij(przejdz)) {
+            post('PRZEJDZ_DO_SKLEPU');
+        }
+
+        // 3) Amasty GDPR cookie
+        var amasty = document.querySelector('.amgdprcookie-button.-allow') ||
+            document.querySelector('button.amgdprcookie-button.-allow') ||
+            document.querySelector('[data-amgdpr-js] .amgdprcookie-button.-allow');
+        if (amasty && kliknij(amasty)) {
+            post('AMASTY_ALLOW');
+        }
+
+        // 4) Szukaj po tekście
+        var frazy = ['przejdź do sklepu', 'przejdz do sklepu', 'akceptuj wszystkie', 'accept all', 'akceptuj', 'zgadzam'];
+        var els = document.querySelectorAll('a, button, [role="button"], span.m-button');
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            var txt = ((el.textContent || el.innerText || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (!txt || txt.length > 40) continue;
+            for (var j = 0; j < frazy.length; j++) {
+                if (txt.indexOf(frazy[j]) >= 0) {
+                    if (kliknij(el)) { post('TEKST:' + frazy[j]); break; }
+                }
+            }
+        }
+
+        // 5) Ukryj overlay na siłę
+        var banner = document.getElementById('m-cookienotice');
+        if (banner) {
+            banner.style.setProperty('display', 'none', 'important');
+            banner.style.setProperty('visibility', 'hidden', 'important');
+            banner.style.setProperty('pointer-events', 'none', 'important');
+        }
+        var overlay = document.getElementById('action-custom-css');
+        if (overlay) {
+            overlay.style.setProperty('display', 'none', 'important');
+            overlay.style.setProperty('pointer-events', 'none', 'important');
+        }
+        document.body.classList.remove('_has-modal');
+        document.body.style.setProperty('overflow', 'auto', 'important');
+        post('DONE');
+    } catch (e) {
+        post('ERROR');
+    }
+})();
+true;
+"""
+
     /** Wykrycie etapu formularza: email / SMS / hasło / już zalogowany */
     const val WYKRYJ = """
 (function() {
     try {
+        var cookieBtn = document.querySelector('a.m-button.m-accept');
+        var cookieBanner = document.getElementById('m-cookienotice');
+        if (cookieBtn && cookieBanner && cookieBanner.style.display !== 'none' && cookieBanner.offsetParent !== null) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'COOKIE_BANNER' });
+            return;
+        }
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="token"]') ||
             document.querySelector('input[name="access_token"]') ||
@@ -205,29 +283,68 @@ true;
     function post(info) {
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: info });
     }
-    function znajdzCheckbox() {
-        return document.querySelector('input[id^="amprivacy-checkbox-"]') ||
-            document.querySelector('input[name="amgdpr_agreement[statute_ap]"]') ||
-            document.querySelector('input[type="checkbox"][name*="gdpr"]') ||
-            document.querySelector('input[type="checkbox"][name*="privacy"]') ||
-            document.querySelector('input[type="checkbox"][id*="privacy"]') ||
-            document.querySelector('.amprivacy-checkbox input[type="checkbox"]') ||
-            document.querySelector('form#login-form input[type="checkbox"]');
-    }
-    function zaznaczCheckbox() {
-        var gdpr = znajdzCheckbox();
-        if (!gdpr || gdpr.checked) return !!gdpr;
+    function zaznaczJeden(gdpr) {
+        if (!gdpr) return false;
+        if (gdpr.checked) return true;
+        try {
+            gdpr.focus();
+            gdpr.click();
+        } catch (e) {}
         try {
             gdpr.dispatchEvent(new MouseEvent('click', { view: window, bubbles: true, cancelable: true }));
         } catch (e) {}
         gdpr.checked = true;
+        try { gdpr.setAttribute('checked', 'checked'); } catch (e) {}
         gdpr.dispatchEvent(new Event('input', { bubbles: true }));
         gdpr.dispatchEvent(new Event('change', { bubbles: true }));
+        if (window.jQuery) {
+            try { window.jQuery(gdpr).prop('checked', true).trigger('change').trigger('click'); } catch (e) {}
+        }
         if (gdpr.id) {
             var label = document.querySelector('label[for="' + gdpr.id + '"]');
             if (label) try { label.click(); } catch (e) {}
         }
-        return true;
+        var parentLabel = gdpr.closest('label');
+        if (parentLabel) try { parentLabel.click(); } catch (e) {}
+        return !!gdpr.checked;
+    }
+    function zaznaczCheckbox() {
+        var selektory = [
+            'input[id^="amprivacy-checkbox-"]',
+            'input[name="amgdpr_agreement[statute_ap]"]',
+            'input[name*="amgdpr_agreement"]',
+            'input[type="checkbox"][name*="gdpr"]',
+            'input[type="checkbox"][name*="privacy"]',
+            'input[type="checkbox"][name*="statute"]',
+            'input[type="checkbox"][id*="privacy"]',
+            'input[type="checkbox"][id*="amprivacy"]',
+            '.amprivacy-checkbox input[type="checkbox"]',
+            '.amgdpr-form input[type="checkbox"]',
+            'form#login-form input[type="checkbox"]',
+            'form.form-login input[type="checkbox"]',
+            '.form-customer-login input[type="checkbox"]',
+            '#customer-login-form input[type="checkbox"]'
+        ];
+        var ok = false;
+        for (var s = 0; s < selektory.length; s++) {
+            var lista = document.querySelectorAll(selektory[s]);
+            for (var i = 0; i < lista.length; i++) {
+                if (zaznaczJeden(lista[i])) ok = true;
+            }
+        }
+        // Etykiety z tekstem polityki / regulaminu
+        var labels = document.querySelectorAll('label, .amprivacy-checkbox, .statute-info');
+        for (var L = 0; L < labels.length; L++) {
+            var txt = ((labels[L].textContent || '') + '').toLowerCase();
+            if (txt.indexOf('polityk') >= 0 || txt.indexOf('regulamin') >= 0 ||
+                txt.indexOf('statut') >= 0 || txt.indexOf('zgadzam') >= 0 ||
+                txt.indexOf('akceptuj') >= 0 || txt.indexOf('prywatno') >= 0) {
+                try { labels[L].click(); } catch (e) {}
+                var inp = labels[L].querySelector('input[type="checkbox"]');
+                if (inp && zaznaczJeden(inp)) ok = true;
+            }
+        }
+        return ok;
     }
     function captchaGotowa() {
         var ta = document.querySelector('textarea[name="g-recaptcha-response"]');
