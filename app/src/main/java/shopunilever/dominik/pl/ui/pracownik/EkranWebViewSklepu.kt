@@ -187,10 +187,15 @@ private class StanLogowaniaSklepu(
         if (zalogowany.get()) return
 
         val u = url?.lowercase().orEmpty()
-        // Daj banerowi chwilę zniknąć, potem wykryj formularz
+        // Amasty modal ładuje się z opóźnieniem — kilka prób + potem wykrycie formularza
+        listOf(600L, 1600L, 3200L).forEach { opoznienie ->
+            webView?.postDelayed({
+                if (zalogowany.get()) return@postDelayed
+                wstrzyknij(SkryptySklepu.CIASTECZKA)
+            }, opoznienie)
+        }
         webView?.postDelayed({
             if (zalogowany.get()) return@postDelayed
-            wstrzyknij(SkryptySklepu.CIASTECZKA)
             if (u.startsWith(StaleSklepu.URL_SKLEPU.lowercase()) &&
                 !u.contains("access") &&
                 !u.contains("login") &&
@@ -202,7 +207,7 @@ private class StanLogowaniaSklepu(
             } else {
                 wstrzyknij(SkryptySklepu.WYKRYJ)
             }
-        }, 700)
+        }, 3800)
     }
 
     fun obsluzWiadomosc(json: String) {
@@ -221,9 +226,12 @@ private class StanLogowaniaSklepu(
 
                 "WYKRYJ" -> when (obj.optString("wynik")) {
                     "COOKIE_BANNER" -> {
-                        status = "Akceptuję politykę — Przejdź do sklepu…"
+                        status = "Akceptuję cookies — Akceptuj wszystkie / Przejdź do sklepu…"
                         wstrzyknij(SkryptySklepu.CIASTECZKA)
-                        webView?.postDelayed({ wstrzyknij(SkryptySklepu.WYKRYJ) }, 800)
+                        webView?.postDelayed({
+                            wstrzyknij(SkryptySklepu.CIASTECZKA)
+                            wstrzyknij(SkryptySklepu.WYKRYJ)
+                        }, 1500)
                     }
                     "EMAIL_FIELD" -> {
                         if (!emailWyslany.get()) wstrzyknijEmail()

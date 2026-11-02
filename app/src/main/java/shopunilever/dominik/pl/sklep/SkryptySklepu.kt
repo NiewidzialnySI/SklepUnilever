@@ -25,111 +25,146 @@ object SkryptySklepu {
 """
 
     /**
-     * Baner Meetanshi CookieNotice: przycisk „PRZEJDŹ DO SKLEPU” (a.m-button.m-accept)
-     * + Amasty „Akceptuj wszystkie”.
+     * 1) Meetanshi „PRZEJDŹ DO SKLEPU”
+     * 2) Amasty modal „Akceptuj wszystkie” (zasłania formularz — krytyczne)
+     * Retry wewnątrz, bo modal ładuje się przez Knockout z opóźnieniem.
      */
     const val CIASTECZKA = """
 (function() {
+    if (window.__sklepikCiasteczkaTrwa) return;
+    window.__sklepikCiasteczkaTrwa = true;
     function post(info) {
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'ciasteczka', sukces: true, info: info });
     }
     function kliknij(el) {
         if (!el) return false;
-        try { el.click(); return true; } catch (e) { return false; }
+        try {
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            el.click();
+            return true;
+        } catch (e) { return false; }
     }
-    try {
-        // 1) Natywna funkcja sklepu
+    function ukryj(el) {
+        if (!el) return;
+        el.style.setProperty('display', 'none', 'important');
+        el.style.setProperty('visibility', 'hidden', 'important');
+        el.style.setProperty('pointer-events', 'none', 'important');
+        el.classList.remove('_show');
+    }
+    function amastyOtwarte() {
+        return document.querySelector('.amgdprcookie-modal-container._show, .modal-popup.amgdprcookie-modal-container._show, aside.amgdprcookie-modal-container._show');
+    }
+    function kliknijAmasty() {
+        var modal = amastyOtwarte() || document.querySelector('.amgdprcookie-modal-container, [data-role=gdpr-cookie-container]');
+        var btn = (modal && (modal.querySelector('button.amgdprcookie-button.-allow') || modal.querySelector('.amgdprcookie-button.-allow'))) ||
+            document.querySelector('button.amgdprcookie-button.-allow') ||
+            document.querySelector('.amgdprcookie-buttons-block .amgdprcookie-button.-allow');
+        if (btn && kliknij(btn)) { post('AMASTY_ALLOW'); return true; }
+        var all = document.querySelectorAll('button, a');
+        for (var i = 0; i < all.length; i++) {
+            var t = ((all[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (t === 'akceptuj wszystkie' || t.indexOf('akceptuj wszystkie') >= 0 || t.indexOf('allow all') >= 0) {
+                if (kliknij(all[i])) { post('TEKST:akceptuj wszystkie'); return true; }
+            }
+        }
+        return false;
+    }
+    function kliknijPrzejdz() {
         if (typeof window.cookieNoticeAccept === 'function') {
             try { window.cookieNoticeAccept(); } catch (e) {}
         }
-
-        // 2) Przycisk „PRZEJDŹ DO SKLEPU”
         var przejdz = document.querySelector('a.m-button.m-accept') ||
-            document.querySelector('#action-custom-css a.m-accept') ||
             document.querySelector('#m-cookienotice a.m-accept') ||
-            document.querySelector('a[href*="cookieNoticeAccept"]');
-        if (przejdz && kliknij(przejdz)) {
-            post('PRZEJDZ_DO_SKLEPU');
-        }
-
-        // 3) Amasty GDPR cookie
-        var amasty = document.querySelector('.amgdprcookie-button.-allow') ||
-            document.querySelector('button.amgdprcookie-button.-allow') ||
-            document.querySelector('[data-amgdpr-js] .amgdprcookie-button.-allow');
-        if (amasty && kliknij(amasty)) {
-            post('AMASTY_ALLOW');
-        }
-
-        // 4) Szukaj po tekście
-        var frazy = ['przejdź do sklepu', 'przejdz do sklepu', 'akceptuj wszystkie', 'accept all', 'akceptuj', 'zgadzam'];
-        var els = document.querySelectorAll('a, button, [role="button"], span.m-button');
+            document.querySelector('#action-custom-css a.m-accept');
+        if (przejdz && kliknij(przejdz)) { post('PRZEJDZ_DO_SKLEPU'); return true; }
+        var els = document.querySelectorAll('a, button');
         for (var i = 0; i < els.length; i++) {
-            var el = els[i];
-            var txt = ((el.textContent || el.innerText || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
-            if (!txt || txt.length > 40) continue;
-            for (var j = 0; j < frazy.length; j++) {
-                if (txt.indexOf(frazy[j]) >= 0) {
-                    if (kliknij(el)) { post('TEKST:' + frazy[j]); break; }
-                }
+            var t = ((els[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (t.indexOf('przejdź do sklepu') >= 0 || t.indexOf('przejdz do sklepu') >= 0) {
+                if (kliknij(els[i])) { post('TEKST:przejdz do sklepu'); return true; }
             }
         }
-
-        // 5) Ukryj overlay na siłę
-        var banner = document.getElementById('m-cookienotice');
-        if (banner) {
-            banner.style.setProperty('display', 'none', 'important');
-            banner.style.setProperty('visibility', 'hidden', 'important');
-            banner.style.setProperty('pointer-events', 'none', 'important');
-        }
-        var overlay = document.getElementById('action-custom-css');
-        if (overlay) {
-            overlay.style.setProperty('display', 'none', 'important');
-            overlay.style.setProperty('pointer-events', 'none', 'important');
-        }
-        document.body.classList.remove('_has-modal');
-        document.body.style.setProperty('overflow', 'auto', 'important');
-        post('DONE');
-    } catch (e) {
-        post('ERROR');
+        return false;
     }
+    var proba = 0;
+    function tick() {
+        proba++;
+        kliknijPrzejdz();
+        kliknijAmasty();
+        ukryj(document.getElementById('m-cookienotice'));
+        ukryj(document.getElementById('action-custom-css'));
+        if (!amastyOtwarte() || proba >= 12) {
+            var m = amastyOtwarte();
+            if (m) {
+                kliknijAmasty();
+                ukryj(m);
+                var confirm = document.querySelector('.modals-overlay');
+                ukryj(confirm);
+            }
+            document.body.classList.remove('_has-modal');
+            document.body.style.setProperty('overflow', 'auto', 'important');
+            window.__sklepikCiasteczkaTrwa = false;
+            post(amastyOtwarte() ? 'PARTIAL' : 'DONE');
+            return;
+        }
+        setTimeout(tick, 700);
+    }
+    tick();
 })();
 true;
 """
 
-    /** Wykrycie etapu formularza: email / SMS / hasło / już zalogowany */
+    /** Wykrycie etapu formularza — tylko WIDOCZNE pola (ukryty #pass w popupie Magento nie liczy się). */
     const val WYKRYJ = """
 (function() {
+    function widoczny(el) {
+        if (!el) return false;
+        var st = window.getComputedStyle(el);
+        if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) return false;
+        var r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) return false;
+        // ukryty w nested display:none
+        var p = el;
+        while (p) {
+            if (p.id === 'authenticationPopup' || (p.getAttribute && p.getAttribute('data-bind') && String(p.getAttribute('data-bind')).indexOf('authenticationPopup') >= 0)) {
+                var pst = window.getComputedStyle(p);
+                if (pst.display === 'none' || p.style.display === 'none') return false;
+            }
+            p = p.parentElement;
+        }
+        return true;
+    }
     try {
-        var cookieBtn = document.querySelector('a.m-button.m-accept');
-        var cookieBanner = document.getElementById('m-cookienotice');
-        if (cookieBtn && cookieBanner && cookieBanner.style.display !== 'none' && cookieBanner.offsetParent !== null) {
+        if (document.querySelector('.amgdprcookie-modal-container._show') ||
+            (document.querySelector('button.amgdprcookie-button.-allow') && document.querySelector('.modals-overlay, .amgdprcookie-modal-container._show'))) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'COOKIE_BANNER' });
+            return;
+        }
+        var meet = document.getElementById('m-cookienotice');
+        if (meet && widoczny(meet) && document.querySelector('a.m-button.m-accept')) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'COOKIE_BANNER' });
             return;
         }
         var tokenField = document.getElementById('access_token') ||
-            document.querySelector('input[name="token"]') ||
             document.querySelector('input[name="access_token"]') ||
-            document.querySelector('input[id*="token"]') ||
-            document.querySelector('input[name*="token"]');
-        if (tokenField && tokenField.offsetParent !== null) {
+            document.querySelector('input[name="token"]');
+        if (widoczny(tokenField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'SMS_TOKEN_FIELD' });
             return;
         }
         var emailField = document.getElementById('access_email');
-        if (emailField && emailField.offsetParent !== null) {
+        if (widoczny(emailField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'EMAIL_FIELD' });
             return;
         }
         var passwordField = document.getElementById('pass') ||
-            document.querySelector('input[type="password"]#pass') ||
-            document.querySelector('input[name="login[password]"]') ||
-            document.querySelector('input[type="password"]');
-        if (passwordField && passwordField.offsetParent !== null) {
+            document.querySelector('input[name="login[password]"]');
+        if (widoczny(passwordField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
             return;
         }
         var logoutLink = document.querySelector('a[href*="logout"], a[href*="customer/account/logout"]');
-        if (logoutLink) {
+        if (logoutLink && widoczny(logoutLink)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
@@ -363,10 +398,25 @@ true;
     }
 
     try {
-        // 1) Najpierw hasło
-        var passField = document.getElementById('pass') ||
-            document.querySelector('input[name="login[password]"]') ||
-            document.querySelector('input[type="password"]');
+        function widoczny(el) {
+            if (!el) return false;
+            var st = window.getComputedStyle(el);
+            if (st.display === 'none' || st.visibility === 'hidden') return false;
+            var r = el.getBoundingClientRect();
+            return r.width > 2 && r.height > 2;
+        }
+        // 1) Najpierw hasło — tylko widoczne pole (nie popup Magento)
+        var passField = document.getElementById('pass');
+        if (!widoczny(passField)) {
+            passField = document.querySelector('input[name="login[password]"]');
+        }
+        if (!widoczny(passField)) {
+            var candidates = document.querySelectorAll('input[type="password"]');
+            passField = null;
+            for (var pi = 0; pi < candidates.length; pi++) {
+                if (widoczny(candidates[pi])) { passField = candidates[pi]; break; }
+            }
+        }
         if (!passField) {
             window.isProcessingLogin = false;
             if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: 'PASS_FIELD_NOT_FOUND' });
