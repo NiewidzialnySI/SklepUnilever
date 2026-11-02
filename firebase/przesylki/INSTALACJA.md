@@ -30,14 +30,26 @@ Po wygenerowaniu **nowego** kodu QR trzeba zaktualizować adres u kuriera — st
 ## Instalacja skryptu
 
 1. Otwórz https://script.google.com na koncie Gmail Sklepik.
-2. Nowy projekt → wklej treść `SklepUnileverPrzesylki.gs`.
-3. **Ustawienia projektu → Właściwości skryptu** → dodaj:
+2. **Nowy projekt** (albo w istniejącym: `Kod.gs` → Ctrl+A → Delete).
+3. Otwórz plik `SklepUnileverPrzesylki.gs` z dysku / repo → **skopiuj CAŁOŚĆ** (ok. 500+ linii, kończy się na `utworzEtykieteJesliBrak`) → wklej do `Kod.gs`.
+4. **Ctrl+S** (zapisz). Poczekaj aż zniknie „Zapisywanie…”.
+5. Lista funkcji (obok Uruchom) → wybierz `zainstalujTrigger` → Uruchom → zatwierdź uprawnienia Gmail + UrlFetch.
+6. **Ustawienia projektu (koło zębate) → Właściwości skryptu** → dodaj:
    - Klucz: `FIREBASE_SA_JSON`
-   - Wartość: cały JSON service account (jedna linia).
-4. Uruchom raz `zainstalujTrigger` (zatwierdź uprawnienia Gmail + UrlFetch).
-5. Opcjonalnie: `testReczny` na kilku mailach w skrzynce.
+   - Wartość: cały JSON service account (jedna linia, projekt **sklepunilever-app**).
+7. Opcjonalnie: `testReczny` na kilku mailach w skrzynce.
 
 Trigger działa co **5 minut**.
+
+### Błędy typowe
+
+| Komunikat | Przyczyna | Co zrobić |
+|-----------|-----------|-----------|
+| `Unexpected end of input` | Ucięte wklejenie (brak końca pliku) | Skasuj `Kod.gs`, wklej **cały** plik z dysku, Ctrl+S |
+| `nie udało się zapisać projektu` | Edytor nie zapisał przed Run | Ctrl+S, odśwież kartę, spróbuj w oknie incognito |
+| `Brak FIREBASE_SA_JSON` | Brak właściwości | Krok 6 powyżej |
+
+**Nie wklejaj skryptu z czatu / maila** — łatwo ucina się w połowie. Bierz plik z repo: `firebase/przesylki/SklepUnileverPrzesylki.gs`.
 
 ## Reguły RTDB
 

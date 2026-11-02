@@ -1,21 +1,19 @@
 /**
- * Sklep Unilever — przetwarzanie maili UPS/DHL z Gmaila
- * Tryb SPARK (bez Cloud Function) — zapis bezpośrednio do Firebase RTDB.
+ * Sklep Unilever - przetwarzanie maili UPS/DHL z Gmaila
+ * Tryb SPARK (bez Cloud Function) - zapis bezposrednio do Firebase RTDB.
  *
- * Wklej w https://script.google.com (konto Gmail Sklepik / Unilever).
+ * Wklej CALOSC do https://script.google.com (plik Kod.gs).
  * Instrukcja: firebase/przesylki/INSTALACJA.md
  *
- * Ścieżka zapisu (dopasowana do aplikacji):
- *   /transmitters/{transmitterUid}/shipments/{id}
- * Kod z adresu +XXXXXXXX mapowany przez:
- *   /pairing_codes/{KOD}.transmitterUid
+ * Zapis: /transmitters/{transmitterUid}/shipments/{id}
+ * Mapowanie: /pairing_codes/{KOD}.transmitterUid
  */
 
 var ETYKIETA_PRZETWORZONE = 'SklepUnileverPrzetworzone';
 var RTDB_URL = 'https://sklepunilever-app-default-rtdb.europe-west1.firebasedatabase.app';
 
 var WLASCIWOSCI = {
-  FIREBASE_SA_JSON: 'FIREBASE_SA_JSON',
+  FIREBASE_SA_JSON: 'FIREBASE_SA_JSON'
 };
 
 function zainstalujTrigger() {
@@ -30,7 +28,7 @@ function zainstalujTrigger() {
     .everyMinutes(5)
     .create();
   utworzEtykieteJesliBrak();
-  Logger.log('Trigger co 5 min — OK. Ustaw FIREBASE_SA_JSON w Właściwościach skryptu.');
+  Logger.log('Trigger co 5 min - OK. Ustaw FIREBASE_SA_JSON w Wlasciwosciach skryptu.');
 }
 
 function testReczny() {
@@ -39,7 +37,7 @@ function testReczny() {
 
 function przetworzNoweMaile(reczny) {
   if (!PropertiesService.getScriptProperties().getProperty(WLASCIWOSCI.FIREBASE_SA_JSON)) {
-    Logger.log('Brak FIREBASE_SA_JSON w Właściwościach skryptu.');
+    Logger.log('Brak FIREBASE_SA_JSON w Wlasciwosciach skryptu.');
     return;
   }
 
@@ -48,7 +46,7 @@ function przetworzNoweMaile(reczny) {
   var zapytanie =
     'in:inbox -label:' +
     ETYKIETA_PRZETWORZONE +
-    ' (from:ups OR from:dhl OR subject:przesylce OR subject:przesyłce OR subject:DHL OR subject:UPS)';
+    ' (from:ups OR from:dhl OR subject:przesylce OR subject:DHL OR subject:UPS)';
   var watki = GmailApp.search(zapytanie, 0, reczny ? 10 : 30);
 
   for (var i = 0; i < watki.length; i++) {
@@ -98,7 +96,7 @@ function przetworzWiadomosc(wiadomosc) {
     from: from,
     subject: subject,
     dateMs: wiadomosc.getDate() ? wiadomosc.getDate().getTime() : Date.now(),
-    body: body.slice(0, 50000),
+    body: body.slice(0, 50000)
   });
 
   if (przesylki.length === 0) {
@@ -111,14 +109,13 @@ function przetworzWiadomosc(wiadomosc) {
     return {
       ok: false,
       pomin: false,
-      powod: 'Brak pairing_codes/' + pairingCode + ' (nadajnik nieaktywny?)',
+      powod: 'Brak pairing_codes/' + pairingCode + ' (nadajnik nieaktywny?)'
     };
   }
 
   var istniejace = pobierzIstniejacePrzesylki(token, transmitterUid);
   var zapisane = [];
   var zaktualizowane = [];
-  var pominiete = [];
 
   for (var i = 0; i < przesylki.length; i++) {
     var p = przesylki[i];
@@ -134,7 +131,7 @@ function przetworzWiadomosc(wiadomosc) {
   }
 
   if (zapisane.length === 0 && zaktualizowane.length === 0) {
-    return { ok: false, pomin: true, powod: 'Duplikaty', pominiete: pominiete };
+    return { ok: false, pomin: true, powod: 'Duplikaty' };
   }
 
   return {
@@ -142,8 +139,7 @@ function przetworzWiadomosc(wiadomosc) {
     pairingCode: pairingCode,
     transmitterUid: transmitterUid,
     zapisane: zapisane,
-    zaktualizowane: zaktualizowane,
-    pominiete: pominiete,
+    zaktualizowane: zaktualizowane
   };
 }
 
@@ -157,7 +153,7 @@ function pobierzTokenFirebase() {
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email',
+    scope: 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email'
   })).replace(/=+$/, '');
   var input = header + '.' + claim;
   var sig = Utilities.base64EncodeWebSafe(
@@ -170,8 +166,8 @@ function pobierzTokenFirebase() {
     muteHttpExceptions: true,
     payload: {
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    },
+      assertion: jwt
+    }
   });
 
   if (resp.getResponseCode() !== 200) {
@@ -180,7 +176,6 @@ function pobierzTokenFirebase() {
   return JSON.parse(resp.getContentText()).access_token;
 }
 
-/** Kod QR/parowania (8 znaków) → UID nadajnika z /pairing_codes. */
 function rozwiazTransmitterUid(token, pairingCode) {
   var url = RTDB_URL + '/pairing_codes/' + encodeURIComponent(pairingCode) + '.json?access_token=' + token;
   var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
@@ -204,7 +199,7 @@ function pobierzIstniejacePrzesylki(token, transmitterUid) {
   if (!dane) return {};
   var map = {};
   for (var id in dane) {
-    if (!dane.hasOwnProperty(id)) continue;
+    if (!Object.prototype.hasOwnProperty.call(dane, id)) continue;
     var w = dane[id];
     if (w.numer && w.kurier) {
       map[w.kurier + '_' + w.numer.replace(/[^A-Za-z0-9]/g, '').toUpperCase()] = id;
@@ -235,8 +230,8 @@ function aktualizujPrzesylke(token, transmitterUid, shipmentId, p) {
       linkSledzenia: p.linkSledzenia,
       nadawcaPaczki: p.nadawcaPaczki || null,
       zaktualizowano: Date.now(),
-      odczytano: false,
-    }),
+      odczytano: false
+    })
   });
   if (resp.getResponseCode() !== 200) {
     throw new Error('Aktualizacja RTDB: ' + resp.getContentText());
@@ -267,8 +262,8 @@ function zapiszPrzesylke(token, transmitterUid, p, pairingCode) {
       syncCode: pairingCode || null,
       zrodlo: 'email_inbound',
       dodano: Date.now(),
-      odczytano: false,
-    }),
+      odczytano: false
+    })
   });
   if (resp.getResponseCode() !== 200) {
     throw new Error('Zapis RTDB: ' + resp.getContentText());
@@ -291,7 +286,11 @@ function parsujMailPrzesylki(input) {
   var nadawcaPaczki = wyciagnijNadawcePaczki(bodyNorm);
   var nadawcaDhl = input.body.match(/From:\s*DHL[^<\n]*<([^>]+@dhl\.com)>/i);
   var nadawcaUps = input.body.match(/From:\s*UPS[^<\n]*<([^>]+@ups\.com)>/i);
-  var nadawca = nadawcaDhl ? nadawcaDhl[1] : nadawcaUps ? nadawcaUps[1] : String(input.from).trim().slice(0, 200);
+  var nadawca = nadawcaDhl
+    ? nadawcaDhl[1]
+    : nadawcaUps
+      ? nadawcaUps[1]
+      : String(input.from).trim().slice(0, 200);
   var wynik = [];
 
   for (var i = 0; i < numery.length; i++) {
@@ -305,7 +304,7 @@ function parsujMailPrzesylki(input) {
       statusTekst: statusTekst,
       linkSledzenia: wyciagnijLinkSledzenia(bodyNorm, n.kurier, n.numer),
       nadawca: nadawca,
-      nadawcaPaczki: nadawcaPaczki,
+      nadawcaPaczki: nadawcaPaczki
     });
   }
   return wynik;
@@ -333,7 +332,7 @@ function rozpoznajKurierZMaila(from, subject, body) {
     tekst.indexOf('mojdhl.pl') >= 0 ||
     tekst.indexOf('dhlecommerce') >= 0 ||
     tekst.indexOf('pl.no.reply@dhl.com') >= 0 ||
-    /powiadomienie o przesy[lł]k/i.test(tekst)
+    /powiadomienie o przesy[l\u0142]k/i.test(tekst)
   ) {
     return 'dhl';
   }
@@ -349,7 +348,11 @@ function rozpoznajKurierZNadawcy(from) {
 
 function czyKontekstDhl(tekst) {
   var lower = tekst.toLowerCase();
-  return lower.indexOf('dhl.com') >= 0 || lower.indexOf('mojdhl.pl') >= 0 || lower.indexOf('powiadomienie o przesy') >= 0;
+  return (
+    lower.indexOf('dhl.com') >= 0 ||
+    lower.indexOf('mojdhl.pl') >= 0 ||
+    lower.indexOf('powiadomienie o przesy') >= 0
+  );
 }
 
 function wyciagnijNumeryPrzesylek(tekst, preferowany, subject) {
@@ -378,7 +381,7 @@ function wyciagnijNumeryPrzesylek(tekst, preferowany, subject) {
   }
 
   if (subject) {
-    var zTematu = subject.match(/przesy[lł]k[^\d]{0,20}(\d{10,14})/i);
+    var zTematu = subject.match(/przesy[l\u0142]k[^\d]{0,20}(\d{10,14})/i);
     if (zTematu) wyniki.push({ numer: zTematu[1], kurier: 'dhl' });
   }
 
@@ -401,8 +404,8 @@ function wyciagnijNadawcePaczki(tekst) {
   var t = normalizujTrescMaila(tekst);
   var wzorce = [
     /paczka od\s+(.+?)\s+o numerze/i,
-    /Z\s+([A-Z0-9\s.]+?)\s+Dor[eę]czenie/i,
-    /(ARTERIA LOGISTICS[^\n]{0,80})/i,
+    /Z\s+([A-Z0-9\s.]+?)\s+Dor[e\u0119]czenie/i,
+    /(ARTERIA LOGISTICS[^\n]{0,80})/i
   ];
   for (var i = 0; i < wzorce.length; i++) {
     var m = t.match(wzorce[i]);
@@ -424,7 +427,6 @@ function unikalneNumery(wyniki) {
   return filtrujZagniezdzoneNumery(out);
 }
 
-/** Usuwa krótsze numery będące fragmentem dłuższego (np. 0975738226 z 30975738226). */
 function filtrujZagniezdzoneNumery(wyniki) {
   return wyniki.filter(function (w) {
     for (var i = 0; i < wyniki.length; i++) {
@@ -443,7 +445,12 @@ function wyciagnijLinkSledzenia(tekst, kurier, numer) {
   if (urls) {
     for (var i = 0; i < urls.length; i++) {
       var u = urls[i].toLowerCase();
-      if (kurier === 'ups' && u.indexOf('ups.com') >= 0 && u.indexOf('track') >= 0 && u.indexOf(numer.toLowerCase()) >= 0) {
+      if (
+        kurier === 'ups' &&
+        u.indexOf('ups.com') >= 0 &&
+        u.indexOf('track') >= 0 &&
+        u.indexOf(numer.toLowerCase()) >= 0
+      ) {
         return urls[i];
       }
       if (kurier === 'dhl' && u.indexOf('mojdhl.pl') >= 0 && u.indexOf(numer) >= 0) {
@@ -460,9 +467,9 @@ function wyciagnijLinkSledzenia(tekst, kurier, numer) {
 function wyciagnijSzacowanaDostawe(tekst) {
   var t = normalizujTrescMaila(tekst);
   var wzorce = [
-    /Dor[eę]czenie\s+\S+\s+(\d{2}\/\d{2}\/\d{4})/i,
-    /(?:delivery|dostaw[aę])\s*(?:on|date|:|\-)?\s*(\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4})/i,
-    /(\d{4}-\d{2}-\d{2})/,
+    /Dor[e\u0119]czenie\s+\S+\s+(\d{2}\/\d{2}\/\d{4})/i,
+    /(?:delivery|dostaw[a\u0105])\s*(?:on|date|:|-)?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
+    /(\d{4}-\d{2}-\d{2})/
   ];
   for (var i = 0; i < wzorce.length; i++) {
     var m = t.match(wzorce[i]);
@@ -473,15 +480,15 @@ function wyciagnijSzacowanaDostawe(tekst) {
 
 function wyciagnijFragmentStatusu(tekst, subject) {
   var wzorce = [
-    /przesy[lł]ka\s+dor[eę]czona/i,
-    /zosta[lł]a\s+dor[eę]czona/i,
+    /przesy[l\u0142]ka\s+dor[e\u0119]czona/i,
+    /zosta[l\u0142]a\s+dor[e\u0119]czona/i,
     /zmiana\s+w\s+zaplanowanej\s+dostawie/i,
-    /zosta[lł]a\s+odebrana\s+z\s+punktu\s+DHL\s+POP/i,
-    /przeka[zż]emy\s+paczk[eę]/i,
+    /zosta[l\u0142]a\s+odebrana\s+z\s+punktu\s+DHL\s+POP/i,
+    /przeka[z\u017c]emy\s+paczk[e\u0119]/i,
     /out for delivery/i,
     /w drodze/i,
     /delivered/i,
-    /shipped/i,
+    /shipped/i
   ];
   var zrodla = [subject || '', tekst || ''];
   for (var s = 0; s < zrodla.length; s++) {
