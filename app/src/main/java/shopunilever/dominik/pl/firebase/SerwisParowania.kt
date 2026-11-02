@@ -298,7 +298,10 @@ object SerwisParowania {
         awaitClose { ref.removeEventListener(listener) }
     }
 
-    /** Status własnej prośby (rodzina). */
+    /**
+     * Status dostępu rodziny.
+     * Gdy pracownik kliknie „Odłącz”, węzły znikają — to NIE jest pending, tylko „revoked”.
+     */
     fun obserwujStatusProsby(context: Context): Flow<String> = callbackFlow {
         val tx = PreferencjeOdbiorcy.uidNadajnika(context)
         val uid = PreferencjeOdbiorcy.uid(context)
@@ -307,25 +310,74 @@ object SerwisParowania {
             close()
             return@callbackFlow
         }
-        val ref = FirebaseSklepik.baza(context).reference
+        val baza = FirebaseSklepik.baza(context).reference
             .child(StaleFirebase.Sciezki.TRANSMITTERS)
             .child(tx)
-            .child("accessRequests")
-            .child(uid)
-            .child("status")
-        val listener = object : ValueEventListener {
+        val refProsba = baza.child("accessRequests").child(uid)
+        val refOdbiorca = baza.child("receivers").child(uid)
+
+        var snapProsba: DataSnapshot? = null
+        var snapOdbiorca: DataSnapshot? = null
+        var mamProsbe = false
+        var mamOdbiorce = false
+
+        fun przelicz() {
+            if (!mamProsbe || !mamOdbiorce) return
+            val prosba = snapProsba
+            val odbiorca = snapOdbiorca
+            val stProsby = prosba?.child("status")?.getValue(String::class.java)
+            val istniejeOdbiorca = odbiorca?.exists() == true
+            val zablokowany = odbiorca?.child("blocked")?.getValue(Boolean::class.java) == true
+
+            val wynik = when {
+                istniejeOdbiorca && !zablokowany -> "approved"
+                istniejeOdbiorca && zablokowany -> "revoked"
+                stProsby == "pending" -> "pending"
+                stProsby == "rejected" -> "rejected"
+                stProsby == "approved" && !istniejeOdbiorca -> "revoked"
+                prosba?.exists() != true -> {
+                    // Usunięte przez pracownika — nie mylić z „pending”
+                    val lokalny = PreferencjeOdbiorcy.status(context)
+                    if (lokalny == "approved" || lokalny == "pending" || lokalny == "rejected") {
+                        "revoked"
+                    } else {
+                        "brak"
+                    }
+                }
+                else -> stProsby ?: "brak"
+            }
+            PreferencjeOdbiorcy.ustawStatus(context, wynik)
+            trySend(wynik)
+        }
+
+        val listenerProsba = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val st = snapshot.getValue(String::class.java) ?: "pending"
-                PreferencjeOdbiorcy.ustawStatus(context, st)
-                trySend(st)
+                snapProsba = snapshot
+                mamProsbe = true
+                przelicz()
             }
 
             override fun onCancelled(error: DatabaseError) {
                 trySend(PreferencjeOdbiorcy.status(context))
             }
         }
-        ref.addValueEventListener(listener)
-        awaitClose { ref.removeEventListener(listener) }
+        val listenerOdbiorca = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                snapOdbiorca = snapshot
+                mamOdbiorce = true
+                przelicz()
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(PreferencjeOdbiorcy.status(context))
+            }
+        }
+        refProsba.addValueEventListener(listenerProsba)
+        refOdbiorca.addValueEventListener(listenerOdbiorca)
+        awaitClose {
+            refProsba.removeEventListener(listenerProsba)
+            refOdbiorca.removeEventListener(listenerOdbiorca)
+        }
     }
 
     /** SMS relay z telefonu pracownika → rodzina. */

@@ -2,6 +2,7 @@ package shopunilever.dominik.pl.ui.rodzina
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,11 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Login
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +62,7 @@ import shopunilever.dominik.pl.ui.components.TloAplikacji
 import shopunilever.dominik.pl.ui.pracownik.EkranWebViewSklepu
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
+import shopunilever.dominik.pl.ui.theme.Blad
 import shopunilever.dominik.pl.ui.theme.Sukces
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
@@ -77,24 +80,51 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
     var info by remember { mutableStateOf<String?>(null) }
     var pokazSklep by remember { mutableStateOf(false) }
 
-    LaunchedEffect(PreferencjeOdbiorcy.uidNadajnika(kontekst), status) {
+    fun poOdlaczeniuPrzezPracownika(komunikat: String) {
+        PreferencjeOdbiorcy.wyczysc(kontekst)
+        PreferencjeKonta.wyczysc(kontekst)
+        pokazSklep = false
+        status = ""
+        kodWpisywany = ""
+        info = null
+        blad = komunikat
+    }
+
+    LaunchedEffect(PreferencjeOdbiorcy.uidNadajnika(kontekst)) {
         if (PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()) return@LaunchedEffect
         SerwisParowania.obserwujStatusProsby(kontekst).collectLatest { st ->
-            status = st
-            if (st == "approved") {
-                runCatching {
-                    SerwisParowania.pobierzDaneLogowania(kontekst)?.let { dane ->
-                        PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
+            when (st) {
+                "approved" -> {
+                    status = "approved"
+                    runCatching {
+                        SerwisParowania.pobierzDaneLogowania(kontekst)?.let { dane ->
+                            PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
+                        }
+                    }
+                    blad = null
+                    info = "Połączono — możesz zalogować się do sklepu."
+                }
+                "pending" -> {
+                    status = "pending"
+                }
+                "rejected" -> {
+                    poOdlaczeniuPrzezPracownika("Prośba odrzucona — zeskanuj nowy kod od pracownika.")
+                }
+                "revoked" -> {
+                    poOdlaczeniuPrzezPracownika(
+                        "Pracownik odłączył to urządzenie — zeskanuj nowy kod, żeby połączyć się ponownie."
+                    )
+                }
+                else -> {
+                    if (st == "brak") {
+                        status = PreferencjeOdbiorcy.status(kontekst).ifBlank { "" }
                     }
                 }
-                info = "Połączono — możesz zalogować się do sklepu."
-            } else if (st == "rejected") {
-                blad = "Prośba odrzucona."
             }
         }
     }
 
-    if (pokazSklep) {
+    if (pokazSklep && status == "approved") {
         EkranWebViewSklepu(
             onZamknij = { pokazSklep = false },
             trybOdbiorcy = true,
@@ -206,7 +236,17 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                                                 pokazSklep = true
                                             }
                                         }.onFailure {
-                                            blad = it.message
+                                            // Brak read = zwykle odłączono
+                                            val msg = it.message.orEmpty()
+                                            if (msg.contains("Permission", ignoreCase = true) ||
+                                                msg.contains("denied", ignoreCase = true)
+                                            ) {
+                                                poOdlaczeniuPrzezPracownika(
+                                                    "Brak dostępu — zeskanuj nowy kod od pracownika."
+                                                )
+                                            } else {
+                                                blad = it.message
+                                            }
                                         }
                                         ladowanie = false
                                     }
@@ -224,16 +264,10 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                                 )
                             }
                         }
-                        TextButton(onClick = {
-                            PreferencjeOdbiorcy.wyczysc(kontekst)
-                            status = ""
-                            info = null
-                        }) {
-                            Icon(Icons.Rounded.LinkOff, null, tint = TekstDrugi, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.size(6.dp))
-                            Text("Odłącz", color = TekstDrugi)
-                        }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    KafelekPaczek()
                 }
 
                 "pending" -> {
@@ -255,6 +289,8 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                         TextButton(onClick = {
                             PreferencjeOdbiorcy.wyczysc(kontekst)
                             status = ""
+                            blad = null
+                            info = null
                         }) {
                             Text("Anuluj", color = TekstDrugi)
                         }
@@ -283,7 +319,13 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("albo wpisz ręcznie", color = TekstDrugi, fontSize = 12.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                        Text(
+                            "albo wpisz ręcznie",
+                            color = TekstDrugi,
+                            fontSize = 12.sp,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
 
                         OutlinedTextField(
@@ -339,12 +381,60 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
             }
             blad?.let {
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(it, color = Color(0xFFF87171), fontSize = 13.sp)
+                Text(it, color = Blad, fontSize = 13.sp, lineHeight = 18.sp)
             }
             info?.let {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(it, color = Sukces, fontSize = 13.sp)
             }
         }
+    }
+}
+
+@Composable
+private fun KafelekPaczek() {
+    SzkloKarta {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(AkcentMorski.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Inventory2,
+                    contentDescription = null,
+                    tint = AkcentMorski,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "PACZKI",
+                    color = AkcentNeon,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Informacje o przesyłkach",
+                    color = TekstGlowny,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "Brak aktywnych paczek",
+            color = TekstDrugi,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
     }
 }
