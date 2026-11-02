@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,15 +45,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeParowania
@@ -67,6 +75,9 @@ import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
 fun EkranUstawien(modifier: Modifier = Modifier) {
     val kontekst = LocalContext.current
     val zakres = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val klawiatura = LocalSoftwareKeyboardController.current
+    val focusHasla = remember { FocusRequester() }
 
     var email by remember { mutableStateOf(PreferencjeKonta.email(kontekst)) }
     var haslo by remember { mutableStateOf("") }
@@ -74,7 +85,6 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
     var edycjaHasla by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var blad by remember { mutableStateOf<String?>(null) }
-
     val emailZapisany = PreferencjeKonta.email(kontekst)
     val emailZmieniony = email.trim() != emailZapisany
 
@@ -89,6 +99,16 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
         focusedContainerColor = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
+
+    fun zamknijEdycjeHasla() {
+        if (!edycjaHasla) return
+        edycjaHasla = false
+        haslo = ""
+        pokazHaslo = false
+        blad = null
+        focusManager.clearFocus(force = true)
+        klawiatura?.hide()
+    }
 
     fun syncFirebaseJesliTrzeba() {
         if (PreferencjeParowania.czyAktywne(kontekst)) {
@@ -122,7 +142,20 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                 edycjaHasla = false
                 status = "Zapisano hasło."
                 blad = null
+                focusManager.clearFocus(force = true)
+                klawiatura?.hide()
                 syncFirebaseJesliTrzeba()
+            }
+        }
+    }
+
+    LaunchedEffect(edycjaHasla) {
+        if (edycjaHasla) {
+            // Po animacji rozwinięcia — fokus + klawiatura
+            delay(300)
+            runCatching {
+                focusHasla.requestFocus()
+                klawiatura?.show()
             }
         }
     }
@@ -132,6 +165,12 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
             .fillMaxSize()
             .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 20.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                if (edycjaHasla) zamknijEdycjeHasla()
+            }
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Top
     ) {
@@ -167,7 +206,13 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                     status = null
                     blad = null
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { stan ->
+                        if (stan.isFocused && edycjaHasla) {
+                            zamknijEdycjeHasla()
+                        }
+                    },
                 label = { Text("Email służbowy") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -183,8 +228,6 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Animacja z googlecodelabs/android-compose-codelabs (AnimationCodelab):
-            // expandVertically + slideInVertically — pole hasła wypycha przycisk w dół.
             AnimatedVisibility(
                 visible = edycjaHasla,
                 enter = expandVertically(
@@ -210,7 +253,9 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                             status = null
                             blad = null
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusHasla),
                         label = { Text("Nowe hasło") },
                         placeholder = { Text("Wpisz nowe hasło") },
                         singleLine = true,
@@ -258,9 +303,9 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                             zapiszHaslo()
                         } else {
                             if (emailZmieniony) zapiszEmail()
-                            edycjaHasla = true
                             status = null
                             blad = null
+                            edycjaHasla = true
                         }
                     }
                     .padding(vertical = 14.dp),
@@ -279,20 +324,6 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
-                }
-            }
-
-            AnimatedVisibility(visible = edycjaHasla) {
-                TextButton(
-                    onClick = {
-                        edycjaHasla = false
-                        haslo = ""
-                        pokazHaslo = false
-                        blad = null
-                    },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Anuluj", color = TekstDrugi)
                 }
             }
         }
