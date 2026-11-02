@@ -417,11 +417,24 @@ private class StanLogowaniaSklepu(
                         }, 1500)
                     }
                     "ACCESS_METHOD_CHOICE" -> {
+                        // Po SMS Magento bywa chwilowo z powrotem na /access —
+                        // nie klikaj ponownie „Kod SMS”, tylko szukaj hasła.
+                        if (smsWstrzykniety.get() || hasloWstrzykniete.get() ||
+                            etap == EtapLogowania.HASLO
+                        ) {
+                            status = "Szukam formularza hasła…"
+                            webView?.postDelayed({
+                                if (!zalogowany.get()) wstrzyknij(SkryptySklepu.WYKRYJ)
+                            }, 800)
+                            return
+                        }
                         // /access: Autologowanie | Kod SMS | Karta → zawsze Kod SMS
                         status = "Wybieram logowanie kodem SMS…"
                         wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
                         webView?.postDelayed({
-                            if (!zalogowany.get() && !emailWyslany.get()) {
+                            if (!zalogowany.get() && !emailWyslany.get() &&
+                                !smsWstrzykniety.get() && !hasloWstrzykniete.get()
+                            ) {
                                 val u = aktualnyUrl.lowercase()
                                 if (!u.contains("access-email")) {
                                     webView?.loadUrl(StaleSklepu.URL_LOGOWANIA)
@@ -458,10 +471,20 @@ private class StanLogowaniaSklepu(
                     }
                     "NO_RECOGNIZED_ELEMENTS" -> {
                         val u = aktualnyUrl.lowercase()
+                        val poSmsLubHasle = smsWstrzykniety.get() ||
+                            hasloWstrzykniete.get() ||
+                            etap == EtapLogowania.HASLO
                         val naWyborze = u.contains("/access") &&
                             !u.contains("access-email") &&
                             !u.contains("access-code")
                         when {
+                            poSmsLubHasle -> {
+                                // Nie wracaj do wyboru metody / URL_LOGOWANIA
+                                status = "Szukam formularza hasła…"
+                                webView?.postDelayed({
+                                    if (!zalogowany.get()) wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }, 800)
+                            }
                             naWyborze -> {
                                 status = "Wybieram logowanie kodem SMS…"
                                 wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
@@ -471,6 +494,12 @@ private class StanLogowaniaSklepu(
                                 !u.contains("login") -> {
                                 status = "Sesja aktywna — otwieram sklep…"
                                 poZalogowaniu()
+                            }
+                            emailWyslany.get() -> {
+                                status = "Czekam na kolejny krok logowania…"
+                                webView?.postDelayed({
+                                    if (!zalogowany.get()) wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }, 1000)
                             }
                             else -> {
                                 status = "Przechodzę do logowania SMS…"
@@ -491,13 +520,25 @@ private class StanLogowaniaSklepu(
                     }
                     "NEEDS_LOGIN" -> {
                         val u = aktualnyUrl.lowercase()
+                        val poSmsLubHasle = smsWstrzykniety.get() ||
+                            hasloWstrzykniete.get() ||
+                            etap == EtapLogowania.HASLO
                         when {
                             u.contains("access-email") || u.contains("access-code") -> {
+                                wstrzyknij(SkryptySklepu.WYKRYJ)
+                            }
+                            poSmsLubHasle -> {
+                                // Po SMS URL często nadal ma „access” — nie restartuj wyboru metody
+                                status = "Szukam formularza hasła…"
                                 wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
                             u.contains("/access") -> {
                                 status = "Wybieram logowanie kodem SMS…"
                                 wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
+                            }
+                            emailWyslany.get() -> {
+                                status = "Czekam na kolejny krok logowania…"
+                                wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
                             else -> {
                                 status = "Brak sesji — logowanie kodem SMS…"
@@ -525,10 +566,20 @@ private class StanLogowaniaSklepu(
                                 "SMS_FIELD_NOT_FOUND"
                             )
                         ) {
-                            // Strona mogła się zmienić — ponów wykrycie
-                            if (info == "SMS_FIELD_NOT_FOUND") {
-                                smsWstrzykniety.set(false)
-                                wstrzyknij(SkryptySklepu.WYKRYJ)
+                            // Strona mogła się zmienić — zwolnij flagi i ponów wykrycie
+                            when (info) {
+                                "PASS_FIELD_NOT_FOUND" -> {
+                                    hasloWstrzykniete.set(false)
+                                    wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }
+                                "SMS_FIELD_NOT_FOUND" -> {
+                                    smsWstrzykniety.set(false)
+                                    wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }
+                                "EMAIL_FIELD_NOT_FOUND" -> {
+                                    emailWstrzykniety.set(false)
+                                    wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }
                             }
                             return
                         }
@@ -547,6 +598,13 @@ private class StanLogowaniaSklepu(
                         "sms" -> {
                             status = "Kod SMS wpisany — czekam na hasło…"
                             oczekujeSms = false
+                            // Nowa strona z hasłem — pozwól wstrzyknąć hasło od zera
+                            hasloWstrzykniete.set(false)
+                            webView?.postDelayed({
+                                if (!zalogowany.get() && !hasloWstrzykniete.get()) {
+                                    wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }
+                            }, 900)
                         }
                         "haslo" -> status = when (info) {
                             "HASLO_WPISANE" -> "Hasło wpisane…"

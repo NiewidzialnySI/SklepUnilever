@@ -204,18 +204,8 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
-        // /access — wybór: Autologowanie / Kod SMS / Karta pracownicza
-        var href = (location.href || '').toLowerCase();
-        var linkSms = document.querySelector('a[href*="access-email"]') ||
-            document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
-        var maWyborMetod = !!document.getElementById('ad_login') ||
-            !!document.querySelector('.access-azure-login, .autologin-content') ||
-            (href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
-             href.indexOf('access-code') < 0 && !!linkSms);
-        if (maWyborMetod && !sklepikWidoczny(document.getElementById('access_email'))) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ACCESS_METHOD_CHOICE' });
-            return;
-        }
+        // Formularze logowania PRZED wyborem metody — po SMS Magento
+        // bywa na URL /access z widocznym hasłem albo z resztkami DOM wyboru.
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="access_token"]') ||
             document.querySelector('input[name="token"]');
@@ -232,6 +222,18 @@ $JS_HELPERY
             document.querySelector('input[name="login[password]"]');
         if (sklepikWidoczny(passwordField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
+            return;
+        }
+        // /access — wybór: Autologowanie / Kod SMS / Karta pracownicza
+        var href = (location.href || '').toLowerCase();
+        var linkSms = document.querySelector('a[href*="access-email"]') ||
+            document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
+        var maWyborMetod = !!document.getElementById('ad_login') ||
+            !!document.querySelector('.access-azure-login, .autologin-content') ||
+            (href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
+             href.indexOf('access-code') < 0 && !!linkSms);
+        if (maWyborMetod && !sklepikWidoczny(document.getElementById('access_email'))) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ACCESS_METHOD_CHOICE' });
             return;
         }
         if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'NO_RECOGNIZED_ELEMENTS' });
