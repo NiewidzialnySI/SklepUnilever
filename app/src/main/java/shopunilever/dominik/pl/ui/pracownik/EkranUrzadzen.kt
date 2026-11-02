@@ -3,6 +3,7 @@ package shopunilever.dominik.pl.ui.pracownik
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,17 +21,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collectLatest
@@ -64,6 +77,7 @@ import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
 import shopunilever.dominik.pl.ui.theme.Blad
 import shopunilever.dominik.pl.ui.theme.Ostrzezenie
+import shopunilever.dominik.pl.ui.theme.RamkaKarty
 import shopunilever.dominik.pl.ui.theme.Sukces
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
@@ -80,8 +94,6 @@ fun EkranUrzadzen(
     var kod by remember { mutableStateOf(PreferencjeParowania.kod(kontekst)) }
     var aktywne by remember { mutableStateOf(PreferencjeParowania.czyAktywne(kontekst)) }
     var ladowanie by remember { mutableStateOf(false) }
-    var blad by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf<String?>(null) }
     var prosby by remember { mutableStateOf<List<ProsbaDostepu>>(emptyList()) }
     var prosbyLogowania by remember { mutableStateOf<List<ProsbaLogowania>>(emptyList()) }
     var odbiorcy by remember { mutableStateOf<List<OdbiorcaPolaczony>>(emptyList()) }
@@ -90,36 +102,31 @@ fun EkranUrzadzen(
     var edytowanyOdbiorca by remember { mutableStateOf<OdbiorcaPolaczony?>(null) }
     var nazwaEdycji by remember { mutableStateOf("") }
     var doOdlaczenia by remember { mutableStateOf<OdbiorcaPolaczony?>(null) }
+    var potwierdzNowyKod by remember { mutableStateOf(false) }
 
     LaunchedEffect(aktywne, kod) {
         if (kod.isBlank()) return@LaunchedEffect
         runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
-        launch {
-            SerwisParowania.obserwujProsby(kontekst).collectLatest { prosby = it }
-        }
-        launch {
-            SerwisParowania.obserwujProsbyLogowania(kontekst).collectLatest { prosbyLogowania = it }
-        }
-        launch {
-            SerwisParowania.obserwujOdbiorcow(kontekst).collectLatest { odbiorcy = it }
-        }
+        launch { SerwisParowania.obserwujProsby(kontekst).collectLatest { prosby = it } }
+        launch { SerwisParowania.obserwujProsbyLogowania(kontekst).collectLatest { prosbyLogowania = it } }
+        launch { SerwisParowania.obserwujOdbiorcow(kontekst).collectLatest { odbiorcy = it } }
     }
 
-    fun uruchomParowanie(nowyKod: Boolean) {
+    fun uruchomParowanie(nowyKod: Boolean, odlaczWszystkich: Boolean = false) {
         zakres.launch {
             ladowanie = true
-            blad = null
-            status = null
             runCatching {
+                if (odlaczWszystkich) {
+                    runCatching { SerwisParowania.usunWszystkichOdbiorcow(kontekst) }
+                }
                 if (nowyKod) PreferencjeParowania.wyczysc(kontekst)
                 SerwisParowania.uruchomJakoNadajnik(kontekst)
             }.onSuccess {
                 kod = it
                 aktywne = true
-                status = "Parowanie aktywne."
                 onParowanieZmienione()
             }.onFailure {
-                blad = it.message ?: "Nie udało się uruchomić parowania."
+                Toast.makeText(kontekst, it.message ?: "Błąd parowania", Toast.LENGTH_SHORT).show()
             }
             ladowanie = false
         }
@@ -128,16 +135,47 @@ fun EkranUrzadzen(
     val oczekujace = prosby.filter { it.status == "pending" }
     val logowaniaOczekujace = prosbyLogowania.filter { it.status == "pending" }
 
+    if (potwierdzNowyKod) {
+        AlertDialog(
+            onDismissRequest = { potwierdzNowyKod = false },
+            icon = {
+                Icon(Icons.Rounded.Refresh, null, tint = Ostrzezenie, modifier = Modifier.size(28.dp))
+            },
+            title = { Text("Nowy kod?", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    if (odbiorcy.isEmpty()) {
+                        "Wygenerujesz nowy kod QR."
+                    } else {
+                        "Wszystkie sparowane urządzenia (${odbiorcy.size}) stracą dostęp i muszą zostać dodane ponownie — zeskanują nowy kod."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    potwierdzNowyKod = false
+                    uruchomParowanie(nowyKod = true, odlaczWszystkich = true)
+                }) {
+                    Text("Nowy kod", color = Ostrzezenie, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { potwierdzNowyKod = false }) {
+                    Text("Anuluj", color = TekstDrugi)
+                }
+            }
+        )
+    }
+
     edytowanyOdbiorca?.let { o ->
         AlertDialog(
             onDismissRequest = { edytowanyOdbiorca = null },
-            title = { Text("Nazwa urządzenia", fontWeight = FontWeight.Bold) },
+            title = { Text("Nazwa", fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = nazwaEdycji,
                     onValueChange = { nazwaEdycji = it.take(40) },
                     singleLine = true,
-                    label = { Text("Nazwa") },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AkcentNeon,
                         focusedLabelColor = AkcentNeon,
@@ -150,14 +188,10 @@ fun EkranUrzadzen(
                     zakres.launch {
                         runCatching {
                             SerwisParowania.zmienNazweOdbiorcy(kontekst, o.id, nazwaEdycji)
-                        }.onSuccess {
-                            status = "Zmieniono nazwę."
-                        }.onFailure {
-                            blad = it.message
                         }
                         edytowanyOdbiorca = null
                     }
-                }) { Text("Zapisz", color = AkcentNeon, fontWeight = FontWeight.Bold) }
+                }) { Text("OK", color = AkcentNeon, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { edytowanyOdbiorca = null }) {
@@ -170,18 +204,15 @@ fun EkranUrzadzen(
     doOdlaczenia?.let { o ->
         AlertDialog(
             onDismissRequest = { doOdlaczenia = null },
-            title = { Text("Odłączyć urządzenie?", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "„${o.nazwa}” straci dostęp do sklepu. Żeby połączyć się ponownie, trzeba będzie zeskanować nowy kod."
-                )
+            icon = {
+                Icon(Icons.Rounded.LinkOff, null, tint = Blad, modifier = Modifier.size(28.dp))
             },
+            title = { Text("Odłączyć?", fontWeight = FontWeight.Bold) },
+            text = { Text("„${o.nazwa}” straci dostęp.") },
             confirmButton = {
                 TextButton(onClick = {
                     zakres.launch {
                         runCatching { SerwisParowania.usunOdbiorce(kontekst, o.id) }
-                            .onSuccess { status = "Odłączono: ${o.nazwa}" }
-                            .onFailure { blad = it.message }
                         doOdlaczenia = null
                     }
                 }) { Text("Odłącz", color = Blad, fontWeight = FontWeight.Bold) }
@@ -222,28 +253,17 @@ fun EkranUrzadzen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.NotificationsActive, null, tint = Ostrzezenie)
                     Spacer(modifier = Modifier.size(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Nowa prośba o dostęp", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(
-                            if (oczekujace.size == 1) "Zaakceptuj lub odrzuć urządzenie rodziny"
-                            else "${oczekujace.size} urządzenia czekają na decyzję",
-                            color = Ostrzezenie,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Text("Parowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 oczekujace.forEach { p ->
                     KartaDecyzji(
                         tytul = p.nazwaUrzadzenia,
-                        podtytul = "Parowanie — oczekuje",
                         ladowanie = akcjaProsby == "pair:${p.id}",
                         onAkceptuj = {
                             zakres.launch {
                                 akcjaProsby = "pair:${p.id}"
                                 runCatching { SerwisParowania.zatwierdzProsbe(kontekst, p.id) }
-                                    .onSuccess { status = "Połączono: ${p.nazwaUrzadzenia}" }
-                                    .onFailure { blad = it.message }
                                 akcjaProsby = null
                             }
                         },
@@ -251,12 +271,11 @@ fun EkranUrzadzen(
                             zakres.launch {
                                 akcjaProsby = "pair:${p.id}"
                                 runCatching { SerwisParowania.odrzucProsbe(kontekst, p.id) }
-                                    .onFailure { blad = it.message }
                                 akcjaProsby = null
                             }
                         }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -265,29 +284,19 @@ fun EkranUrzadzen(
         if (logowaniaOczekujace.isNotEmpty()) {
             SzkloKarta {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.NotificationsActive, null, tint = AkcentMorski)
+                    Icon(Icons.Rounded.LockOpen, null, tint = AkcentMorski)
                     Spacer(modifier = Modifier.size(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Prośba o logowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text(
-                            "Urządzenie chce wejść do sklepu",
-                            color = TekstDrugi,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Text("Logowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 logowaniaOczekujace.forEach { p ->
                     KartaDecyzji(
                         tytul = p.nazwaUrzadzenia,
-                        podtytul = "Logowanie — oczekuje",
                         ladowanie = akcjaProsby == "login:${p.id}",
                         onAkceptuj = {
                             zakres.launch {
                                 akcjaProsby = "login:${p.id}"
                                 runCatching { SerwisParowania.zatwierdzLogowanie(kontekst, p.id) }
-                                    .onSuccess { status = "Zezwolono na logowanie: ${p.nazwaUrzadzenia}" }
-                                    .onFailure { blad = it.message }
                                 akcjaProsby = null
                             }
                         },
@@ -295,12 +304,11 @@ fun EkranUrzadzen(
                             zakres.launch {
                                 akcjaProsby = "login:${p.id}"
                                 runCatching { SerwisParowania.odrzucLogowanie(kontekst, p.id) }
-                                    .onFailure { blad = it.message }
                                 akcjaProsby = null
                             }
                         }
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -311,7 +319,7 @@ fun EkranUrzadzen(
                 Icon(Icons.Rounded.Link, contentDescription = null, tint = AkcentNeon)
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
-                    text = "Kod parowania",
+                    text = "Kod",
                     color = TekstGlowny,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
@@ -335,39 +343,33 @@ fun EkranUrzadzen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
                 ) {
-                    TextButton(onClick = {
+                    FilledTonalIconButton(onClick = {
                         val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
-                        status = "Skopiowano kod."
+                        Toast.makeText(kontekst, "Skopiowano", Toast.LENGTH_SHORT).show()
                     }) {
-                        Icon(Icons.Rounded.ContentCopy, null, tint = AkcentNeon, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text("Kopiuj", color = AkcentNeon)
+                        Icon(Icons.Rounded.ContentCopy, "Kopiuj")
                     }
-                    TextButton(onClick = { uruchomParowanie(nowyKod = true) }) {
-                        Text("Nowy kod", color = TekstDrugi)
+                    FilledTonalIconButton(
+                        onClick = { potwierdzNowyKod = true },
+                        enabled = !ladowanie,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            contentColor = Ostrzezenie
+                        )
+                    ) {
+                        Icon(Icons.Rounded.Refresh, "Nowy kod")
                     }
                 }
-            } else {
-                Text(
-                    text = "Wygeneruj kod i zeskanuj go na drugim telefonie.",
-                    color = TekstDrugi,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-
-            if (ladowanie) {
+            } else if (ladowanie) {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(28.dp))
                 }
-            } else if (kod.isBlank()) {
+            } else {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -377,93 +379,50 @@ fun EkranUrzadzen(
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Uruchom parowanie", color = TekstNaAkcencie, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Rounded.Link, null, tint = TekstNaAkcencie, modifier = Modifier.size(22.dp))
                 }
             }
 
-            blad?.let {
+            if (ladowanie && kod.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = Blad, fontSize = 12.sp)
-            }
-            status?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = Sukces, fontSize = 12.sp)
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(22.dp))
+                }
             }
         }
 
         if (odbiorcy.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
             SzkloKarta {
-                Text("Sparowane urządzenia", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(10.dp))
-                odbiorcy.forEach { o ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .padding(12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(o.nazwa, color = TekstGlowny, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                                Text(
-                                    if (o.zablokowany) "Zablokowane" else "Połączone",
-                                    color = if (o.zablokowany) TekstDrugi else Sukces,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            TextButton(onClick = {
-                                nazwaEdycji = o.nazwa
-                                edytowanyOdbiorca = o
-                            }) {
-                                Icon(Icons.Rounded.Edit, null, tint = AkcentNeon, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.size(4.dp))
-                                Text("Nazwa", color = AkcentNeon)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Auto-logowanie",
-                                    color = TekstGlowny,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    if (o.autoLogowanie) {
-                                        "Może wchodzić do sklepu bez Twojej zgody"
-                                    } else {
-                                        "Każde logowanie wymaga Twojej akceptacji"
-                                    },
-                                    color = TekstDrugi,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
-                            }
-                            Switch(
-                                checked = o.autoLogowanie,
-                                onCheckedChange = { wlacz ->
-                                    zakres.launch {
-                                        runCatching {
-                                            SerwisParowania.ustawAutoLogowanie(kontekst, o.id, wlacz)
-                                        }.onFailure { blad = it.message }
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = TekstNaAkcencie,
-                                    checkedTrackColor = AkcentNeon,
-                                    uncheckedThumbColor = TekstDrugi,
-                                    uncheckedTrackColor = Color.White.copy(alpha = 0.15f)
-                                )
-                            )
-                        }
-                        TextButton(onClick = { doOdlaczenia = o }) {
-                            Text("Odłącz", color = Blad)
-                        }
+                Text(
+                    "Urządzenia",
+                    color = TekstGlowny,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                odbiorcy.forEachIndexed { indeks, o ->
+                    if (indeks > 0) {
+                        HorizontalDivider(
+                            color = RamkaKarty,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    WierszUrzadzenia(
+                        odbiorca = o,
+                        onEdytuj = {
+                            nazwaEdycji = o.nazwa
+                            edytowanyOdbiorca = o
+                        },
+                        onAutoLogowanie = { wlacz ->
+                            zakres.launch {
+                                runCatching {
+                                    SerwisParowania.ustawAutoLogowanie(kontekst, o.id, wlacz)
+                                }
+                            }
+                        },
+                        onOdlacz = { doOdlaczenia = o }
+                    )
                 }
             }
         }
@@ -471,53 +430,132 @@ fun EkranUrzadzen(
 }
 
 @Composable
+private fun WierszUrzadzenia(
+    odbiorca: OdbiorcaPolaczony,
+    onEdytuj: () -> Unit,
+    onAutoLogowanie: (Boolean) -> Unit,
+    onOdlacz: () -> Unit
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = odbiorca.nazwa,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        leadingContent = {
+            Icon(Icons.Rounded.PhoneAndroid, contentDescription = null)
+        },
+        trailingContent = {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                FilledTonalIconButton(
+                    onClick = onEdytuj,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "Zmień nazwę")
+                }
+                FilledTonalIconToggleButton(
+                    checked = odbiorca.autoLogowanie,
+                    onCheckedChange = onAutoLogowanie,
+                    modifier = Modifier.size(40.dp),
+                    colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                        checkedContainerColor = Sukces.copy(alpha = 0.22f),
+                        checkedContentColor = Sukces,
+                        containerColor = Ostrzezenie.copy(alpha = 0.16f),
+                        contentColor = Ostrzezenie
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (odbiorca.autoLogowanie) {
+                            Icons.Rounded.LockOpen
+                        } else {
+                            Icons.Rounded.Lock
+                        },
+                        contentDescription = if (odbiorca.autoLogowanie) {
+                            "Auto-logowanie wł."
+                        } else {
+                            "Wymaga zgody"
+                        }
+                    )
+                }
+                FilledTonalIconButton(
+                    onClick = onOdlacz,
+                    modifier = Modifier.size(40.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Blad.copy(alpha = 0.16f),
+                        contentColor = Blad
+                    )
+                ) {
+                    Icon(Icons.Rounded.LinkOff, contentDescription = "Odłącz")
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent,
+            headlineColor = TekstGlowny,
+            leadingIconColor = AkcentNeon
+        )
+    )
+}
+
+@Composable
 private fun KartaDecyzji(
     tytul: String,
-    podtytul: String,
     ladowanie: Boolean,
     onAkceptuj: () -> Unit,
     onOdrzuc: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = 0.06f))
-            .padding(14.dp)
-    ) {
-        Text(tytul, color = TekstGlowny, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        Text(podtytul, color = TekstDrugi, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Sukces.copy(alpha = 0.2f))
-                    .clickable(enabled = !ladowanie, onClick = onAkceptuj)
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (ladowanie) {
-                    CircularProgressIndicator(color = Sukces, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Akceptuj", color = Sukces, fontWeight = FontWeight.Bold)
+    ListItem(
+        headlineContent = {
+            Text(
+                text = tytul,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        leadingContent = {
+            Icon(Icons.Rounded.PhoneAndroid, contentDescription = null)
+        },
+        trailingContent = {
+            if (ladowanie) {
+                CircularProgressIndicator(
+                    color = AkcentNeon,
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    FilledTonalIconButton(
+                        onClick = onAkceptuj,
+                        modifier = Modifier.size(40.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Sukces.copy(alpha = 0.18f),
+                            contentColor = Sukces
+                        )
+                    ) {
+                        Icon(Icons.Rounded.Check, contentDescription = "Akceptuj")
+                    }
+                    FilledTonalIconButton(
+                        onClick = onOdrzuc,
+                        modifier = Modifier.size(40.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Blad.copy(alpha = 0.16f),
+                            contentColor = Blad
+                        )
+                    ) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Odrzuć")
+                    }
                 }
             }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Blad.copy(alpha = 0.15f))
-                    .clickable(enabled = !ladowanie, onClick = onOdrzuc)
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Odrzuć", color = Blad, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.White.copy(alpha = 0.06f),
+            headlineColor = TekstGlowny,
+            leadingIconColor = TekstDrugi
+        ),
+        modifier = Modifier.clip(RoundedCornerShape(14.dp))
+    )
 }

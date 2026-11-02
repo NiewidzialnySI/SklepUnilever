@@ -34,6 +34,13 @@ data class ProsbaLogowania(
     val status: String
 )
 
+data class LogWejsciaUrzadzenia(
+    val id: String,
+    val deviceId: String,
+    val nazwa: String,
+    val ts: Long
+)
+
 data class DaneLogowaniaZdalne(
     val email: String,
     val haslo: String
@@ -78,6 +85,9 @@ object SerwisParowania {
 
         PreferencjeParowania.zapisz(context, kod, uid)
         publikujDaneLogowania(context)
+        runCatching {
+            shopunilever.dominik.pl.tlo.SerwisTlaNadajnika.uruchomJesliTrzeba(context)
+        }
         return kod
     }
 
@@ -270,6 +280,89 @@ object SerwisParowania {
         ref.child("receivers").child(odbiorcaId).removeValue().await()
         ref.child("accessRequests").child(odbiorcaId).removeValue().await()
         ref.child("loginRequests").child(odbiorcaId).removeValue().await()
+    }
+
+    /** Nowy kod QR — kasuje wszystkie sparowane urządzenia i prośby. */
+    suspend fun usunWszystkichOdbiorcow(context: Context) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        val ref = FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+        ref.child("receivers").removeValue().await()
+        ref.child("accessRequests").removeValue().await()
+        ref.child("loginRequests").removeValue().await()
+    }
+
+    /** Rodzina: zapis wejścia do sklepu (bez urządzenia pracownika). */
+    suspend fun zapiszLogWejscia(context: Context) {
+        val tx = PreferencjeOdbiorcy.uidNadajnika(context).ifBlank { return }
+        val uid = PreferencjeOdbiorcy.uid(context).ifBlank { return }
+        // Nadajnik nie loguje siebie — ta ścieżka jest tylko dla odbiorcy.
+        if (PreferencjeParowania.czyAktywne(context) && PreferencjeParowania.uid(context) == uid) return
+        val nazwa = PreferencjeOdbiorcy.nazwaUrzadzenia(context).ifBlank {
+            Build.MODEL.ifBlank { "Urządzenie" }
+        }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(tx)
+            .child("loginLogs")
+            .push()
+            .setValue(
+                mapOf(
+                    "deviceId" to uid,
+                    "deviceName" to nazwa,
+                    "ts" to System.currentTimeMillis()
+                )
+            ).await()
+    }
+
+    fun obserwujLogiWejsc(context: Context): Flow<List<LogWejsciaUrzadzenia>> = callbackFlow {
+        val uid = PreferencjeParowania.uid(context)
+        if (uid.isBlank()) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val ref = FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("loginLogs")
+            .orderByChild("ts")
+            .limitToLast(40)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val lista = snapshot.children.mapNotNull { dziecko ->
+                    val id = dziecko.key ?: return@mapNotNull null
+                    val deviceId = dziecko.child("deviceId").getValue(String::class.java).orEmpty()
+                    // Pomiń ewentualne wpisy samego nadajnika
+                    if (deviceId.isNotBlank() && deviceId == uid) return@mapNotNull null
+                    LogWejsciaUrzadzenia(
+                        id = id,
+                        deviceId = deviceId,
+                        nazwa = dziecko.child("deviceName").getValue(String::class.java)
+                            ?: "Urządzenie",
+                        ts = dziecko.child("ts").getValue(Long::class.java) ?: 0L
+                    )
+                }.sortedByDescending { it.ts }
+                trySend(lista)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                trySend(emptyList())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+
+    suspend fun wyczyscLogiWejsc(context: Context) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("loginLogs")
+            .removeValue()
+            .await()
     }
 
     /**
