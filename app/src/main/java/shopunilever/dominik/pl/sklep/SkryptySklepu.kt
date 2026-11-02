@@ -151,33 +151,48 @@ true;
         }
         return true;
     }
+    function sklepikCzyStronaHasla() {
+        var href = (location.href || '').toLowerCase();
+        var bodyCls = (document.body && document.body.className) || '';
+        if (href.indexOf('customer/account/login') >= 0) return true;
+        if (bodyCls.indexOf('customer-account-login') >= 0) return true;
+        if (document.querySelector('form#login-form, form.form-login, #customer-login-form')) return true;
+        if (document.getElementById('pass') || document.querySelector('input[name="login[password]"]')) return true;
+        return false;
+    }
     function sklepikCzyZalogowanySklep() {
         var href = (location.href || '').toLowerCase();
         var bodyCls = (document.body && document.body.className) || '';
+        // Formularz hasła / login Magento — NIGDY nie traktuj jako zalogowany
+        // (header ma .navigation / .minicart i wcześniej dawał fałszywy LOGGED_IN).
+        if (sklepikCzyStronaHasla()) return false;
         if (href.indexOf('/access') >= 0 || bodyCls.indexOf('cms-access') >= 0) {
             // Strona bramki — zalogowany tylko gdy NIE ma widocznego formularza dostępu
             if (sklepikWidoczny(document.getElementById('access_email'))) return false;
             if (sklepikWidoczny(document.getElementById('access_token'))) return false;
             if (sklepikWidoczny(document.querySelector('input[name="access_token"]'))) return false;
+            // Samo /access z wyborem metody = nie zalogowany
+            if (href.indexOf('access-email') < 0 && href.indexOf('access-code') < 0) return false;
         }
         var logout = document.querySelector('a[href*="customer/account/logout"], a[href*="/logout"]');
         if (sklepikWidoczny(logout)) return true;
         var welcome = document.querySelector('.customer-welcome, .header.links li.welcome, .logged-in, .customer-name');
         if (sklepikWidoczny(welcome)) return true;
         // Katalog / koszyk / produkty = jesteśmy w sklepie po bramce
-        if (document.querySelector('.product-item, .products-grid, .category-products, .page-products, .minicart-wrapper, .block-search, .navigation')) {
+        // (bez stron logowania — już odfiltrowane wyżej)
+        if (document.querySelector('.product-item, .products-grid, .category-products, .page-products')) {
             if (!sklepikWidoczny(document.getElementById('access_email')) &&
                 !sklepikWidoczny(document.getElementById('access_token'))) {
                 return true;
             }
         }
-        // Root sklepu bez formularza access
+        // Root sklepu bez formularza access / login
         if (href.indexOf('/access') < 0 && href.indexOf('login') < 0 &&
             !sklepikWidoczny(document.getElementById('access_email')) &&
             !sklepikWidoczny(document.querySelector('#access_email_form'))) {
             // Nie mylić z pustą/404
             if (bodyCls.indexOf('cms-no-route') < 0 && bodyCls.indexOf('noroute') < 0) {
-                if (document.querySelector('.page-wrapper, .page-header, #maincontent')) return true;
+                if (document.querySelector('.product-item, .products-grid, .page-products, .category-products')) return true;
             }
         }
         return false;
@@ -199,13 +214,19 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'COOKIE_BANNER' });
             return;
         }
+        var href = (location.href || '').toLowerCase();
+        // Po SMS Magento ląduje na /customer/account/login?access-email=...
+        // — to ekran hasła, NIE wybór metody i NIE „już zalogowany”.
+        if (sklepikCzyStronaHasla()) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
+            return;
+        }
         // Najpierw: już w sklepie / sesja aktywna
         if (sklepikCzyZalogowanySklep()) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
-        // Formularze logowania PRZED wyborem metody — po SMS Magento
-        // bywa na URL /access z widocznym hasłem albo z resztkami DOM wyboru.
+        // Formularze logowania PRZED wyborem metody
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="access_token"]') ||
             document.querySelector('input[name="token"]');
@@ -224,14 +245,16 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
             return;
         }
-        // /access — wybór: Autologowanie / Kod SMS / Karta pracownicza
-        var href = (location.href || '').toLowerCase();
+        // /access — wybór: Autologowanie / Kod SMS / Karta (nigdy na customer/login)
         var linkSms = document.querySelector('a[href*="access-email"]') ||
             document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
-        var maWyborMetod = !!document.getElementById('ad_login') ||
+        var naWyborzeUrl = href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
+            href.indexOf('access-code') < 0 && href.indexOf('customer/account') < 0;
+        var maWyborMetod = naWyborzeUrl && (
+            !!document.getElementById('ad_login') ||
             !!document.querySelector('.access-azure-login, .autologin-content') ||
-            (href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
-             href.indexOf('access-code') < 0 && !!linkSms);
+            !!linkSms
+        );
         if (maWyborMetod && !sklepikWidoczny(document.getElementById('access_email'))) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ACCESS_METHOD_CHOICE' });
             return;
@@ -253,6 +276,10 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NOT_FOUND' });
             return;
         }
+        if (sklepikCzyStronaHasla()) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
+            return;
+        }
         if (sklepikCzyZalogowanySklep()) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'LOGGED_IN' });
             return;
@@ -261,9 +288,14 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
             return;
         }
+        var hrefSesja = (location.href || '').toLowerCase();
+        // Uwaga: query ?access-email= na /customer/account/login NIE jest bramką /access
+        var naBramceAccess = hrefSesja.indexOf('/access') >= 0 ||
+            hrefSesja.indexOf('/access-email') >= 0 ||
+            hrefSesja.indexOf('/access-code') >= 0;
         if (sklepikWidoczny(document.getElementById('access_email')) ||
             sklepikWidoczny(document.getElementById('access_token')) ||
-            (location.href || '').toLowerCase().indexOf('access') >= 0) {
+            naBramceAccess) {
             if (window.SklepikPost) window.SklepikPost({ type: 'SESJA', wynik: 'NEEDS_LOGIN' });
             return;
         }
@@ -413,15 +445,19 @@ true;
 """.trimIndent()
     }
 
-    fun skryptWypelnijHaslo(haslo: String): String {
+    fun skryptWypelnijHaslo(haslo: String, email: String = ""): String {
         val bezpieczny = haslo.replace("\\", "\\\\").replace("\"", "\\\"")
+        val bezpiecznyEmail = email.replace("\\", "\\\\").replace("\"", "\\\"")
         return """
 (function() {
     if (window.jQuery && !window.jQuery.fn.validation) {
         window.jQuery.fn.validation = function() { return { valid: function() { return true; } }; };
     }
-    if (window.isProcessingLogin) return;
+    // Pozwól na retry gdy poprzednia próba utknęła na tej samej stronie
+    if (window.isProcessingLogin && window.__sklepikHasloTs &&
+        (Date.now() - window.__sklepikHasloTs) < 12000) return;
     window.isProcessingLogin = true;
+    window.__sklepikHasloTs = Date.now();
 
     function post(info) {
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: info });
@@ -513,7 +549,21 @@ true;
             var r = el.getBoundingClientRect();
             return r.width > 2 && r.height > 2;
         }
-        // 1) Najpierw hasło — tylko widoczne pole (nie popup Magento)
+        // 0) Email na formularzu Magento login (często pusty mimo ?access-email=)
+        var emailVal = "$bezpiecznyEmail";
+        if (emailVal) {
+            var emailLogin = document.getElementById('email') ||
+                document.querySelector('input[name="login[username]"]') ||
+                document.querySelector('#login-form input[type="email"]');
+            if (emailLogin) {
+                emailLogin.focus();
+                emailLogin.value = emailVal;
+                emailLogin.dispatchEvent(new Event('input', { bubbles: true }));
+                emailLogin.dispatchEvent(new Event('change', { bubbles: true }));
+                post('EMAIL_LOGIN_WPISANY');
+            }
+        }
+        // 1) Hasło — widoczne pole (nie popup Magento)
         var passField = document.getElementById('pass');
         if (!widoczny(passField)) {
             passField = document.querySelector('input[name="login[password]"]');
@@ -524,6 +574,12 @@ true;
             for (var pi = 0; pi < candidates.length; pi++) {
                 if (widoczny(candidates[pi])) { passField = candidates[pi]; break; }
             }
+        }
+        // Na /customer/account/login bierz #pass nawet jeśli chwilowo „niewidoczne”
+        if (!passField && (location.href || '').toLowerCase().indexOf('customer/account/login') >= 0) {
+            passField = document.getElementById('pass') ||
+                document.querySelector('input[name="login[password]"]') ||
+                document.querySelector('input[type="password"]');
         }
         if (!passField) {
             window.isProcessingLogin = false;

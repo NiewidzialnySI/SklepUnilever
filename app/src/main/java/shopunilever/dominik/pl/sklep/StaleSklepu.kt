@@ -14,6 +14,13 @@ object StaleSklepu {
         return u.contains(HOST_SKLEPU)
     }
 
+    /** Magento po SMS: /customer/account/login?access-email=… — ekran hasła. */
+    fun czyStronaHasla(url: String?): Boolean {
+        val u = url?.lowercase().orEmpty()
+        return u.contains("customer/account/login") ||
+            (u.contains("/login") && u.contains("access-email"))
+    }
+
     fun czyGlownaSklepu(url: String?): Boolean {
         val u = url?.lowercase()?.substringBefore('?')?.trimEnd('/').orEmpty()
         return u == URL_SKLEPU.lowercase() ||

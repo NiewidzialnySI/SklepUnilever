@@ -270,9 +270,27 @@ private class StanLogowaniaSklepu(
     fun wstrzyknijHaslo() {
         if (!hasloWstrzykniete.compareAndSet(false, true)) return
         oczekujeSms = false
+        emailWyslany.set(true)
+        smsWstrzykniety.set(true)
         etap = EtapLogowania.HASLO
         status = "Wpisuję hasło…"
-        wstrzyknij(SkryptySklepu.skryptWypelnijHaslo(haslo))
+        wstrzyknij(SkryptySklepu.skryptWypelnijHaslo(haslo, email))
+    }
+
+    /** Po SMS Magento → /customer/account/login?access-email=… */
+    fun naStronieHaslaWymusz(url: String? = aktualnyUrl) {
+        if (!StaleSklepu.czyStronaHasla(url) || zalogowany.get()) return
+        emailWyslany.set(true)
+        smsWstrzykniety.set(true)
+        if (haslo.isBlank()) {
+            etap = EtapLogowania.BLAD
+            blad = "Brak hasła w aplikacji"
+            status = "Brak danych logowania"
+            return
+        }
+        if (hasloWstrzykniete.get()) return
+        status = "Strona hasła — wpisuję dane…"
+        wstrzyknijHaslo()
     }
 
     fun zacznijOczekiwanieSms() {
@@ -312,6 +330,21 @@ private class StanLogowaniaSklepu(
         }
 
         val u = url?.lowercase().orEmpty()
+        // Po SMS od razu celuj w hasło — nie czekaj na fałszywe LOGGED_IN z headera Magento
+        if (StaleSklepu.czyStronaHasla(u)) {
+            status = "Strona hasła — przygotowuję logowanie…"
+            emailWyslany.set(true)
+            smsWstrzykniety.set(true)
+            listOf(400L, 1000L, 2000L, 3500L).forEach { opoznienie ->
+                webView?.postDelayed({
+                    if (zalogowany.get() || hasloWstrzykniete.get()) return@postDelayed
+                    wstrzyknij(SkryptySklepu.CIASTECZKA)
+                    naStronieHaslaWymusz(aktualnyUrl)
+                }, opoznienie)
+            }
+            return
+        }
+
         val toBramka = u.contains("access") || u.contains("login")
         status = if (toBramka) "Sprawdzam bramkę logowania…" else "Sprawdzam, czy jesteś już zalogowany…"
 
@@ -417,14 +450,21 @@ private class StanLogowaniaSklepu(
                         }, 1500)
                     }
                     "ACCESS_METHOD_CHOICE" -> {
+                        if (StaleSklepu.czyStronaHasla(aktualnyUrl)) {
+                            naStronieHaslaWymusz()
+                            return
+                        }
                         // Po SMS Magento bywa chwilowo z powrotem na /access —
                         // nie klikaj ponownie „Kod SMS”, tylko szukaj hasła.
                         if (smsWstrzykniety.get() || hasloWstrzykniete.get() ||
-                            etap == EtapLogowania.HASLO
+                            etap == EtapLogowania.HASLO || emailWyslany.get()
                         ) {
                             status = "Szukam formularza hasła…"
                             webView?.postDelayed({
-                                if (!zalogowany.get()) wstrzyknij(SkryptySklepu.WYKRYJ)
+                                if (!zalogowany.get()) {
+                                    if (StaleSklepu.czyStronaHasla(aktualnyUrl)) naStronieHaslaWymusz()
+                                    else wstrzyknij(SkryptySklepu.WYKRYJ)
+                                }
                             }, 800)
                             return
                         }
@@ -463,6 +503,8 @@ private class StanLogowaniaSklepu(
                             status = "Brak danych logowania"
                             return
                         }
+                        emailWyslany.set(true)
+                        smsWstrzykniety.set(true)
                         wstrzyknijHaslo()
                     }
                     "ALREADY_LOGGED_IN" -> {
@@ -473,11 +515,14 @@ private class StanLogowaniaSklepu(
                         val u = aktualnyUrl.lowercase()
                         val poSmsLubHasle = smsWstrzykniety.get() ||
                             hasloWstrzykniete.get() ||
-                            etap == EtapLogowania.HASLO
+                            etap == EtapLogowania.HASLO ||
+                            emailWyslany.get()
                         val naWyborze = u.contains("/access") &&
                             !u.contains("access-email") &&
-                            !u.contains("access-code")
+                            !u.contains("access-code") &&
+                            !u.contains("customer/account")
                         when {
+                            StaleSklepu.czyStronaHasla(u) -> naStronieHaslaWymusz()
                             poSmsLubHasle -> {
                                 // Nie wracaj do wyboru metody / URL_LOGOWANIA
                                 status = "Szukam formularza hasła…"
@@ -494,12 +539,6 @@ private class StanLogowaniaSklepu(
                                 !u.contains("login") -> {
                                 status = "Sesja aktywna — otwieram sklep…"
                                 poZalogowaniu()
-                            }
-                            emailWyslany.get() -> {
-                                status = "Czekam na kolejny krok logowania…"
-                                webView?.postDelayed({
-                                    if (!zalogowany.get()) wstrzyknij(SkryptySklepu.WYKRYJ)
-                                }, 1000)
                             }
                             else -> {
                                 status = "Przechodzę do logowania SMS…"
@@ -522,8 +561,10 @@ private class StanLogowaniaSklepu(
                         val u = aktualnyUrl.lowercase()
                         val poSmsLubHasle = smsWstrzykniety.get() ||
                             hasloWstrzykniete.get() ||
-                            etap == EtapLogowania.HASLO
+                            etap == EtapLogowania.HASLO ||
+                            emailWyslany.get()
                         when {
+                            StaleSklepu.czyStronaHasla(u) -> naStronieHaslaWymusz()
                             u.contains("access-email") || u.contains("access-code") -> {
                                 wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
@@ -532,13 +573,9 @@ private class StanLogowaniaSklepu(
                                 status = "Szukam formularza hasła…"
                                 wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
-                            u.contains("/access") -> {
+                            u.contains("/access") && !u.contains("customer/account") -> {
                                 status = "Wybieram logowanie kodem SMS…"
                                 wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
-                            }
-                            emailWyslany.get() -> {
-                                status = "Czekam na kolejny krok logowania…"
-                                wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
                             else -> {
                                 status = "Brak sesji — logowanie kodem SMS…"
