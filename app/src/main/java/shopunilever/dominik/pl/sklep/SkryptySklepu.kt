@@ -24,6 +24,25 @@ object SkryptySklepu {
 })();
 """
 
+    /** Lepsza skala / viewport na telefonie — mniej „desktopowej” strony w WebView. */
+    const val RESPONSYWNOSC = """
+(function() {
+    try {
+        var m = document.querySelector('meta[name="viewport"]');
+        if (!m) {
+            m = document.createElement('meta');
+            m.setAttribute('name', 'viewport');
+            (document.head || document.documentElement).appendChild(m);
+        }
+        m.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover');
+        document.documentElement.style.setProperty('-webkit-text-size-adjust', '100%');
+        document.body && document.body.style.setProperty('max-width', '100vw');
+        document.body && document.body.style.setProperty('overflow-x', 'auto');
+    } catch (e) {}
+    true;
+})();
+"""
+
     /**
      * 1) Meetanshi „PRZEJDŹ DO SKLEPU”
      * 2) Amasty modal „Akceptuj wszystkie” (zasłania formularz — krytyczne)

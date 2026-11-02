@@ -2,13 +2,16 @@ package shopunilever.dominik.pl.ui.pracownik
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,14 +23,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import android.webkit.WebResourceRequest
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -52,11 +51,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
+import shopunilever.dominik.pl.dane.PozycjaKoszyka
 import shopunilever.dominik.pl.dane.PreferencjeKonta
+import shopunilever.dominik.pl.dane.PreferencjeKoszykow
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.sklep.NasluchSms
+import shopunilever.dominik.pl.sklep.SkryptyKoszyka
 import shopunilever.dominik.pl.sklep.SkryptySklepu
 import shopunilever.dominik.pl.sklep.StaleSklepu
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
@@ -64,6 +67,7 @@ import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TloAmoled
 import shopunilever.dominik.pl.ui.theme.TloWarstwa
+import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -93,6 +97,9 @@ private class StanLogowaniaSklepu(
     val smsWstrzykniety = AtomicBoolean(false)
     val zalogowany = AtomicBoolean(false)
     val smsOdKiedyMs = AtomicLong(0L)
+    val oczekujeEksportuKoszyka = AtomicBoolean(false)
+    private val kolejkaDodawania = ArrayDeque<String>()
+    private val dodawanieTrwa = AtomicBoolean(false)
 
     var etap by mutableStateOf(EtapLogowania.LADOWANIE)
     var status by mutableStateOf("Ładowanie sklepu…")
@@ -101,6 +108,12 @@ private class StanLogowaniaSklepu(
     var kodSms by mutableStateOf("")
     var ukryjNakladke by mutableStateOf(false)
     var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
+
+    fun toast(tekst: String) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            Toast.makeText(kontekstAplikacji, tekst, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun wstrzyknij(skrypt: String) {
         webView?.evaluateJavascript(skrypt, null)
@@ -126,6 +139,58 @@ private class StanLogowaniaSklepu(
         if (!StaleSklepu.czyGlownaSklepu(aktualnyUrl)) {
             wv.loadUrl(StaleSklepu.URL_GLOWNA)
         }
+    }
+
+    fun zapiszAktualnyKoszyk() {
+        oczekujeEksportuKoszyka.set(true)
+        toast("Zbieram produkty z koszyka…")
+        wstrzyknij(SkryptySklepu.MOSTEK)
+        wstrzyknij(SkryptyKoszyka.EKSPORT)
+        // Awaria: jeśli JS nic nie odesłał, otwórz stronę koszyka i spróbuj ponownie
+        webView?.postDelayed({
+            if (!oczekujeEksportuKoszyka.get()) return@postDelayed
+            webView?.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
+            webView?.postDelayed({
+                if (oczekujeEksportuKoszyka.get()) {
+                    wstrzyknij(SkryptySklepu.MOSTEK)
+                    wstrzyknij(SkryptyKoszyka.EKSPORT)
+                }
+            }, 1200)
+        }, 2000)
+    }
+
+    fun otworzKoszykSklepu() {
+        webView?.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
+    }
+
+    fun dodajZapisaneDoKoszyka(pozycje: List<PozycjaKoszyka>) {
+        val urlki = pozycje.map { it.url.trim() }.filter { it.isNotBlank() }
+        if (urlki.isEmpty()) {
+            toast("Brak linków produktów — nie da się dodać automatycznie")
+            return
+        }
+        kolejkaDodawania.clear()
+        kolejkaDodawania.addAll(urlki)
+        dodawanieTrwa.set(true)
+        toast("Dodaję ${urlki.size} produkt(ów) do koszyka…")
+        nastepnyProduktZKolejki()
+    }
+
+    private fun nastepnyProduktZKolejki() {
+        val wv = webView ?: return
+        val url = kolejkaDodawania.pollFirst()
+        if (url == null) {
+            dodawanieTrwa.set(false)
+            toast("Gotowe — otwieram koszyk")
+            wv.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
+            return
+        }
+        wv.loadUrl(url)
+        wv.postDelayed({
+            wstrzyknij(SkryptySklepu.MOSTEK)
+            wstrzyknij(SkryptyKoszyka.KLIKNIJ_DODAJ_DO_KOSZYKA)
+            wv.postDelayed({ nastepnyProduktZKolejki() }, 1600)
+        }, 1100)
     }
 
     fun poZalogowaniu() {
@@ -193,6 +258,7 @@ private class StanLogowaniaSklepu(
     /** Po załadowaniu: cookies, potem szybkie sprawdzenie sesji (już zalogowany?). */
     fun poZaladowaniuStrony(url: String?) {
         wstrzyknij(SkryptySklepu.MOSTEK)
+        wstrzyknij(SkryptySklepu.RESPONSYWNOSC)
         wstrzyknij(SkryptySklepu.CIASTECZKA)
 
         if (zalogowany.get()) {
@@ -225,12 +291,56 @@ private class StanLogowaniaSklepu(
     }
 
     fun obsluzWiadomosc(json: String) {
-        if (zalogowany.get()) return
         try {
             val obj = JSONObject(json)
             when (obj.optString("type")) {
-                "LOG" -> { /* debug */ }
+                "KOSZYK_EXPORT" -> {
+                    // Tylko gdy użytkownik kliknął „Zapisz” (flaga ustawiona)
+                    if (!oczekujeEksportuKoszyka.getAndSet(false)) return
+                    val arr = obj.optJSONArray("pozycje") ?: JSONArray()
+                    val pozycje = buildList {
+                        for (i in 0 until arr.length()) {
+                            val p = arr.optJSONObject(i) ?: continue
+                            add(
+                                PozycjaKoszyka(
+                                    nazwa = p.optString("nazwa").ifBlank { "Produkt ${i + 1}" },
+                                    sku = p.optString("sku"),
+                                    ilosc = p.optInt("ilosc", 1).coerceAtLeast(1),
+                                    url = p.optString("url"),
+                                    cena = p.optString("cena")
+                                )
+                            )
+                        }
+                    }
+                    if (pozycje.isEmpty()) {
+                        toast("Koszyk pusty albo nie znaleziono produktów — otwórz koszyk i spróbuj ponownie")
+                        return
+                    }
+                    val zapis = PreferencjeKoszykow.zapisz(
+                        kontekstAplikacji,
+                        nazwa = "Koszyk ${PreferencjeKoszykow.lista(kontekstAplikacji).size + 1}",
+                        pozycje = pozycje
+                    )
+                    toast("Zapisano „${zapis.nazwa}” (${pozycje.size} poz.)")
+                    return
+                }
 
+                "KOSZYK_DODANO" -> {
+                    // Informacyjnie — kolejka i tak idzie dalej po timeoutach
+                    return
+                }
+
+                "LOG" -> { /* debug */ }
+            }
+        } catch (_: Exception) {
+            return
+        }
+
+        if (zalogowany.get()) return
+
+        try {
+            val obj = JSONObject(json)
+            when (obj.optString("type")) {
                 "EMAIL_WYNIK" -> {
                     if (obj.optString("wynik") == "EMAIL_SENT" && emailWyslany.compareAndSet(false, true)) {
                         smsOdKiedyMs.set(System.currentTimeMillis())
@@ -398,20 +508,20 @@ fun EkranWebViewSklepu(
                 .padding(horizontal = 4.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onZamknij) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = "Wyjdź ze sklepu",
-                    tint = TekstGlowny
-                )
-            }
-            IconButton(onClick = { stan.obsluzWstecz() }) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Wstecz",
-                    tint = TekstDrugi
-                )
-            }
+            PrzyciskAnimowanySklepu(
+                ikona = IkonaWyjsciaSklepu,
+                opis = "Wyjdź ze sklepu",
+                kolor = TekstGlowny,
+                animacja = AnimacjaPrzyciskuSklepu.PULSE,
+                onClick = onZamknij
+            )
+            PrzyciskAnimowanySklepu(
+                ikona = Icons.AutoMirrored.Rounded.ArrowBack,
+                opis = "Wstecz",
+                kolor = TekstDrugi,
+                animacja = AnimacjaPrzyciskuSklepu.COFNIECIE,
+                onClick = { stan.obsluzWstecz() }
+            )
             Text(
                 text = "Sklep firmowy",
                 color = TekstGlowny,
@@ -420,21 +530,38 @@ fun EkranWebViewSklepu(
                 modifier = Modifier.weight(1f),
                 maxLines = 1
             )
-            IconButton(onClick = { stan.odswiez() }) {
-                Icon(
-                    imageVector = Icons.Rounded.Refresh,
-                    contentDescription = "Odśwież",
-                    tint = AkcentNeon
-                )
-            }
+            PrzyciskAnimowanySklepu(
+                ikona = Icons.Rounded.Refresh,
+                opis = "Odśwież",
+                kolor = AkcentNeon,
+                animacja = AnimacjaPrzyciskuSklepu.OBROT,
+                onClick = { stan.odswiez() }
+            )
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        settings.setSupportZoom(true)
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        settings.textZoom = 100
+                        settings.cacheMode = WebSettings.LOAD_DEFAULT
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                        @Suppress("DEPRECATION")
+                        settings.layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+                        settings.mediaPlaybackRequiresUserGesture = true
+                        isVerticalScrollBarEnabled = true
+                        isHorizontalScrollBarEnabled = false
                         webChromeClient = WebChromeClient()
                         addJavascriptInterface(
                             object {
@@ -588,5 +715,11 @@ fun EkranWebViewSklepu(
                 }
             }
         }
+
+        DolnyPasekSklepu(
+            onZapiszKoszyk = { stan.zapiszAktualnyKoszyk() },
+            onOtworzKoszykSklepu = { stan.otworzKoszykSklepu() },
+            onDodajPozycje = { pozycje -> stan.dodajZapisaneDoKoszyka(pozycje) }
+        )
     }
 }
