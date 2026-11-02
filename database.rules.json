@@ -53,6 +53,14 @@
           "$logId": {
             ".write": "auth != null && (auth.uid == $uid || (root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists() && (!newData.exists() || newData.child('deviceId').val() == auth.uid)))"
           }
+        },
+        "shipments": {
+          ".indexOn": ["dodano", "dataMaila"],
+          ".read": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists())",
+          ".write": "auth != null && auth.uid == $uid",
+          "$shipmentId": {
+            ".write": "auth != null && auth.uid == $uid"
+          }
         }
       }
     },

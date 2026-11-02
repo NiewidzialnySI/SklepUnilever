@@ -24,5 +24,6 @@ object StaleFirebase {
         const val PAIRING_CODES = "pairing_codes"
         const val RECEIVER_SESSIONS = "receiver_sessions"
         const val ANNOUNCEMENTS = "announcements"
+        const val SHIPMENTS = "shipments"
     }
 }
