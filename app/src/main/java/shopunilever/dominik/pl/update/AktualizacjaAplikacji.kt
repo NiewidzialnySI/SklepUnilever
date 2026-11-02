@@ -33,8 +33,9 @@ import java.net.URL
  */
 object AktualizacjaAplikacji {
 
+    // jsDelivr — raw.githubusercontent.com czasem trzyma stary update.json w CDN
     const val DOMYSLNY_MANIFEST =
-        "https://raw.githubusercontent.com/NiewidzialnySI/SklepUnilever/main/update.json"
+        "https://cdn.jsdelivr.net/gh/NiewidzialnySI/SklepUnilever@main/update.json"
 
     private const val PREFS = "aktualizacja_prefs"
     private const val K_AUTO = "auto_sprawdzaj"
