@@ -1,12 +1,16 @@
 package shopunilever.dominik.pl.update
 
 import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.core.content.edit
@@ -54,9 +58,17 @@ object AktualizacjaAplikacji {
         data object Aktualna : Stan()
         data class Pobieranie(val postep01: Float, val info: InfoWersji) : Stan()
         data class GotowaDoInstalacji(val plik: File, val info: InfoWersji) : Stan()
+        data class GotowaAdb(
+            val plik: File,
+            val info: InfoWersji,
+            val sciezkaUrzadzenia: String,
+            val komenda: String
+        ) : Stan()
         data class WymagaUprawnienia(val plik: File?, val info: InfoWersji) : Stan()
         data class Blad(val komunikat: String) : Stan()
     }
+
+    private const val NAZWA_APK_POBRANE = "sklep-unilever-update.apk"
 
     private val _stan = MutableStateFlow<Stan>(Stan.Bezczynny)
     val stan: StateFlow<Stan> = _stan.asStateFlow()
@@ -157,31 +169,14 @@ object AktualizacjaAplikacji {
         }
     }
 
-    /** Jeden przycisk: pobierz APK, potem otwórz wybór instalatora. */
-    suspend fun pobierzIZainstaluj(context: Context, info: InfoWersji): Boolean {
-        if (!czyMoznaInstalowac(context)) {
-            _stan.value = Stan.WymagaUprawnienia(plik = null, info = info)
-            return false
-        }
-        val ok = pobierz(context, info)
-        if (!ok) return false
-        val gotowa = _stan.value as? Stan.GotowaDoInstalacji ?: return false
-        withContext(Dispatchers.Main) {
-            zainstalujZWyborem(context, gotowa.plik)
-        }
-        return true
-    }
-
+    /** Tylko pobierz i zapisz APK — bez instalatora / uprawnień. */
     suspend fun pobierz(context: Context, info: InfoWersji): Boolean =
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (_stan.value is Stan.Pobieranie) return@withLock false
                 try {
                     _stan.value = Stan.Pobieranie(0.02f, info)
-                    val dir = File(context.cacheDir, "apk").apply { mkdirs() }
-                    val plik = File(dir, "sklep-unilever-update.apk")
-                    if (plik.exists()) plik.delete()
-                    pobierzPlik(info.apkUrl, plik, githubToken(context)) { p ->
+                    val plik = pobierzDoCache(context, info) { p ->
                         _stan.value = Stan.Pobieranie(p, info)
                     }
                     weryfikujPodpisApk(context, plik)
@@ -193,6 +188,96 @@ object AktualizacjaAplikacji {
                 }
             }
         }
+
+    /**
+     * Obejście pod konto służbowe: pobierz APK → Pobrane → skopiuj komendę ADB.
+     * Bez uprawnienia „instalacja z nieznanych źródeł”.
+     */
+    suspend fun przygotujAdb(context: Context, info: InfoWersji): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val aktualny = _stan.value
+                val plik = when (aktualny) {
+                    is Stan.GotowaDoInstalacji -> aktualny.plik
+                    is Stan.GotowaAdb -> aktualny.plik
+                    is Stan.WymagaUprawnienia -> aktualny.plik
+                    else -> null
+                }?.takeIf { it.exists() && it.length() > 1024L }
+
+                val lokalny = if (plik != null) {
+                    plik
+                } else {
+                    mutex.withLock {
+                        _stan.value = Stan.Pobieranie(0.02f, info)
+                        pobierzDoCache(context, info) { p ->
+                            _stan.value = Stan.Pobieranie(p, info)
+                        }.also { weryfikujPodpisApk(context, it) }
+                    }
+                }
+
+                val publiczny = skopiujDoPobranych(context, lokalny)
+                val sciezka = "/sdcard/Download/$NAZWA_APK_POBRANE"
+                val komenda =
+                    "adb pull \"$sciezka\" . && adb install -r $NAZWA_APK_POBRANE"
+                withContext(Dispatchers.Main) {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("adb", komenda))
+                }
+                _stan.value = Stan.GotowaAdb(lokalny, info, publiczny ?: sciezka, komenda)
+                true
+            } catch (e: Exception) {
+                _stan.value = Stan.Blad(e.message?.takeIf { it.isNotBlank() } ?: "Błąd ADB")
+                false
+            }
+        }
+
+    private fun pobierzDoCache(
+        context: Context,
+        info: InfoWersji,
+        postep: (Float) -> Unit
+    ): File {
+        val dir = File(context.cacheDir, "apk").apply { mkdirs() }
+        val plik = File(dir, NAZWA_APK_POBRANE)
+        if (plik.exists()) plik.delete()
+        pobierzPlik(info.apkUrl, plik, githubToken(context), postep)
+        return plik
+    }
+
+    /** Zapis do publicznego Download — widoczny dla `adb pull`. */
+    private fun skopiujDoPobranych(context: Context, zrodlo: File): String? {
+        // 1) MediaStore (API 31+)
+        runCatching {
+            val resolver = context.contentResolver
+            resolver.delete(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${MediaStore.Downloads.DISPLAY_NAME}=?",
+                arrayOf(NAZWA_APK_POBRANE)
+            )
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, NAZWA_APK_POBRANE)
+                put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("MediaStore insert null")
+            resolver.openOutputStream(uri)?.use { out ->
+                zrodlo.inputStream().use { it.copyTo(out) }
+            } ?: error("Brak output stream")
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+        }
+
+        // 2) Bezpośredni plik (często działa na /sdcard/Download)
+        val folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        runCatching {
+            if (!folder.exists()) folder.mkdirs()
+            val cel = File(folder, NAZWA_APK_POBRANE)
+            zrodlo.copyTo(cel, overwrite = true)
+            return cel.absolutePath
+        }
+        return File(folder, NAZWA_APK_POBRANE).absolutePath
+    }
 
     fun czyMoznaInstalowac(context: Context): Boolean =
         context.packageManager.canRequestPackageInstalls()

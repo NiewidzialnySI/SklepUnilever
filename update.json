@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.1/sklep-unilever-v1.0.1.apk",
-  "changelog": "Parowanie: prośby o dostęp u pracownika (Akceptuj/Odrzuć), badge, powiadomienie. Poprawione reguły Firebase."
+  "versionCode": 3,
+  "versionName": "1.0.2",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.2/sklep-unilever-v1.0.2.apk",
+  "changelog": "Proste okno aktualizacji + instalacja przez ADB bez uprawnień."
 }
