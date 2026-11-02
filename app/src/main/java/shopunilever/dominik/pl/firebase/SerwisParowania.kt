@@ -202,6 +202,8 @@ object SerwisParowania {
                 "blocked" to false
             )
         ).await()
+        // Upewnij się, że rodzina ma świeże dane logowania
+        runCatching { publikujDaneLogowania(context) }
     }
 
     suspend fun odrzucProsbe(context: Context, prosbaId: String) {

@@ -204,6 +204,18 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
+        // /access — wybór: Autologowanie / Kod SMS / Karta pracownicza
+        var href = (location.href || '').toLowerCase();
+        var linkSms = document.querySelector('a[href*="access-email"]') ||
+            document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
+        var maWyborMetod = !!document.getElementById('ad_login') ||
+            !!document.querySelector('.access-azure-login, .autologin-content') ||
+            (href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
+             href.indexOf('access-code') < 0 && !!linkSms);
+        if (maWyborMetod && !sklepikWidoczny(document.getElementById('access_email'))) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ACCESS_METHOD_CHOICE' });
+            return;
+        }
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="access_token"]') ||
             document.querySelector('input[name="token"]');
@@ -265,6 +277,39 @@ true;
         val bezpieczny = url.replace("\\", "\\\\").replace("\"", "\\\"")
         return """window.location.href="$bezpieczny"; true;"""
     }
+
+    /** Na /access wybierz „Kod SMS” → /access-email (nie Azure / nie karta). */
+    val WYBIERZ_KOD_SMS = """
+(function() {
+    try {
+        var a = document.querySelector('a[href*="access-email"]') ||
+            document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
+        if (a) {
+            try {
+                a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            } catch (e) {}
+            a.click();
+            if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'wybor', sukces: true, info: 'KLIK_KOD_SMS' });
+            return;
+        }
+        var links = document.querySelectorAll('a, button, span');
+        for (var i = 0; i < links.length; i++) {
+            var t = ((links[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+            if (t === 'kod sms' || t.indexOf('kod sms') >= 0) {
+                var cel = links[i].closest('a') || links[i];
+                try { cel.click(); } catch (e) {}
+                if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'wybor', sukces: true, info: 'TEKST_KOD_SMS' });
+                return;
+            }
+        }
+        window.location.href = 'https://sklepfirmowyunilever.pl/access-email';
+        if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'wybor', sukces: true, info: 'REDIRECT_ACCESS_EMAIL' });
+    } catch (e) {
+        window.location.href = 'https://sklepfirmowyunilever.pl/access-email';
+    }
+})();
+true;
+""".trimIndent()
 
     fun skryptWypelnijEmail(email: String): String {
         val bezpieczny = email.replace("\\", "\\\\").replace("\"", "\\\"")

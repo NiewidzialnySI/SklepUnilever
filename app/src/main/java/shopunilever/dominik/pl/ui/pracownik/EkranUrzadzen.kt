@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NotificationsActive
@@ -246,27 +245,6 @@ fun EkranUrzadzen(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                 }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-        } else if (aktywne) {
-            SzkloKarta {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.CheckCircle, null, tint = Sukces)
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text(
-                        "Brak oczekujących próśb",
-                        color = TekstGlowny,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    "Gdy ktoś zeskanuje QR, pojawi się tu przycisk Akceptuj / Odrzuć.",
-                    color = TekstDrugi,
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

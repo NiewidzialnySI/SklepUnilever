@@ -409,14 +409,33 @@ private class StanLogowaniaSklepu(
 
                 "WYKRYJ" -> when (obj.optString("wynik")) {
                     "COOKIE_BANNER" -> {
-                        status = "Akceptuję cookies — Akceptuj wszystkie / Przejdź do sklepu…"
+                        status = "Akceptuję cookies…"
                         wstrzyknij(SkryptySklepu.CIASTECZKA)
                         webView?.postDelayed({
                             wstrzyknij(SkryptySklepu.CIASTECZKA)
                             wstrzyknij(SkryptySklepu.WYKRYJ)
                         }, 1500)
                     }
+                    "ACCESS_METHOD_CHOICE" -> {
+                        // /access: Autologowanie | Kod SMS | Karta → zawsze Kod SMS
+                        status = "Wybieram logowanie kodem SMS…"
+                        wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
+                        webView?.postDelayed({
+                            if (!zalogowany.get() && !emailWyslany.get()) {
+                                val u = aktualnyUrl.lowercase()
+                                if (!u.contains("access-email")) {
+                                    webView?.loadUrl(StaleSklepu.URL_LOGOWANIA)
+                                }
+                            }
+                        }, 2500)
+                    }
                     "EMAIL_FIELD" -> {
+                        if (email.isBlank() || haslo.isBlank()) {
+                            etap = EtapLogowania.BLAD
+                            blad = "Brak email/hasła — zapisz dane u pracownika w Ustawieniach"
+                            status = "Brak danych logowania"
+                            return
+                        }
                         if (!emailWyslany.get()) wstrzyknijEmail()
                     }
                     "SMS_TOKEN_FIELD" -> {
@@ -425,7 +444,12 @@ private class StanLogowaniaSklepu(
                         zacznijOczekiwanieSms()
                     }
                     "PASSWORD_FIELD" -> {
-                        // Powrót sesji / po SMS: od razu hasło → checkbox → captcha → Zaloguj
+                        if (haslo.isBlank()) {
+                            etap = EtapLogowania.BLAD
+                            blad = "Brak hasła w aplikacji"
+                            status = "Brak danych logowania"
+                            return
+                        }
                         wstrzyknijHaslo()
                     }
                     "ALREADY_LOGGED_IN" -> {
@@ -433,15 +457,25 @@ private class StanLogowaniaSklepu(
                         poZalogowaniu()
                     }
                     "NO_RECOGNIZED_ELEMENTS" -> {
-                        val naSklepie = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
-                            !aktualnyUrl.contains("access", ignoreCase = true) &&
-                            !aktualnyUrl.contains("login", ignoreCase = true)
-                        if (naSklepie) {
-                            status = "Sesja aktywna — otwieram sklep…"
-                            poZalogowaniu()
-                        } else {
-                            status = "Nie rozpoznano formularza — sprawdzam sesję…"
-                            wstrzyknij(SkryptySklepu.SESJA)
+                        val u = aktualnyUrl.lowercase()
+                        val naWyborze = u.contains("/access") &&
+                            !u.contains("access-email") &&
+                            !u.contains("access-code")
+                        when {
+                            naWyborze -> {
+                                status = "Wybieram logowanie kodem SMS…"
+                                wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
+                            }
+                            StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
+                                !u.contains("access") &&
+                                !u.contains("login") -> {
+                                status = "Sesja aktywna — otwieram sklep…"
+                                poZalogowaniu()
+                            }
+                            else -> {
+                                status = "Przechodzę do logowania SMS…"
+                                wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                            }
                         }
                     }
                 }
@@ -456,11 +490,19 @@ private class StanLogowaniaSklepu(
                         webView?.loadUrl(StaleSklepu.URL_GLOWNA)
                     }
                     "NEEDS_LOGIN" -> {
-                        if (!aktualnyUrl.contains("access", ignoreCase = true)) {
-                            status = "Brak sesji — przechodzę do logowania…"
-                            wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
-                        } else {
-                            wstrzyknij(SkryptySklepu.WYKRYJ)
+                        val u = aktualnyUrl.lowercase()
+                        when {
+                            u.contains("access-email") || u.contains("access-code") -> {
+                                wstrzyknij(SkryptySklepu.WYKRYJ)
+                            }
+                            u.contains("/access") -> {
+                                status = "Wybieram logowanie kodem SMS…"
+                                wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
+                            }
+                            else -> {
+                                status = "Brak sesji — logowanie kodem SMS…"
+                                wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                            }
                         }
                     }
                     "UNKNOWN" -> {
@@ -498,6 +540,9 @@ private class StanLogowaniaSklepu(
                             if (info.contains("PRZEJDZ") || info.contains("TEKST:przejd")) {
                                 status = "Kliknięto Przejdź do sklepu…"
                             }
+                        }
+                        "wybor" -> {
+                            status = "Przechodzę do formularza email / SMS…"
                         }
                         "sms" -> {
                             status = "Kod SMS wpisany — czekam na hasło…"
@@ -741,7 +786,11 @@ fun EkranWebViewSklepu(
                         if (stan.oczekujeSms) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Kod z SMS wpisze się automatycznie. Pole poniżej tylko awaryjnie:",
+                                text = if (trybOdbiorcy) {
+                                    "Czekam na kod z telefonu pracownika. Awaryjnie wpisz poniżej:"
+                                } else {
+                                    "Kod z SMS wpisze się automatycznie. Awaryjnie wpisz poniżej:"
+                                },
                                 color = TekstDrugi,
                                 fontSize = 12.sp
                             )

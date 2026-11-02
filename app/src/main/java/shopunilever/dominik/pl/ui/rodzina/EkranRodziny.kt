@@ -196,12 +196,14 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                                 .clickable {
                                     zakres.launch {
                                         ladowanie = true
+                                        blad = null
                                         runCatching {
-                                            SerwisParowania.pobierzDaneLogowania(kontekst)?.let { dane ->
+                                            val dane = SerwisParowania.pobierzDaneLogowania(kontekst)
+                                            if (dane == null || dane.email.isBlank() || dane.haslo.isBlank()) {
+                                                blad = "Brak danych logowania — pracownik musi zapisać email i hasło w Ustawieniach."
+                                            } else {
                                                 PreferencjeKonta.zapiszDane(kontekst, dane.email, dane.haslo)
                                                 pokazSklep = true
-                                            } ?: run {
-                                                blad = "Brak danych logowania — poczekaj aż pracownik zapisze konto."
                                             }
                                         }.onFailure {
                                             blad = it.message
