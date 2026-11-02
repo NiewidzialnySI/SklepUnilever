@@ -12,9 +12,9 @@
  * 6. Zapisz wlasciwosci.
  * 7. Uruchom funkcje:  KROK1_sprawdzKonfiguracje
  * 8. Jak log = OK, uruchom:      KROK2_zainstalujTrigger
- * 9. (Opcjonalnie) Wlasciwosc DOMYSLNY_TRANSMITTER_UID = UID z Firebase
- *    transmitters/...  - gdy stare maile maja stary +KOD (np. WCYNEV47)
- * 10. Potem: testReczny
+ * 9. Potem: testReczny
+ *    Skrypt sam szuka kodu w pairing_codes / syncCode,
+ *    a jak nie znajdzie (+ stary KOD) - bierze aktywny nadajnik z /transmitters.
  *
  * NIE wklejaj JSON obok var / function - bedzie blad skladni.
  * NIE wysylaj JSON na czat.
@@ -186,10 +186,8 @@ function przetworzWiadomosc(wiadomosc) {
     return { ok: false, pomin: true, powod: 'Nie UPS/DHL' };
   }
 
+  // +KOD opcjonalny - jak brak / nieznany, bierzemy aktywny nadajnik z RTDB
   var pairingCode = wyciagnijKodParowania(wiadomosc);
-  if (!pairingCode) {
-    return { ok: false, pomin: false, powod: 'Brak +KOD w adresie To' };
-  }
 
   if (!body || body.length < 10) {
     return { ok: false, pomin: false, powod: 'Pusta tresc' };
@@ -212,7 +210,7 @@ function przetworzWiadomosc(wiadomosc) {
     return {
       ok: false,
       pomin: false,
-      powod: 'Brak pairing_codes/' + pairingCode + ' (nadajnik nieaktywny?)'
+      powod: 'Brak aktywnego nadajnika w /transmitters (wlacz parowanie w apce)'
     };
   }
 
@@ -279,42 +277,87 @@ function pobierzTokenFirebase() {
   return JSON.parse(resp.getContentText()).access_token;
 }
 
+/**
+ * Dynamicznie: +KOD z maila -> pairing_codes / syncCode,
+ * inaczej najnowszy aktywny nadajnik z /transmitters.
+ */
 function rozwiazTransmitterUid(token, pairingCode) {
-  // 1) Oficjalna mapa aplikacji
-  var url = RTDB_URL + '/pairing_codes/' + encodeURIComponent(pairingCode) + '.json?access_token=' + token;
-  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (resp.getResponseCode() === 200) {
-    var dane = JSON.parse(resp.getContentText());
-    if (dane && dane.transmitterUid) return dane.transmitterUid;
-  } else if (resp.getResponseCode() !== 404) {
-    throw new Error('Odczyt pairing_codes: ' + resp.getContentText());
+  if (pairingCode) {
+    // 1) pairing_codes/{KOD}
+    var url = RTDB_URL + '/pairing_codes/' + encodeURIComponent(pairingCode) + '.json?access_token=' + token;
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() === 200) {
+      var dane = JSON.parse(resp.getContentText());
+      if (dane && dane.transmitterUid) return dane.transmitterUid;
+    } else if (resp.getResponseCode() !== 404) {
+      throw new Error('Odczyt pairing_codes: ' + resp.getContentText());
+    }
+
+    // 2) transmitters.syncCode == KOD
+    var q =
+      RTDB_URL +
+      '/transmitters.json?orderBy="syncCode"&equalTo="' +
+      encodeURIComponent(pairingCode) +
+      '"&access_token=' +
+      token;
+    var resp2 = UrlFetchApp.fetch(q, { muteHttpExceptions: true });
+    if (resp2.getResponseCode() === 200) {
+      var mapa = JSON.parse(resp2.getContentText());
+      if (mapa) {
+        for (var uid in mapa) {
+          if (Object.prototype.hasOwnProperty.call(mapa, uid)) return uid;
+        }
+      }
+    }
+    Logger.log('Kod ' + pairingCode + ' nieznany - szukam aktywnego nadajnika');
   }
 
-  // 2) Szukaj nadajnika po syncCode (aktualny kod w apce)
-  var q =
-    RTDB_URL +
-    '/transmitters.json?orderBy="syncCode"&equalTo="' +
-    encodeURIComponent(pairingCode) +
-    '"&access_token=' +
-    token;
-  var resp2 = UrlFetchApp.fetch(q, { muteHttpExceptions: true });
-  if (resp2.getResponseCode() === 200) {
-    var mapa = JSON.parse(resp2.getContentText());
-    if (mapa) {
-      for (var uid in mapa) {
-        if (Object.prototype.hasOwnProperty.call(mapa, uid)) return uid;
-      }
+  // 3) Automatycznie: aktywny / najnowszy transmitter w bazie
+  var auto = znajdzAktywnyNadajnik(token);
+  if (auto) return auto;
+
+  // 4) Reczny fallback (opcjonalny)
+  var fallback = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_DOMYSLNY_UID);
+  if (fallback && String(fallback).trim()) {
+    return String(fallback).trim();
+  }
+  return null;
+}
+
+/** Bierze nadajnik active=true, a jak wielu - ten z najwyzszym updatedAt. */
+function znajdzAktywnyNadajnik(token) {
+  var url = RTDB_URL + '/transmitters.json?access_token=' + token;
+  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (resp.getResponseCode() !== 200) {
+    throw new Error('Odczyt transmitters: ' + resp.getContentText());
+  }
+  var dane = JSON.parse(resp.getContentText());
+  if (!dane) return null;
+
+  var najlepszyUid = null;
+  var najlepszyTs = -1;
+  var aktywnyUid = null;
+  var aktywnyTs = -1;
+
+  for (var uid in dane) {
+    if (!Object.prototype.hasOwnProperty.call(dane, uid)) continue;
+    var n = dane[uid] || {};
+    var ts = Number(n.updatedAt || n.createdAt || 0);
+    if (ts >= najlepszyTs) {
+      najlepszyTs = ts;
+      najlepszyUid = uid;
+    }
+    if (n.active === true && ts >= aktywnyTs) {
+      aktywnyTs = ts;
+      aktywnyUid = uid;
     }
   }
 
-  // 3) Fallback dla starych maili (+KOD ze Sklepik / poprzedniego QR)
-  var fallback = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_DOMYSLNY_UID);
-  if (fallback && String(fallback).trim()) {
-    Logger.log('Brak pairing_codes/' + pairingCode + ' - uzywam DOMYSLNY_TRANSMITTER_UID');
-    return String(fallback).trim();
+  var wynik = aktywnyUid || najlepszyUid;
+  if (wynik) {
+    Logger.log('Auto-nadajnik: ' + wynik + (aktywnyUid ? ' (active)' : ' (najnowszy)'));
   }
-
-  return null;
+  return wynik;
 }
 
 function pobierzIstniejacePrzesylki(token, transmitterUid) {
