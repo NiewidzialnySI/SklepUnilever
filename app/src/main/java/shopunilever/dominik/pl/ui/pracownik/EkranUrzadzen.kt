@@ -20,8 +20,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Phonelink
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -54,13 +57,18 @@ import shopunilever.dominik.pl.firebase.StaleFirebase
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
+import shopunilever.dominik.pl.ui.theme.Blad
+import shopunilever.dominik.pl.ui.theme.Ostrzezenie
 import shopunilever.dominik.pl.ui.theme.Sukces
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
 
 @Composable
-fun EkranUrzadzen(modifier: Modifier = Modifier) {
+fun EkranUrzadzen(
+    modifier: Modifier = Modifier,
+    onParowanieZmienione: () -> Unit = {}
+) {
     val kontekst = LocalContext.current
     val zakres = rememberCoroutineScope()
 
@@ -71,9 +79,11 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
     var status by remember { mutableStateOf<String?>(null) }
     var prosby by remember { mutableStateOf<List<ProsbaDostepu>>(emptyList()) }
     var odbiorcy by remember { mutableStateOf<List<OdbiorcaPolaczony>>(emptyList()) }
+    var akcjaProsby by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(aktywne, kod) {
-        if (!aktywne) return@LaunchedEffect
+        if (kod.isBlank()) return@LaunchedEffect
+        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
         launch {
             SerwisParowania.obserwujProsby(kontekst).collectLatest { prosby = it }
         }
@@ -94,12 +104,15 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
                 kod = it
                 aktywne = true
                 status = "Parowanie aktywne — kody SMS będą przekazywane bezpiecznie."
+                onParowanieZmienione()
             }.onFailure {
                 blad = it.message ?: "Nie udało się uruchomić parowania."
             }
             ladowanie = false
         }
     }
+
+    val oczekujace = prosby.filter { it.status == "pending" }
 
     Column(
         modifier = modifier
@@ -122,7 +135,141 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // Prośby NA GÓRZE — zawsze widoczne gdy ktoś czeka.
+        if (oczekujace.isNotEmpty()) {
+            SzkloKarta {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.NotificationsActive,
+                        contentDescription = null,
+                        tint = Ostrzezenie
+                    )
+                    Spacer(modifier = Modifier.size(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Nowa prośba o dostęp",
+                            color = TekstGlowny,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            text = if (oczekujace.size == 1) {
+                                "Zaakceptuj lub odrzuć urządzenie rodziny"
+                            } else {
+                                "${oczekujace.size} urządzenia czekają na decyzję"
+                            },
+                            color = Ostrzezenie,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                oczekujace.forEach { p ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.06f))
+                            .padding(14.dp)
+                    ) {
+                        Text(
+                            p.nazwaUrzadzenia,
+                            color = TekstGlowny,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            "Oczekuje na Twoją decyzję",
+                            color = TekstDrugi,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Sukces.copy(alpha = 0.2f))
+                                    .clickable(enabled = akcjaProsby == null) {
+                                        zakres.launch {
+                                            akcjaProsby = p.id
+                                            runCatching {
+                                                SerwisParowania.zatwierdzProsbe(kontekst, p.id)
+                                            }.onSuccess {
+                                                status = "Połączono: ${p.nazwaUrzadzenia}"
+                                            }.onFailure {
+                                                blad = it.message ?: "Nie udało się zaakceptować."
+                                            }
+                                            akcjaProsby = null
+                                        }
+                                    }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (akcjaProsby == p.id) {
+                                    CircularProgressIndicator(
+                                        color = Sukces,
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("Akceptuj", color = Sukces, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Blad.copy(alpha = 0.15f))
+                                    .clickable(enabled = akcjaProsby == null) {
+                                        zakres.launch {
+                                            akcjaProsby = p.id
+                                            runCatching {
+                                                SerwisParowania.odrzucProsbe(kontekst, p.id)
+                                            }.onFailure {
+                                                blad = it.message ?: "Nie udało się odrzucić."
+                                            }
+                                            akcjaProsby = null
+                                        }
+                                    }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Odrzuć", color = Blad, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        } else if (aktywne) {
+            SzkloKarta {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.CheckCircle, null, tint = Sukces)
+                    Spacer(modifier = Modifier.size(10.dp))
+                    Text(
+                        "Brak oczekujących próśb",
+                        color = TekstGlowny,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "Gdy ktoś zeskanuje QR, pojawi się tu przycisk Akceptuj / Odrzuć.",
+                    color = TekstDrugi,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         SzkloKarta {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,7 +348,7 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
 
             blad?.let {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = androidx.compose.ui.graphics.Color(0xFFF87171), fontSize = 12.sp)
+                Text(it, color = Blad, fontSize = 12.sp)
             }
             status?.let {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -233,37 +380,6 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
                 fontSize = 13.sp,
                 lineHeight = 18.sp
             )
-        }
-
-        if (prosby.any { it.status == "pending" }) {
-            Spacer(modifier = Modifier.height(16.dp))
-            SzkloKarta {
-                Text("Prośby o dostęp", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(10.dp))
-                prosby.filter { it.status == "pending" }.forEach { p ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(p.nazwaUrzadzenia, color = TekstGlowny, fontWeight = FontWeight.SemiBold)
-                            Text("Oczekuje", color = TekstDrugi, fontSize = 12.sp)
-                        }
-                        TextButton(onClick = {
-                            zakres.launch {
-                                runCatching { SerwisParowania.zatwierdzProsbe(kontekst, p.id) }
-                            }
-                        }) { Text("OK", color = Sukces) }
-                        TextButton(onClick = {
-                            zakres.launch {
-                                runCatching { SerwisParowania.odrzucProsbe(kontekst, p.id) }
-                            }
-                        }) { Text("Nie", color = TekstDrugi) }
-                    }
-                }
-            }
         }
 
         if (odbiorcy.isNotEmpty()) {

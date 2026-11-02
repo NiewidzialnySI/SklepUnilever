@@ -103,21 +103,19 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
         return
     }
 
-    fun dolacz(kod: String) {
-        zakres.launch {
-            ladowanie = true
-            blad = null
-            info = null
-            runCatching {
-                SerwisParowania.dolaczJakoOdbiorca(kontekst, kod)
-            }.onSuccess {
-                status = "pending"
-                info = "Wysłano prośbę — poczekaj na akceptację pracownika."
-            }.onFailure {
-                blad = it.message ?: "Nie udało się połączyć."
-            }
-            ladowanie = false
+    suspend fun dolacz(kod: String) {
+        ladowanie = true
+        blad = null
+        info = null
+        runCatching {
+            SerwisParowania.dolaczJakoOdbiorca(kontekst, kod)
+        }.onSuccess {
+            status = "pending"
+            info = "Wysłano prośbę — poczekaj na akceptację na telefonie pracownika (zakładka Urządzenia)."
+        }.onFailure {
+            blad = it.message ?: "Nie udało się połączyć."
         }
+        ladowanie = false
     }
 
     fun skanujQr() {
@@ -319,7 +317,7 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
                                     if (kod.length != StaleFirebase.DLUGOSC_KODU) {
                                         blad = "Kod musi mieć ${StaleFirebase.DLUGOSC_KODU} znaków"
                                     } else {
-                                        dolacz(kod)
+                                        zakres.launch { dolacz(kod) }
                                     }
                                 }
                                 .padding(vertical = 14.dp),

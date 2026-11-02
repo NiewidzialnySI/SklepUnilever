@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,20 +35,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
+import shopunilever.dominik.pl.ui.theme.Blad
 import shopunilever.dominik.pl.ui.theme.RamkaKarty
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
+import shopunilever.dominik.pl.ui.theme.TekstNaAkcencie
 import shopunilever.dominik.pl.ui.theme.TloKarty
 import kotlin.math.roundToInt
 
-/** Ikony-only bottom bar — szybki sliding pill, bez kółek wokół ikon. */
+/** Ikony-only bottom bar — szybki sliding pill, badge na Urządzeniach. */
 @Composable
 fun DolnyPasekPracownika(
     aktywna: ZakladkaPracownika,
     onZmiana: (ZakladkaPracownika) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    badgeUrzadzenia: Int = 0
 ) {
     val ksztalt = RoundedCornerShape(22.dp)
     val zakladki = ZakladkaPracownika.entries
@@ -112,17 +119,36 @@ fun DolnyPasekPracownika(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = zakladka.ikona,
-                            contentDescription = zakladka.etykieta,
-                            tint = if (zaznaczona) AkcentNeon else TekstDrugi,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .graphicsLayer {
-                                    scaleX = skala
-                                    scaleY = skala
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            Icon(
+                                imageVector = zakladka.ikona,
+                                contentDescription = zakladka.etykieta,
+                                tint = if (zaznaczona) AkcentNeon else TekstDrugi,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .graphicsLayer {
+                                        scaleX = skala
+                                        scaleY = skala
+                                    }
+                            )
+                            if (zakladka == ZakladkaPracownika.URZADZENIA && badgeUrzadzenia > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = 6.dp, y = (-4).dp)
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(Blad),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (badgeUrzadzenia > 9) "9+" else badgeUrzadzenia.toString(),
+                                        color = TekstNaAkcencie,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                        )
+                            }
+                        }
                     }
                 }
             }

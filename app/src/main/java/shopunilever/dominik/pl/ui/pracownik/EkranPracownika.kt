@@ -15,23 +15,75 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.flow.collectLatest
+import shopunilever.dominik.pl.dane.PreferencjeParowania
+import shopunilever.dominik.pl.firebase.PowiadomieniaParowania
+import shopunilever.dominik.pl.firebase.ProsbaDostepu
+import shopunilever.dominik.pl.firebase.SerwisParowania
+import shopunilever.dominik.pl.ui.IntentyNawigacji
 import shopunilever.dominik.pl.ui.components.TloAplikacji
 
 @Composable
 fun EkranPracownika(modifier: Modifier = Modifier) {
+    val kontekst = LocalContext.current
     var zakladka by remember { mutableStateOf(ZakladkaPracownika.DOM) }
     var pokazSklep by remember { mutableStateOf(false) }
+    var prosbyOczekujace by remember { mutableIntStateOf(0) }
+    var restartNasluchu by remember { mutableIntStateOf(0) }
+    val juzPowiadomione = remember { mutableSetOf<String>() }
+
+    val chceUrzadzenia by IntentyNawigacji.otworzUrzadzenia.collectAsState()
+    LaunchedEffect(chceUrzadzenia) {
+        if (chceUrzadzenia) {
+            pokazSklep = false
+            zakladka = ZakladkaPracownika.URZADZENIA
+            IntentyNawigacji.skonsumujOtworzUrzadzenia()
+        }
+    }
+
+    // Globalny nasłuch próśb — poza zakładką Urządzenia i w sklepie.
+    LaunchedEffect(restartNasluchu) {
+        val kod = PreferencjeParowania.kod(kontekst)
+        if (kod.isBlank()) {
+            prosbyOczekujace = 0
+            return@LaunchedEffect
+        }
+        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
+        SerwisParowania.obserwujProsby(kontekst).collectLatest { lista: List<ProsbaDostepu> ->
+            val pending = lista.filter { it.status == "pending" }
+            prosbyOczekujace = pending.size
+            var nowaProsba = false
+            pending.forEach { p ->
+                if (juzPowiadomione.add(p.id)) {
+                    nowaProsba = true
+                    PowiadomieniaParowania.pokazanowaProsbe(
+                        kontekst,
+                        p.nazwaUrzadzenia,
+                        p.id
+                    )
+                }
+            }
+            if (nowaProsba) {
+                pokazSklep = false
+                zakladka = ZakladkaPracownika.URZADZENIA
+            }
+            juzPowiadomione.retainAll(pending.map { it.id }.toSet())
+        }
+    }
 
     AnimatedContent(
         targetState = pokazSklep,
         transitionSpec = {
             if (targetState) {
-                // Wejście do sklepu
                 (
                     fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 8 } +
                         scaleIn(initialScale = 0.97f, animationSpec = tween(260))
@@ -39,7 +91,6 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                     fadeOut(tween(160)) + scaleOut(targetScale = 0.98f, animationSpec = tween(160))
                     )
             } else {
-                // Wyjście ze sklepu — w dół + fade
                 (
                     fadeIn(tween(200)) + scaleIn(initialScale = 0.98f, animationSpec = tween(220))
                     ) togetherWith (
@@ -79,14 +130,17 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
                                 ZakladkaPracownika.DOM -> EkranHomePracownika(
                                     onOtworzSklep = { pokazSklep = true }
                                 )
-                                ZakladkaPracownika.URZADZENIA -> EkranUrzadzen()
+                                ZakladkaPracownika.URZADZENIA -> EkranUrzadzen(
+                                    onParowanieZmienione = { restartNasluchu++ }
+                                )
                                 ZakladkaPracownika.USTAWIENIA -> EkranUstawien()
                             }
                         }
                     }
                     DolnyPasekPracownika(
                         aktywna = zakladka,
-                        onZmiana = { zakladka = it }
+                        onZmiana = { zakladka = it },
+                        badgeUrzadzenia = prosbyOczekujace
                     )
                 }
             }

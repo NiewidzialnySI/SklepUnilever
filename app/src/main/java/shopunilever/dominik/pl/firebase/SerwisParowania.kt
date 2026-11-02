@@ -66,6 +66,30 @@ object SerwisParowania {
         return kod
     }
 
+    /**
+     * Utrzymuje sesję Auth = UID nadajnika z preferencji.
+     * Bez tego reguły RTDB blokują odczyt próśb (auth.uid musi = transmitterUid).
+     */
+    suspend fun upewnijSesjeNadajnika(context: Context): String? {
+        val kod = PreferencjeParowania.kod(context)
+        if (kod.isBlank()) return null
+        FirebaseSklepik.upewnijSie(context)
+        val authUid = FirebaseSklepik.zalogujAnonimowo(context)
+        val zapisany = PreferencjeParowania.uid(context)
+        if (zapisany.isBlank() || zapisany != authUid) {
+            return uruchomJakoNadajnik(context)
+        }
+        // Odśwież znacznik aktywności — bez zmiany kodu.
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(authUid)
+            .child("updatedAt")
+            .setValue(System.currentTimeMillis())
+            .await()
+        PreferencjeParowania.zapisz(context, kod, authUid)
+        return authUid
+    }
+
     suspend fun publikujDaneLogowania(context: Context) {
         val uid = PreferencjeParowania.uid(context).ifBlank { return }
         val email = PreferencjeKonta.email(context)
