@@ -145,7 +145,16 @@ private class StanLogowaniaSklepu(
         }
     }
 
-    fun zapiszAktualnyKoszyk() {
+    @Volatile
+    private var nazwaKoszykaDoZapisu: String = ""
+
+    private val pominięteProdukty = mutableListOf<String>()
+    private var aktualnyProduktUrl: String = ""
+
+    fun zapiszAktualnyKoszyk(nazwa: String) {
+        nazwaKoszykaDoZapisu = nazwa.trim().ifBlank {
+            "Koszyk ${PreferencjeKoszykow.lista(kontekstAplikacji).size + 1}"
+        }
         oczekujeEksportuKoszyka.set(true)
         toast("Zbieram produkty z koszyka…")
         wstrzyknij(SkryptySklepu.MOSTEK)
@@ -181,6 +190,7 @@ private class StanLogowaniaSklepu(
         }
         kolejkaDodawania.clear()
         kolejkaDodawania.addAll(urlki)
+        pominięteProdukty.clear()
         dodawanieTrwa.set(true)
         toast("Dodaję ${urlki.size} produkt(ów) do koszyka…")
         nastepnyProduktZKolejki()
@@ -193,10 +203,20 @@ private class StanLogowaniaSklepu(
         if (url == null) {
             dodawanieTrwa.set(false)
             oczekujeDodaniaDoKoszyka.set(false)
-            toast("Gotowe — otwieram koszyk")
+            val pominięte = pominięteProdukty.toList()
+            if (pominięte.isNotEmpty()) {
+                toast(
+                    "Gotowe. Pominięto ${pominięte.size} niedostępnych: " +
+                        pominięte.take(2).joinToString(", ") +
+                        if (pominięte.size > 2) "…" else ""
+                )
+            } else {
+                toast("Gotowe — otwieram koszyk")
+            }
             wv.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
             return
         }
+        aktualnyProduktUrl = url
         oczekujeDodaniaDoKoszyka.set(true)
         wv.loadUrl(url)
         wv.postDelayed({
@@ -340,9 +360,13 @@ private class StanLogowaniaSklepu(
                         toast("Koszyk pusty albo nie znaleziono produktów — otwórz koszyk i spróbuj ponownie")
                         return
                     }
+                    val nazwa = nazwaKoszykaDoZapisu.ifBlank {
+                        "Koszyk ${PreferencjeKoszykow.lista(kontekstAplikacji).size + 1}"
+                    }
+                    nazwaKoszykaDoZapisu = ""
                     val zapis = PreferencjeKoszykow.zapisz(
                         kontekstAplikacji,
-                        nazwa = "Koszyk ${PreferencjeKoszykow.lista(kontekstAplikacji).size + 1}",
+                        nazwa = nazwa,
                         pozycje = pozycje
                     )
                     toast("Zapisano „${zapis.nazwa}” (${pozycje.size} poz.)")
@@ -350,7 +374,18 @@ private class StanLogowaniaSklepu(
                 }
 
                 "KOSZYK_DODANO" -> {
-                    poDodaniuDoKoszyka()
+                    val sukces = obj.optBoolean("sukces", true)
+                    val info = obj.optString("info")
+                    if (!sukces && info in setOf("BRAK_PRODUKTU", "BRAK_PRZYCISKU", "STRONA_404")) {
+                        val skrot = aktualnyProduktUrl
+                            .substringAfterLast('/')
+                            .substringBefore('?')
+                            .ifBlank { "produkt" }
+                        pominięteProdukty.add(skrot)
+                    }
+                    if (info != "SKIP_DUP") {
+                        poDodaniuDoKoszyka()
+                    }
                     return
                 }
 
@@ -529,11 +564,12 @@ fun EkranWebViewSklepu(
         stan.obsluzWstecz()
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(TloAmoled)
     ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         // Pasek pod status/wycięciem — spycha WebView w dół
         Row(
             modifier = Modifier
@@ -751,10 +787,15 @@ fun EkranWebViewSklepu(
             }
         }
 
+        // miejsce na wysokość dolnego paska (panel nakłada się overlayem)
+        Spacer(modifier = Modifier.height(72.dp))
+    }
+
         DolnyPasekSklepu(
-            onZapiszKoszyk = { stan.zapiszAktualnyKoszyk() },
+            onZapiszKoszyk = { nazwa -> stan.zapiszAktualnyKoszyk(nazwa) },
             onOtworzKoszykSklepu = { stan.otworzKoszykSklepu() },
-            onDodajPozycje = { pozycje -> stan.dodajZapisaneDoKoszyka(pozycje) }
+            onDodajPozycje = { pozycje -> stan.dodajZapisaneDoKoszyka(pozycje) },
+            modifier = Modifier.fillMaxSize()
         )
     }
 }

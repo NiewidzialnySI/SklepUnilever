@@ -1,8 +1,8 @@
 package shopunilever.dominik.pl.ui.pracownik
 
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ripple
@@ -42,9 +41,7 @@ import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TloKarty
 import kotlin.math.roundToInt
 
-/**
- * Ikony-only bottom bar ze sliding pill (w stylu AnimatedBottomBar / canopas).
- */
+/** Ikony-only bottom bar — szybki sliding pill, bez kółek wokół ikon. */
 @Composable
 fun DolnyPasekPracownika(
     aktywna: ZakladkaPracownika,
@@ -55,10 +52,7 @@ fun DolnyPasekPracownika(
     val zakladki = ZakladkaPracownika.entries
     val indeksAnim by animateFloatAsState(
         targetValue = aktywna.ordinal.toFloat(),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
         label = "wskaznik_zakladki"
     )
 
@@ -71,7 +65,7 @@ fun DolnyPasekPracownika(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(54.dp)
                 .clip(ksztalt)
                 .background(TloKarty)
                 .border(
@@ -81,46 +75,35 @@ fun DolnyPasekPracownika(
                     ),
                     shape = ksztalt
                 )
-                .padding(horizontal = 6.dp, vertical = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 5.dp)
         ) {
             val szerokoscSlotu = maxWidth / zakladki.size
             val gestosc = LocalDensity.current
             val offsetPx = with(gestosc) { (szerokoscSlotu * indeksAnim).toPx() }
 
-            // Płynny wskaźnik pod aktywną ikoną
             Box(
                 modifier = Modifier
                     .offset { IntOffset(offsetPx.roundToInt(), 0) }
                     .width(szerokoscSlotu)
                     .fillMaxHeight()
                     .padding(horizontal = 4.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                AkcentNeon.copy(alpha = 0.22f),
-                                AkcentNeon.copy(alpha = 0.10f)
-                            )
-                        )
-                    )
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AkcentNeon.copy(alpha = 0.16f))
             )
 
             Row(modifier = Modifier.fillMaxSize()) {
                 zakladki.forEach { zakladka ->
                     val zaznaczona = zakladka == aktywna
                     val skala by animateFloatAsState(
-                        targetValue = if (zaznaczona) 1.18f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
+                        targetValue = if (zaznaczona) 1.08f else 1f,
+                        animationSpec = tween(140, easing = FastOutSlowInEasing),
                         label = "skala_${zakladka.name}"
                     )
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = ripple(bounded = true, color = AkcentNeon),
@@ -129,27 +112,17 @@ fun DolnyPasekPracownika(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
+                        Icon(
+                            imageVector = zakladka.ikona,
+                            contentDescription = zakladka.etykieta,
+                            tint = if (zaznaczona) AkcentNeon else TekstDrugi,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(24.dp)
                                 .graphicsLayer {
                                     scaleX = skala
                                     scaleY = skala
                                 }
-                                .clip(CircleShape)
-                                .background(
-                                    if (zaznaczona) AkcentNeon.copy(alpha = 0.12f)
-                                    else Color.Transparent
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = zakladka.ikona,
-                                contentDescription = zakladka.etykieta,
-                                tint = if (zaznaczona) AkcentNeon else TekstDrugi,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        )
                     }
                 }
             }

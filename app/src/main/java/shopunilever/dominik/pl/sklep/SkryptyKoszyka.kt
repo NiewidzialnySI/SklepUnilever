@@ -73,12 +73,23 @@ true;
         return true;
     }
     window.__sklepikDodajeTeraz = true;
+    function post(sukces, info) {
+        if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: !!sukces, info: info || '' });
+    }
     function kliknijRaz(el) {
         if (!el) return false;
-        try {
-            el.click();
-            return true;
-        } catch (e) { return false; }
+        try { el.click(); return true; } catch (e) { return false; }
+    }
+    var url = (location.href || '').toLowerCase();
+    var tekst = ((document.body && (document.body.innerText || document.body.textContent)) || '').toLowerCase();
+    var niedostepny = !!document.querySelector('.stock.unavailable, .out-of-stock, .product-info-stock-sku .unavailable') ||
+        url.indexOf('/noroute') >= 0 ||
+        url.indexOf('404') >= 0 ||
+        /nie\s*znaleziono|strona nie istnieje|out of stock|produkt.*niedost/.test(tekst);
+    if (niedostepny && !document.querySelector('#product-addtocart-button, form#product_addtocart_form')) {
+        window.__sklepikDodajeTeraz = false;
+        post(false, url.indexOf('noroute') >= 0 || url.indexOf('404') >= 0 ? 'STRONA_404' : 'BRAK_PRODUKTU');
+        return true;
     }
     var btn = document.querySelector('#product-addtocart-button') ||
         document.querySelector('form#product_addtocart_form button.action.tocart') ||
@@ -94,13 +105,13 @@ true;
             }
         }
     }
-    if (btn && kliknijRaz(btn)) {
+    if (btn && !btn.disabled && kliknijRaz(btn)) {
         setTimeout(function() { window.__sklepikDodajeTeraz = false; }, 2500);
-        if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: true });
+        post(true, 'OK');
         return true;
     }
     window.__sklepikDodajeTeraz = false;
-    if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: false, info: 'BRAK_PRZYCISKU' });
+    post(false, niedostepny ? 'BRAK_PRODUKTU' : 'BRAK_PRZYCISKU');
     true;
 })();
 """
