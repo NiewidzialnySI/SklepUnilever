@@ -6,28 +6,52 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Okręgowa podświetlana ramka wokół logo -->
-    <path
-        android:pathData="M54,54m-28,0a28,28 0 1,0 56,0a28,28 0 1,0 -56,0"
-        android:strokeWidth="2"
-        android:strokeColor="#FF00E5FF"
-        android:fillColor="#1F00E5FF" />
+    <!-- 1. BUTELKA / KOSMETYK W WÓZKU (PŁYN / CHEMIA UNILEVER) -->
+    <!-- Korpus butelki -->
+    <path android:pathData="M47,40h12c1.5,0 2.5,1 2.5,2.5v17.5H44.5V42.5c0,-1.5 1,-2.5 2.5,-2.5z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="44.5"
+                android:startY="40"
+                android:endX="61.5"
+                android:endY="60"
+                android:type="linear">
+                <item android:color="#FF00E5FF" android:offset="0.0" />
+                <item android:color="#FF0072FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Trajektoria Unilever 'U' -->
+    <!-- Szyjka i nakrętka butelki -->
     <path
-        android:pathData="M40,38v18c0,13 28,13 28,0V38"
-        android:strokeWidth="7"
+        android:pathData="M50,34h6v6h-6z"
+        android:fillColor="#FF00E5FF" />
+    <path
+        android:pathData="M49,29h8v5h-8z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- 2. BIAŁY WÓZEK SKLEPOWY (ZAKUPY) -->
+    <!-- Rączka i konstrukcja wózka -->
+    <path
+        android:pathData="M27,37h7l6,26h25l6,-20H37.5"
+        android:strokeWidth="3.5"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 
-    <!-- Akcenty na końcach litery U -->
+    <!-- Kratka wózka (pozioma linia) -->
     <path
-        android:pathData="M40,32m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"
-        android:fillColor="#FFFFFFFF" />
+        android:pathData="M39,53h30"
+        android:strokeWidth="2"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
 
+    <!-- Kółka wózka -->
     <path
-        android:pathData="M68,32m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"
-        android:fillColor="#FF00E5FF" />
+        android:pathData="M44,70m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M62,70m-3.5,0a3.5,3.5 0 1,0 7,0a3.5,3.5 0 1,0 -7,0"
+        android:fillColor="#FFFFFFFF" />
 </vector>

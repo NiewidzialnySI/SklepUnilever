@@ -45,8 +45,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import shopunilever.dominik.pl.dane.PreferencjeKonta
+import shopunilever.dominik.pl.dane.PreferencjeParowania
+import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.sklep.NasluchSms
 import shopunilever.dominik.pl.sklep.SkryptySklepu
 import shopunilever.dominik.pl.sklep.StaleSklepu
@@ -72,9 +78,11 @@ private enum class EtapLogowania {
  * Decyzje po DOM (WYKRYJ), nie po samym URL — jak w Harmonogramie.
  */
 private class StanLogowaniaSklepu(
+    val kontekstAplikacji: android.content.Context,
     val email: String,
     val haslo: String
 ) {
+    private val zakresTla = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     var webView: WebView? = null
     val emailWyslany = AtomicBoolean(false)
     val emailWstrzykniety = AtomicBoolean(false)
@@ -135,6 +143,12 @@ private class StanLogowaniaSklepu(
         kodSms = kod
         status = "Wpisuję kod SMS ($kod)…"
         wstrzyknij(SkryptySklepu.skryptWypelnijSms(kod))
+        // Bezpieczny relay do sparowanych urządzeń (tylko kod, bez treści SMS)
+        if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
+            zakresTla.launch {
+                runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+            }
+        }
     }
 
     /** Po załadowaniu strony — zawsze najpierw wykryj elementy DOM. */
@@ -247,6 +261,7 @@ fun EkranWebViewSklepu(
     val kontekst = LocalContext.current
     val stan = remember {
         StanLogowaniaSklepu(
+            kontekstAplikacji = kontekst.applicationContext,
             email = PreferencjeKonta.email(kontekst),
             haslo = PreferencjeKonta.haslo(kontekst)
         )
