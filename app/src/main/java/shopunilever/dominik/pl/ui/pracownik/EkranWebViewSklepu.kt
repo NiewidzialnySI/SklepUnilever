@@ -74,6 +74,7 @@ import shopunilever.dominik.pl.ui.theme.TloAmoled
 import shopunilever.dominik.pl.ui.theme.TloWarstwa
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 private enum class EtapLogowania {
@@ -92,8 +93,8 @@ private const val TAG_LOGIN = "SklepLogin"
  * Maszyna stanów auto-logowania.
  * Decyzje po DOM (WYKRYJ), nie po samym URL — jak w Harmonogramie.
  *
- * trybReczny = true → nie klika / nie wypełnia; tylko WYKRYJ + DIAG do Logcat
- * (przechodzimy flow ręcznie i patrzymy co się odpala).
+ * trybReczny = false → auto (klik SMS / email / kod / hasło + GDPR).
+ * trybReczny = true → tylko WYKRYJ + DIAG do Logcat (bez wypełniania).
  */
 private class StanLogowaniaSklepu(
     val kontekstAplikacji: android.content.Context,
@@ -106,22 +107,26 @@ private class StanLogowaniaSklepu(
     val emailWstrzykniety = AtomicBoolean(false)
     val hasloWstrzykniete = AtomicBoolean(false)
     val smsWstrzykniety = AtomicBoolean(false)
+    /** Byliśmy już na SMS/haśle — powrót na email = ponów wypełnienie. */
+    val bylNaSmsLubHasle = AtomicBoolean(false)
     val zalogowany = AtomicBoolean(false)
+    /** Ile razy UNKNOWN na katalogu — po 2. uznaj sesję (logout bywa w DOM ukryty). */
+    private val probySesjiUnknown = AtomicInteger(0)
     val smsOdKiedyMs = AtomicLong(0L)
     val oczekujeEksportuKoszyka = AtomicBoolean(false)
     private val kolejkaDodawania = ArrayDeque<String>()
     private val dodawanieTrwa = AtomicBoolean(false)
     private val oczekujeDodaniaDoKoszyka = AtomicBoolean(false)
 
-    /** Tymczasowo: Ty wpisujesz, ja loguję DOM. Ustaw false żeby wrócić auto-login. */
-    val trybReczny = true
+    /** false = auto-login (klik/wypełnianie); true = tylko DIAG do Logcat. */
+    val trybReczny = false
 
     var etap by mutableStateOf(EtapLogowania.LADOWANIE)
     var status by mutableStateOf("Ładowanie sklepu…")
     var blad by mutableStateOf<String?>(null)
     var oczekujeSms by mutableStateOf(false)
     var kodSms by mutableStateOf("")
-    var ukryjNakladke by mutableStateOf(true) // tryb ręczny: od razu widać stronę
+    var ukryjNakladke by mutableStateOf(false)
     var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
 
     fun toast(tekst: String) {
@@ -251,14 +256,15 @@ private class StanLogowaniaSklepu(
     fun poZalogowaniu() {
         if (!zalogowany.compareAndSet(false, true)) return
         oczekujeSms = false
+        probySesjiUnknown.set(0)
         etap = EtapLogowania.GOTOWE
         status = "Zalogowano"
         ukryjNakladke = true
         // Nie pchamy na /market (404). Zostaw aktualną stronę albo wejdź na root sklepu.
         val teraz = aktualnyUrl.lowercase()
         if (StaleSklepu.czyPodejrzany404(teraz) ||
-            teraz.contains("access") ||
-            teraz.contains("login")
+            StaleSklepu.czyBramkaAccess(teraz) ||
+            StaleSklepu.czyStronaHasla(teraz)
         ) {
             wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_GLOWNA))
         }
@@ -268,6 +274,27 @@ private class StanLogowaniaSklepu(
         if (!StaleSklepu.czyPodejrzany404(url)) return
         status = "Błędny adres sklepu — wracam na stronę główną…"
         webView?.loadUrl(StaleSklepu.URL_GLOWNA)
+    }
+
+    /** Po powrocie na /access-email (błąd SMS itd.) — odblokuj ponowne wpisanie. */
+    fun przygotujPonowneWpisanieEmail() {
+        emailWyslany.set(false)
+        emailWstrzykniety.set(false)
+        smsWstrzykniety.set(false)
+        hasloWstrzykniete.set(false)
+        bylNaSmsLubHasle.set(false)
+        oczekujeSms = false
+        smsOdKiedyMs.set(0L)
+        // Flagi JS z poprzedniej próby (ten sam WebView)
+        wstrzyknij(
+            """
+            window.__sklepikEmailWyslany = false;
+            window.__sklepikEmailWTrakcie = false;
+            window.__sklepikSmsWyslany = false;
+            window.__sklepikSmsWTrakcie = false;
+            true;
+            """.trimIndent()
+        )
     }
 
     fun wstrzyknijEmail() {
@@ -317,10 +344,16 @@ private class StanLogowaniaSklepu(
     }
 
     fun zacznijOczekiwanieSms() {
+        // Nie resetuj smsWstrzykniety — inaczej NasluchSms wstrzyknie kod drugi raz
+        // zanim captcha zdąży się załadować.
+        if (smsWstrzykniety.get()) {
+            oczekujeSms = false
+            etap = EtapLogowania.SMS
+            return
+        }
         if (smsOdKiedyMs.get() == 0L) {
             smsOdKiedyMs.set(System.currentTimeMillis())
         }
-        smsWstrzykniety.set(false)
         oczekujeSms = true
         etap = EtapLogowania.SMS
         status = "Odczytuję kod z SMS — wpisze się sam…"
@@ -338,9 +371,13 @@ private class StanLogowaniaSklepu(
             }
             return
         }
-        if (!smsWstrzykniety.compareAndSet(false, true)) return
+        if (!smsWstrzykniety.compareAndSet(false, true)) {
+            Log.i(TAG_LOGIN, "POMINIĘTO naKodSms (już wstrzyknięty) kodLen=${kod.length}")
+            return
+        }
         kodSms = kod
-        status = "Wpisuję kod SMS ($kod)…"
+        oczekujeSms = false
+        status = "Wpisuję kod SMS — czekam na captcha…"
         wstrzyknij(SkryptySklepu.skryptWypelnijSms(kod))
         // Bezpieczny relay do sparowanych urządzeń (tylko kod, bez treści SMS)
         if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
@@ -364,7 +401,7 @@ private class StanLogowaniaSklepu(
         }
 
         val u = url?.lowercase().orEmpty()
-        val toBramka = u.contains("access") || u.contains("login")
+        val toBramka = StaleSklepu.czyBramkaAccess(u) || StaleSklepu.czyStronaHasla(u)
         status = when {
             trybReczny -> "Tryb ręczny — wpisuj sam (Logcat: SklepLogin)"
             toBramka -> "Sprawdzam bramkę logowania…"
@@ -387,6 +424,10 @@ private class StanLogowaniaSklepu(
             return
         }
 
+        if (StaleSklepu.czyStronaKoduSms(u) || StaleSklepu.czyStronaHasla(u)) {
+            bylNaSmsLubHasle.set(true)
+        }
+
         // Po SMS od razu celuj w hasło — nie czekaj na fałszywe LOGGED_IN z headera Magento
         if (StaleSklepu.czyStronaHasla(u)) {
             status = "Strona hasła — przygotowuję logowanie…"
@@ -400,6 +441,17 @@ private class StanLogowaniaSklepu(
                     naStronieHaslaWymusz(aktualnyUrl)
                 }, opoznienie)
             }
+            return
+        }
+
+        // Po wpisaniu SMS: nie spamuj WYKRYJ — skrypt JS czeka na captcha i kliknie sam
+        if (StaleSklepu.czyStronaKoduSms(u) && smsWstrzykniety.get()) {
+            status = "Kod SMS wpisany — czekam aż captcha się załaduje…"
+            webView?.postDelayed({
+                if (!zalogowany.get() && StaleSklepu.czyStronaKoduSms(aktualnyUrl)) {
+                    wstrzyknij(SkryptySklepu.DIAG_STRONY)
+                }
+            }, 2000)
             return
         }
 
@@ -515,19 +567,10 @@ private class StanLogowaniaSklepu(
                             naStronieHaslaWymusz()
                             return
                         }
-                        // Po SMS Magento bywa chwilowo z powrotem na /access —
-                        // nie klikaj ponownie „Kod SMS”, tylko szukaj hasła.
-                        if (smsWstrzykniety.get() || hasloWstrzykniete.get() ||
-                            etap == EtapLogowania.HASLO || emailWyslany.get()
-                        ) {
-                            status = "Szukam formularza hasła…"
-                            webView?.postDelayed({
-                                if (!zalogowany.get()) {
-                                    if (StaleSklepu.czyStronaHasla(aktualnyUrl)) naStronieHaslaWymusz()
-                                    else wstrzyknij(SkryptySklepu.WYKRYJ)
-                                }
-                            }, 800)
-                            return
+                        // Po błędzie Magento wraca na /access — zresetuj flagi i znów „Kod SMS”
+                        if (bylNaSmsLubHasle.get() || emailWyslany.get() || smsWstrzykniety.get()) {
+                            Log.i(TAG_LOGIN, "ACCESS_METHOD_CHOICE po błędzie — restart od Kod SMS")
+                            przygotujPonowneWpisanieEmail()
                         }
                         // /access: Autologowanie | Kod SMS | Karta → zawsze Kod SMS
                         status = "Wybieram logowanie kodem SMS…"
@@ -550,11 +593,32 @@ private class StanLogowaniaSklepu(
                             status = "Brak danych logowania"
                             return
                         }
-                        if (!emailWyslany.get()) wstrzyknijEmail()
+                        val wracamyPoSmsLubHasle = bylNaSmsLubHasle.get() ||
+                            smsWstrzykniety.get() ||
+                            hasloWstrzykniete.get()
+                        when {
+                            // Wróciliśmy na email PO stronie SMS/hasła — wpisz i kliknij od nowa
+                            wracamyPoSmsLubHasle -> {
+                                Log.i(TAG_LOGIN, "EMAIL_FIELD po SMS/hasle — restart email")
+                                status = "Ponawiam wpisanie email…"
+                                przygotujPonowneWpisanieEmail()
+                                wstrzyknijEmail()
+                            }
+                            !emailWyslany.get() && !emailWstrzykniety.get() -> wstrzyknijEmail()
+                            else -> {
+                                // Pierwsze wypełnianie w toku / tuż po EMAIL_SENT — nie spamuj
+                            }
+                        }
                     }
                     "SMS_TOKEN_FIELD" -> {
                         // Nawet bez wcześniejszego EMAIL_SENT — jesteśmy na ekranie tokenu
                         emailWyslany.set(true)
+                        bylNaSmsLubHasle.set(true)
+                        if (smsWstrzykniety.get()) {
+                            // Kod już wpisany — czekamy na captcha / przejście, nie resetuj
+                            status = "Kod SMS wpisany — czekam na captcha…"
+                            return
+                        }
                         zacznijOczekiwanieSms()
                     }
                     "PASSWORD_FIELD" -> {
@@ -566,6 +630,7 @@ private class StanLogowaniaSklepu(
                         }
                         emailWyslany.set(true)
                         smsWstrzykniety.set(true)
+                        bylNaSmsLubHasle.set(true)
                         wstrzyknijHaslo()
                     }
                     "ALREADY_LOGGED_IN" -> {
@@ -581,6 +646,7 @@ private class StanLogowaniaSklepu(
                         val naWyborze = u.contains("/access") &&
                             !u.contains("access-email") &&
                             !u.contains("access-code") &&
+                            !u.contains("validate-token-sms") &&
                             !u.contains("customer/account")
                         when {
                             StaleSklepu.czyStronaHasla(u) -> naStronieHaslaWymusz()
@@ -595,15 +661,20 @@ private class StanLogowaniaSklepu(
                                 status = "Wybieram logowanie kodem SMS…"
                                 wstrzyknij(SkryptySklepu.WYBIERZ_KOD_SMS)
                             }
-                            StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
-                                !u.contains("access") &&
-                                !u.contains("login") -> {
-                                status = "Sesja aktywna — otwieram sklep…"
-                                poZalogowaniu()
-                            }
+                            // Root sklepu bez formularzy — daj DOM chwilę (logout bywa w dropdownie)
                             else -> {
-                                status = "Przechodzę do logowania SMS…"
-                                wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                                val naKatalogu = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
+                                    !StaleSklepu.czyBramkaAccess(u) &&
+                                    !StaleSklepu.czyStronaHasla(u)
+                                if (naKatalogu) {
+                                    status = "Sprawdzam sesję sklepu…"
+                                    webView?.postDelayed({
+                                        if (!zalogowany.get()) wstrzyknij(SkryptySklepu.SESJA)
+                                    }, 900)
+                                } else {
+                                    status = "Przechodzę do logowania SMS…"
+                                    wstrzyknij(SkryptySklepu.skryptPrzekieruj(StaleSklepu.URL_LOGOWANIA))
+                                }
                             }
                         }
                     }
@@ -631,7 +702,9 @@ private class StanLogowaniaSklepu(
                             emailWyslany.get()
                         when {
                             StaleSklepu.czyStronaHasla(u) -> naStronieHaslaWymusz()
-                            u.contains("access-email") || u.contains("access-code") -> {
+                            u.contains("access-email") ||
+                                u.contains("access-code") ||
+                                u.contains("validate-token-sms") -> {
                                 wstrzyknij(SkryptySklepu.WYKRYJ)
                             }
                             poSmsLubHasle -> {
@@ -650,10 +723,25 @@ private class StanLogowaniaSklepu(
                         }
                     }
                     "UNKNOWN" -> {
-                        // Na katalogu bez jasnych znaczników — traktuj jako zalogowany
-                        val naSklepie = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
-                            !aktualnyUrl.contains("access", ignoreCase = true)
-                        if (naSklepie) poZalogowaniu() else wstrzyknij(SkryptySklepu.WYKRYJ)
+                        val u = aktualnyUrl.lowercase()
+                        val naKatalogu = StaleSklepu.czyUrlSklepu(aktualnyUrl) &&
+                            !StaleSklepu.czyBramkaAccess(u) &&
+                            !StaleSklepu.czyStronaHasla(u)
+                        if (naKatalogu) {
+                            val nr = probySesjiUnknown.incrementAndGet()
+                            if (nr >= 2) {
+                                // Root sklepu bez bramki — uznaj sesję (logout w dropdownie Magento)
+                                status = "Sesja aktywna — otwieram sklep…"
+                                poZalogowaniu()
+                            } else {
+                                status = "Sprawdzam znaczniki zalogowania…"
+                                webView?.postDelayed({
+                                    if (!zalogowany.get()) wstrzyknij(SkryptySklepu.SESJA)
+                                }, 1200)
+                            }
+                        } else {
+                            wstrzyknij(SkryptySklepu.WYKRYJ)
+                        }
                     }
                     else -> wstrzyknij(SkryptySklepu.WYKRYJ)
                     }
@@ -702,15 +790,19 @@ private class StanLogowaniaSklepu(
                             status = "Przechodzę do formularza email / SMS…"
                         }
                         "sms" -> {
-                            status = "Kod SMS wpisany — czekam na hasło…"
                             oczekujeSms = false
-                            // Nowa strona z hasłem — pozwól wstrzyknąć hasło od zera
-                            hasloWstrzykniete.set(false)
-                            webView?.postDelayed({
-                                if (!zalogowany.get() && !hasloWstrzykniete.get()) {
-                                    wstrzyknij(SkryptySklepu.WYKRYJ)
+                            when (info) {
+                                "SMS_WPISANY_CZEKAM_CAPTCHA", "CZEKAM_CAPTCHA" -> {
+                                    status = "Kod wpisany — czekam aż załaduje się captcha…"
                                 }
-                            }, 900)
+                                "SMS_CODE_INJECTED" -> {
+                                    status = "Kod SMS wysłany — czekam na stronę hasła…"
+                                    // Nie odpalaj WYKRYJ od razu na tej samej stronie —
+                                    // poczekaj na onPageFinished /customer/account/login
+                                    hasloWstrzykniete.set(false)
+                                }
+                                else -> status = "Krok SMS: $info"
+                            }
                         }
                         "haslo" -> status = when (info) {
                             "HASLO_WPISANE" -> "Hasło wpisane…"

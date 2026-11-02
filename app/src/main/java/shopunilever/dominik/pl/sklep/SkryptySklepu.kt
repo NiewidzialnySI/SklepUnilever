@@ -163,39 +163,43 @@ true;
         if (sklepikWidoczny(pass)) return true;
         return false;
     }
-    function sklepikCzyZalogowanySklep() {
+    function sklepikCzyBramkaAccess() {
         var href = (location.href || '').toLowerCase();
         var bodyCls = (document.body && document.body.className) || '';
-        // Formularz hasła / login Magento — NIGDY nie traktuj jako zalogowany
-        // (header ma .navigation / .minicart i wcześniej dawał fałszywy LOGGED_IN).
+        if (href.indexOf('/access') >= 0 || href.indexOf('validate-token-sms') >= 0) return true;
+        if (bodyCls.indexOf('cms-access') >= 0 || bodyCls.indexOf('cms-validate-token-sms') >= 0) return true;
+        if (sklepikWidoczny(document.getElementById('access_email'))) return true;
+        if (sklepikWidoczny(document.getElementById('access_token'))) return true;
+        return false;
+    }
+    /**
+     * Znaczniki TYLKO po zalogowaniu.
+     * UWAGA: Magento trzyma „Wyloguj” / .customer-welcome w zwiniętym dropdownie
+     * (DIAG: logout.jest=true, widoczny=false) — wystarczy obecność w DOM, nie visibility.
+     */
+    function sklepikCzyZalogowanySklep() {
         if (sklepikCzyStronaHasla()) return false;
-        if (href.indexOf('/access') >= 0 || bodyCls.indexOf('cms-access') >= 0) {
-            // Strona bramki — zalogowany tylko gdy NIE ma widocznego formularza dostępu
-            if (sklepikWidoczny(document.getElementById('access_email'))) return false;
-            if (sklepikWidoczny(document.getElementById('access_token'))) return false;
-            if (sklepikWidoczny(document.querySelector('input[name="access_token"]'))) return false;
-            // Samo /access z wyborem metody = nie zalogowany
-            if (href.indexOf('access-email') < 0 && href.indexOf('access-code') < 0) return false;
+        if (sklepikCzyBramkaAccess()) return false;
+        // 1) Link Wyloguj w DOM = sesja aktywna (nawet ukryty w menu)
+        var logout = document.querySelector(
+            'a[href*="customer/account/logout"], a[href*="/customer/account/logout/"]'
+        );
+        if (logout) return true;
+        // 2) Blok powitania klienta Magento (często display:none do kliknięcia)
+        if (document.querySelector('.customer-welcome, li.customer-welcome, .customer-name')) {
+            return true;
         }
-        var logout = document.querySelector('a[href*="customer/account/logout"], a[href*="/logout"]');
-        if (sklepikWidoczny(logout)) return true;
-        var welcome = document.querySelector('.customer-welcome, .header.links li.welcome, .logged-in, .customer-name');
-        if (sklepikWidoczny(welcome)) return true;
-        // Katalog / koszyk / produkty = jesteśmy w sklepie po bramce
-        // (bez stron logowania — już odfiltrowane wyżej)
-        if (document.querySelector('.product-item, .products-grid, .category-products, .page-products')) {
-            if (!sklepikWidoczny(document.getElementById('access_email')) &&
-                !sklepikWidoczny(document.getElementById('access_token'))) {
+        // 3) Link „Moje konto” (nie login / create / forgotpassword)
+        var linki = document.querySelectorAll('a[href*="customer/account"]');
+        for (var i = 0; i < linki.length; i++) {
+            var hk = (linki[i].getAttribute('href') || '').toLowerCase();
+            if (hk.indexOf('login') >= 0) continue;
+            if (hk.indexOf('create') >= 0) continue;
+            if (hk.indexOf('forgot') >= 0) continue;
+            if (hk.indexOf('logout') >= 0) return true;
+            // /customer/account/ lub /customer/account (bez podścieżek auth)
+            if (/customer\/account\/?$/.test(hk) || hk.indexOf('customer/account/') >= 0) {
                 return true;
-            }
-        }
-        // Root sklepu bez formularza access / login
-        if (href.indexOf('/access') < 0 && href.indexOf('login') < 0 &&
-            !sklepikWidoczny(document.getElementById('access_email')) &&
-            !sklepikWidoczny(document.querySelector('#access_email_form'))) {
-            // Nie mylić z pustą/404
-            if (bodyCls.indexOf('cms-no-route') < 0 && bodyCls.indexOf('noroute') < 0) {
-                if (document.querySelector('.product-item, .products-grid, .page-products, .category-products')) return true;
             }
         }
         return false;
@@ -249,6 +253,7 @@ $JS_HELPERY
         var naWyborzeUrl = (href.indexOf('/access') >= 0 || href.endsWith('/access')) &&
             href.indexOf('access-email') < 0 &&
             href.indexOf('access-code') < 0 &&
+            href.indexOf('validate-token-sms') < 0 &&
             href.indexOf('customer/account') < 0;
         var maWyborMetod = naWyborzeUrl && (
             sklepikWidoczny(document.getElementById('ad_login')) ||
@@ -294,9 +299,11 @@ $JS_HELPERY
         }
         var hrefSesja = (location.href || '').toLowerCase();
         // Uwaga: query ?access-email= na /customer/account/login NIE jest bramką /access
+        // Po SMS Magento: /validate-token-sms?access-email=…
         var naBramceAccess = hrefSesja.indexOf('/access') >= 0 ||
             hrefSesja.indexOf('/access-email') >= 0 ||
-            hrefSesja.indexOf('/access-code') >= 0;
+            hrefSesja.indexOf('/access-code') >= 0 ||
+            hrefSesja.indexOf('validate-token-sms') >= 0;
         if (sklepikWidoczny(document.getElementById('access_email')) ||
             sklepikWidoczny(document.getElementById('access_token')) ||
             naBramceAccess) {
@@ -370,7 +377,16 @@ $JS_HELPERY
                 azure: !!document.querySelector('.access-azure-login, .autologin-content'),
                 navigation: !!document.querySelector('.navigation'),
                 minicart: !!document.querySelector('.minicart-wrapper'),
-                logout: !!document.querySelector('a[href*="customer/account/logout"]')
+                logout: (function() {
+                    var el = document.querySelector('a[href*="customer/account/logout"]');
+                    return el ? { jest: true, widoczny: sklepikWidoczny(el), href: el.getAttribute('href') || '' } : { jest: false };
+                })(),
+                customer_welcome: opisSelektor('.customer-welcome, .customer-name, li.greet.welcome'),
+                moje_konto: (function() {
+                    var el = document.querySelector('a[href*="customer/account/"]');
+                    if (!el) return { jest: false };
+                    return { jest: true, widoczny: sklepikWidoczny(el), href: (el.getAttribute('href') || '').slice(0, 80) };
+                })()
             }
         };
         if (window.SklepikPost) window.SklepikPost(dump);
@@ -445,9 +461,12 @@ true;
                 checkCount++;
                 var isBtnReady = btn && !btn.disabled && !btn.classList.contains('disabled');
                 var isCaptchaLoaded = document.querySelector('textarea[name="g-recaptcha-response"]') ||
-                    document.querySelector('.grecaptcha-badge');
-                if (checkCount < 8) return;
-                if ((isBtnReady && isCaptchaLoaded) || checkCount >= 28) {
+                    document.querySelector('.grecaptcha-badge') ||
+                    document.querySelector('iframe[src*="recaptcha"]') ||
+                    (typeof grecaptcha !== 'undefined');
+                // Min. ~0.75s (3×250ms), max ~10s — klik zaraz gdy captcha + przycisk gotowe
+                if (checkCount < 3) return;
+                if ((isBtnReady && isCaptchaLoaded) || isBtnReady || checkCount >= 40) {
                     clearInterval(checkReady);
                     setTimeout(function() {
                         window.__sklepikEmailWyslany = true;
@@ -455,14 +474,14 @@ true;
                         btn.click();
                         window.__sklepikEmailWTrakcie = false;
                         if (window.SklepikPost) window.SklepikPost({ type: 'EMAIL_WYNIK', wynik: 'EMAIL_SENT' });
-                    }, 1500);
+                    }, 350);
                 }
-            }, 500);
+            }, 250);
         } catch (err) {
             window.__sklepikEmailWTrakcie = false;
             if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'email', sukces: false, info: String(err.message) });
         }
-    }, 800);
+    }, 250);
 })();
 true;
 """.trimIndent()
@@ -472,7 +491,8 @@ true;
         val bezpieczny = kod.replace("\\", "\\\\").replace("\"", "\\\"")
         return """
 (function() {
-    if (window.__sklepikSmsWTrakcie) return;
+    // Jak przy emailu: wpisz kod, POCZEKAJ aż captcha się załaduje, dopiero kliknij.
+    if (window.__sklepikSmsWyslany || window.__sklepikSmsWTrakcie) return;
     window.__sklepikSmsWTrakcie = true;
     try {
         var smsField = document.getElementById('access_token') ||
@@ -490,6 +510,7 @@ true;
         smsField.value = "$bezpieczny";
         smsField.dispatchEvent(new Event('input', { bubbles: true }));
         smsField.dispatchEvent(new Event('change', { bubbles: true }));
+        if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: true, info: 'SMS_WPISANY_CZEKAM_CAPTCHA' });
         var submitBtn = document.querySelector('.action.submit.primary.btn-send-token') ||
             document.querySelector('button.action.submit.primary') ||
             document.querySelector('button[type="submit"]') ||
@@ -499,12 +520,30 @@ true;
             if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: false, info: 'SMS_SUBMIT_NOT_FOUND' });
             return;
         }
-        setTimeout(function() {
-            submitBtn.focus();
-            submitBtn.click();
-            window.__sklepikSmsWTrakcie = false;
-            if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: true, info: 'SMS_CODE_INJECTED' });
-        }, 1200);
+        var checkCount = 0;
+        var checkReady = setInterval(function() {
+            checkCount++;
+            var isBtnReady = submitBtn && !submitBtn.disabled && !submitBtn.classList.contains('disabled');
+            var isCaptchaLoaded = document.querySelector('textarea[name="g-recaptcha-response"]') ||
+                document.querySelector('.grecaptcha-badge') ||
+                document.querySelector('iframe[src*="recaptcha"]') ||
+                (typeof grecaptcha !== 'undefined');
+            if (window.SklepikPost && checkCount === 1) {
+                window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: true, info: 'CZEKAM_CAPTCHA' });
+            }
+            // Min. ~0.75s, max ~10s — bez sztucznych 4s+1.5s
+            if (checkCount < 3) return;
+            if ((isBtnReady && isCaptchaLoaded) || isBtnReady || checkCount >= 40) {
+                clearInterval(checkReady);
+                setTimeout(function() {
+                    window.__sklepikSmsWyslany = true;
+                    submitBtn.focus();
+                    submitBtn.click();
+                    window.__sklepikSmsWTrakcie = false;
+                    if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: true, info: 'SMS_CODE_INJECTED' });
+                }, 350);
+            }
+        }, 250);
     } catch (err) {
         window.__sklepikSmsWTrakcie = false;
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'sms', sukces: false, info: String(err.message) });
@@ -522,9 +561,9 @@ true;
     if (window.jQuery && !window.jQuery.fn.validation) {
         window.jQuery.fn.validation = function() { return { valid: function() { return true; } }; };
     }
-    // Pozwól na retry gdy poprzednia próba utknęła na tej samej stronie
+    // Pozwól na retry gdy poprzednia próba utknęła (poll captcha max ~20s)
     if (window.isProcessingLogin && window.__sklepikHasloTs &&
-        (Date.now() - window.__sklepikHasloTs) < 12000) return;
+        (Date.now() - window.__sklepikHasloTs) < 25000) return;
     window.isProcessingLogin = true;
     window.__sklepikHasloTs = Date.now();
 
@@ -676,55 +715,60 @@ true;
         passField.dispatchEvent(new Event('change', { bubbles: true }));
         post('HASLO_WPISANE');
 
-        // 2) Potem checkbox (po krótkiej pauzie)
+        // 2) Checkbox zaraz po haśle, potem poll captcha (bez sztucznych 4.5s+3s)
         setTimeout(function() {
             zaznaczCheckbox();
             post('CHECKBOX_ZAZNACZONY');
 
-            // 3) Czekaj aż captcha się dociągnie, dopiero potem Zaloguj
-            setTimeout(function() {
-                var checkCount = 0;
-                var trySubmit = setInterval(function() {
-                    checkCount++;
-                    var submitBtn = przyciskLogowania();
-                    var isBtnReady = submitBtn && !submitBtn.disabled && !submitBtn.classList.contains('disabled');
-                    var isCaptchaLoaded = captchaGotowa();
-
-                    if ((isBtnReady && isCaptchaLoaded) || checkCount >= 40) {
-                        clearInterval(trySubmit);
-                        post('CAPTCHA_GOTOWA_CZEKAM');
-                        // dodatkowa pauza po pełnym załadowaniu captcha
-                        setTimeout(function() {
-                            zaznaczCheckbox();
-                            submitBtn = przyciskLogowania();
-                            if (!submitBtn) {
-                                window.isProcessingLogin = false;
-                                if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: 'SEND2_NOT_FOUND' });
-                                return;
-                            }
-                            submitBtn.focus();
-                            setTimeout(function() {
-                                try {
-                                    submitBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                                } catch (e) {}
-                                submitBtn.click();
-                                post('PRZYCISK_ZALOGUJ');
-                                setTimeout(function() {
-                                    window.isProcessingLogin = false;
-                                    if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: 'HASLO_WYSLANE' });
-                                }, 1200);
-                                setTimeout(function() {
-                                    if (document.getElementById('pass')) {
-                                        var loginForm = document.getElementById('login-form') || document.getElementById('customer-login-form');
-                                        if (loginForm) try { loginForm.submit(); } catch (e) {}
-                                    }
-                                }, 5000);
-                            }, 500);
-                        }, 3000);
-                    }
-                }, 500);
-            }, 4500);
-        }, 900);
+            // 3) Magento trzyma #send2 disabled aż token reCAPTCHA — poll i klik od razu gdy enabled
+            var checkCount = 0;
+            var juzKliknieto = false;
+            function kliknijZaloguj(powod) {
+                if (juzKliknieto) return;
+                juzKliknieto = true;
+                post(powod);
+                zaznaczCheckbox();
+                var submitBtn = przyciskLogowania();
+                if (!submitBtn) {
+                    window.isProcessingLogin = false;
+                    if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: 'SEND2_NOT_FOUND' });
+                    return;
+                }
+                submitBtn.focus();
+                setTimeout(function() {
+                    try {
+                        submitBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    } catch (e) {}
+                    submitBtn.click();
+                    post('PRZYCISK_ZALOGUJ');
+                    setTimeout(function() {
+                        window.isProcessingLogin = false;
+                        if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: true, info: 'HASLO_WYSLANE' });
+                    }, 400);
+                    setTimeout(function() {
+                        if (document.getElementById('pass')) {
+                            var loginForm = document.getElementById('login-form') || document.getElementById('customer-login-form');
+                            if (loginForm) try { loginForm.submit(); } catch (e) {}
+                        }
+                    }, 2500);
+                }, 150);
+            }
+            var trySubmit = setInterval(function() {
+                checkCount++;
+                var submitBtn = przyciskLogowania();
+                var isBtnReady = submitBtn && !submitBtn.disabled && !submitBtn.classList.contains('disabled');
+                // Przycisk enabled = Magento ma token — nie czekaj dodatkowych sekund
+                if (isBtnReady) {
+                    clearInterval(trySubmit);
+                    kliknijZaloguj('CAPTCHA_GOTOWA_CZEKAM');
+                    return;
+                }
+                if (checkCount >= 80) {
+                    clearInterval(trySubmit);
+                    kliknijZaloguj('CAPTCHA_TIMEOUT_KLIK');
+                }
+            }, 250);
+        }, 250);
     } catch (err) {
         window.isProcessingLogin = false;
         if (window.SklepikPost) window.SklepikPost({ type: 'KROK', krok: 'haslo', sukces: false, info: String(err.message) });

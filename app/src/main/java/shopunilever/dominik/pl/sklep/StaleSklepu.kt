@@ -21,6 +21,22 @@ object StaleSklepu {
             (u.contains("/login") && u.contains("access-email"))
     }
 
+    /** Bramka tożsamości (wybór metody / email / kod SMS). */
+    fun czyBramkaAccess(url: String?): Boolean {
+        val u = url?.lowercase().orEmpty()
+        if (u.contains("customer/account/login")) return false
+        return u.contains("/access") ||
+            u.contains("access-email") ||
+            u.contains("access-code") ||
+            u.contains("validate-token-sms")
+    }
+
+    /** Strona z polem kodu SMS (żywy Magento: /validate-token-sms). */
+    fun czyStronaKoduSms(url: String?): Boolean {
+        val u = url?.lowercase().orEmpty()
+        return u.contains("validate-token-sms") || u.contains("access-code")
+    }
+
     fun czyGlownaSklepu(url: String?): Boolean {
         val u = url?.lowercase()?.substringBefore('?')?.trimEnd('/').orEmpty()
         return u == URL_SKLEPU.lowercase() ||
