@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LinkOff
@@ -238,14 +237,6 @@ fun EkranUrzadzen(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "URZĄDZENIA",
-            color = AkcentNeon,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
             text = "Parowanie",
             color = TekstGlowny,
             fontSize = 30.sp,
@@ -320,54 +311,59 @@ fun EkranUrzadzen(
         }
 
         SzkloKarta {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Link, contentDescription = null, tint = AkcentNeon)
-                Spacer(modifier = Modifier.size(10.dp))
-                Text(
-                    text = "Kod",
-                    color = TekstGlowny,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-
             if (kod.isNotBlank()) {
                 val trescQr = "${StaleFirebase.PREFIX_QR}$kod"
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    KodQrParowania(tresc = trescQr, rozmiar = 200.dp)
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-                Text(
-                    text = kod.chunked(4).joinToString(" "),
-                    color = TekstGlowny,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 2.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)
-                ) {
-                    FilledTonalIconButton(onClick = {
-                        val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
-                        Toast.makeText(kontekst, "Skopiowano", Toast.LENGTH_SHORT).show()
-                    }) {
-                        Icon(Icons.Rounded.ContentCopy, "Kopiuj")
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Tap na QR = kopiuj kod (bez osobnego przycisku Kopiuj)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
+                                    Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            KodQrParowania(tresc = trescQr, rozmiar = 200.dp)
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = kod.chunked(4).joinToString(" "),
+                            color = TekstGlowny,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
+                                    Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
+                                }
+                        )
+                        if (ladowanie) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(22.dp))
+                        }
                     }
+                    // Reset / nowy kod — róg karty
                     FilledTonalIconButton(
                         onClick = { potwierdzNowyKod = true },
                         enabled = !ladowanie,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(40.dp),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             contentColor = Ostrzezenie
                         )
                     ) {
-                        Icon(Icons.Rounded.Refresh, "Nowy kod")
+                        Icon(Icons.Rounded.Refresh, contentDescription = "Nowy kod")
                     }
                 }
             } else if (ladowanie) {
@@ -385,13 +381,6 @@ fun EkranUrzadzen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Rounded.Link, null, tint = TekstNaAkcencie, modifier = Modifier.size(22.dp))
-                }
-            }
-
-            if (ladowanie && kod.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(22.dp))
                 }
             }
         }

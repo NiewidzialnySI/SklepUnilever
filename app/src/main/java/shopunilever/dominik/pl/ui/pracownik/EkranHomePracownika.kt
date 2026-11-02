@@ -1,5 +1,6 @@
 package shopunilever.dominik.pl.ui.pracownik
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Login
-import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,11 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import shopunilever.dominik.pl.R
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.ui.components.SzkloKarta
 import shopunilever.dominik.pl.ui.theme.AkcentMorski
@@ -76,14 +79,6 @@ fun EkranHomePracownika(
             .verticalScroll(rememberScrollState())
     ) {
         Text(
-            text = "HOME",
-            color = AkcentNeon,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
             text = "Sklep firmowy",
             color = TekstGlowny,
             fontSize = 30.sp,
@@ -96,20 +91,14 @@ fun EkranHomePracownika(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher_round),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(72.dp)
                         .clip(CircleShape)
-                        .background(AkcentNeon.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Storefront,
-                        contentDescription = null,
-                        tint = AkcentNeon,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = if (maDane) "Gotowy do logowania" else "Najpierw podaj dane służbowe",

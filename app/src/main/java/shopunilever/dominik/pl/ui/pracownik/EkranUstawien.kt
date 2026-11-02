@@ -203,14 +203,6 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Top
     ) {
         Text(
-            text = "USTAWIENIA",
-            color = AkcentNeon,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
             text = "Konto",
             color = TekstGlowny,
             fontSize = 30.sp,
