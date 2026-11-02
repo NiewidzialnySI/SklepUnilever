@@ -8,6 +8,7 @@ import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.tasks.await
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeOdbiorcy
@@ -359,7 +360,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     suspend fun wyczyscLogiWejsc(context: Context) {
         val uid = PreferencjeParowania.uid(context).ifBlank { return }
@@ -489,7 +490,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     fun obserwujOdbiorcow(context: Context): Flow<List<OdbiorcaPolaczony>> = callbackFlow {
         val uid = PreferencjeParowania.uid(context)
@@ -524,7 +525,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     fun obserwujProsbyLogowania(context: Context): Flow<List<ProsbaLogowania>> = callbackFlow {
         val uid = PreferencjeParowania.uid(context)
@@ -558,7 +559,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     /** Status prośby o logowanie (rodzina, gdy autoLogowanie=false). */
     fun obserwujStatusLogowania(context: Context): Flow<String> = callbackFlow {
@@ -586,7 +587,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     /**
      * Status dostępu rodziny.
@@ -669,7 +670,7 @@ object SerwisParowania {
             refProsba.removeEventListener(listenerProsba)
             refOdbiorca.removeEventListener(listenerOdbiorca)
         }
-    }
+    }.distinctUntilChanged()
 
     /** SMS relay z telefonu pracownika → rodzina. */
     fun obserwujKodSms(context: Context): Flow<String> = callbackFlow {
@@ -697,7 +698,7 @@ object SerwisParowania {
         }
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
-    }
+    }.distinctUntilChanged()
 
     fun wyodrebnijKodZQr(tresc: String): String {
         val raw = tresc.trim()

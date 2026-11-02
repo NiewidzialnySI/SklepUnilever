@@ -24,11 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.History
@@ -190,7 +189,7 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
@@ -200,18 +199,20 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                 indication = null
             ) {
                 if (edycjaHasla) zamknijEdycjeHasla()
-            }
-            .verticalScroll(rememberScrollState()),
+            },
         verticalArrangement = Arrangement.Top
     ) {
-        Text(
-            text = "Konto",
-            color = TekstGlowny,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(22.dp))
+        item(key = "konto-hdr") {
+            Text(
+                text = "Konto",
+                color = TekstGlowny,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(22.dp))
+        }
 
+        item(key = "dane") {
         SzkloKarta {
             Text(
                 text = "Dane służbowe",
@@ -349,81 +350,83 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
                 }
             }
         }
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        SzkloKarta {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Rounded.History, null, tint = AkcentNeon, modifier = Modifier.size(22.dp))
-                Spacer(modifier = Modifier.size(10.dp))
-                Text(
-                    "Logi",
-                    color = TekstGlowny,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                if (logi.isNotEmpty()) {
-                    IconButton(
-                        onClick = {
-                            zakres.launch {
-                                runCatching { SerwisParowania.wyczyscLogiWejsc(kontekst) }
+        item(key = "logi") {
+            Spacer(modifier = Modifier.height(16.dp))
+            SzkloKarta {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.History, null, tint = AkcentNeon, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.size(10.dp))
+                    Text(
+                        "Logi",
+                        color = TekstGlowny,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (logi.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                zakres.launch {
+                                    runCatching { SerwisParowania.wyczyscLogiWejsc(kontekst) }
+                                }
                             }
+                        ) {
+                            Icon(Icons.Rounded.DeleteOutline, "Wyczyść", tint = Blad, modifier = Modifier.size(20.dp))
                         }
-                    ) {
-                        Icon(Icons.Rounded.DeleteOutline, "Wyczyść", tint = Blad, modifier = Modifier.size(20.dp))
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            if (logi.isEmpty()) {
-                Text("Brak", color = TekstDrugi, fontSize = 13.sp)
-            } else {
-                logi.forEachIndexed { indeks, wpis ->
-                    if (indeks > 0) {
-                        HorizontalDivider(
-                            color = RamkaKarty,
-                            modifier = Modifier.padding(vertical = 2.dp)
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(AkcentMorski.copy(alpha = 0.16f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Rounded.PhoneAndroid,
-                                null,
-                                tint = AkcentMorski,
-                                modifier = Modifier.size(18.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                if (logi.isEmpty()) {
+                    Text("Brak", color = TekstDrugi, fontSize = 13.sp)
+                } else {
+                    logi.forEachIndexed { indeks, wpis ->
+                        if (indeks > 0) {
+                            HorizontalDivider(
+                                color = RamkaKarty,
+                                modifier = Modifier.padding(vertical = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Text(
-                            wpis.nazwa,
-                            color = TekstGlowny,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            if (wpis.ts > 0L) formatCzasu.format(Date(wpis.ts)) else "—",
-                            color = TekstDrugi,
-                            fontSize = 12.sp
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AkcentMorski.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.PhoneAndroid,
+                                    null,
+                                    tint = AkcentMorski,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.size(12.dp))
+                            Text(
+                                wpis.nazwa,
+                                color = TekstGlowny,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                if (wpis.ts > 0L) formatCzasu.format(Date(wpis.ts)) else "—",
+                                color = TekstDrugi,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
             }

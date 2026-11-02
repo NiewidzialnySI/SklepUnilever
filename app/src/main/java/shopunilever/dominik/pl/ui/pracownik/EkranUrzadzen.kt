@@ -17,9 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -120,7 +119,10 @@ fun EkranUrzadzen(
             }.onSuccess {
                 kod = it
                 aktywne = true
-                runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
+                // FGS dopiero gdy pojawią się odbiorcy (EkranPracownika.odswiezWgOdbiorcow)
+                if (odlaczWszystkich) {
+                    runCatching { SerwisTlaNadajnika.zatrzymaj(kontekst) }
+                }
                 onParowanieZmienione()
                 RepozytoriumParowaniaUi.restart(kontekst)
                 if (odlaczWszystkich) {
@@ -223,194 +225,203 @@ fun EkranUrzadzen(
         )
     }
 
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
             .padding(horizontal = 24.dp, vertical = 20.dp)
-            .verticalScroll(rememberScrollState())
     ) {
-        Text(
-            text = "Parowanie",
-            color = TekstGlowny,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(18.dp))
+        item(key = "tytul") {
+            Text(
+                text = "Parowanie",
+                color = TekstGlowny,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+        }
 
         if (oczekujace.isNotEmpty()) {
-            SzkloKarta {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.NotificationsActive, null, tint = Ostrzezenie)
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text("Parowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                oczekujace.forEach { p ->
-                    KartaDecyzji(
-                        tytul = p.nazwaUrzadzenia,
-                        ladowanie = akcjaProsby == "pair:${p.id}",
-                        onAkceptuj = {
-                            zakres.launch {
-                                akcjaProsby = "pair:${p.id}"
-                                runCatching { SerwisParowania.zatwierdzProsbe(kontekst, p.id) }
-                                akcjaProsby = null
+            item(key = "prosby-hdr") {
+                SzkloKarta {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.NotificationsActive, null, tint = Ostrzezenie)
+                        Spacer(modifier = Modifier.size(10.dp))
+                        Text("Parowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    oczekujace.forEach { p ->
+                        KartaDecyzji(
+                            tytul = p.nazwaUrzadzenia,
+                            ladowanie = akcjaProsby == "pair:${p.id}",
+                            onAkceptuj = {
+                                zakres.launch {
+                                    akcjaProsby = "pair:${p.id}"
+                                    runCatching { SerwisParowania.zatwierdzProsbe(kontekst, p.id) }
+                                    akcjaProsby = null
+                                }
+                            },
+                            onOdrzuc = {
+                                zakres.launch {
+                                    akcjaProsby = "pair:${p.id}"
+                                    runCatching { SerwisParowania.odrzucProsbe(kontekst, p.id) }
+                                    akcjaProsby = null
+                                }
                             }
-                        },
-                        onOdrzuc = {
-                            zakres.launch {
-                                akcjaProsby = "pair:${p.id}"
-                                runCatching { SerwisParowania.odrzucProsbe(kontekst, p.id) }
-                                akcjaProsby = null
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
         if (logowaniaOczekujace.isNotEmpty()) {
-            SzkloKarta {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.LockOpen, null, tint = AkcentMorski)
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text("Logowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                logowaniaOczekujace.forEach { p ->
-                    KartaDecyzji(
-                        tytul = p.nazwaUrzadzenia,
-                        ladowanie = akcjaProsby == "login:${p.id}",
-                        onAkceptuj = {
-                            zakres.launch {
-                                akcjaProsby = "login:${p.id}"
-                                runCatching { SerwisParowania.zatwierdzLogowanie(kontekst, p.id) }
-                                akcjaProsby = null
+            item(key = "logowania-hdr") {
+                SzkloKarta {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.LockOpen, null, tint = AkcentMorski)
+                        Spacer(modifier = Modifier.size(10.dp))
+                        Text("Logowanie", color = TekstGlowny, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    logowaniaOczekujace.forEach { p ->
+                        KartaDecyzji(
+                            tytul = p.nazwaUrzadzenia,
+                            ladowanie = akcjaProsby == "login:${p.id}",
+                            onAkceptuj = {
+                                zakres.launch {
+                                    akcjaProsby = "login:${p.id}"
+                                    runCatching { SerwisParowania.zatwierdzLogowanie(kontekst, p.id) }
+                                    akcjaProsby = null
+                                }
+                            },
+                            onOdrzuc = {
+                                zakres.launch {
+                                    akcjaProsby = "login:${p.id}"
+                                    runCatching { SerwisParowania.odrzucLogowanie(kontekst, p.id) }
+                                    akcjaProsby = null
+                                }
                             }
-                        },
-                        onOdrzuc = {
-                            zakres.launch {
-                                akcjaProsby = "login:${p.id}"
-                                runCatching { SerwisParowania.odrzucLogowanie(kontekst, p.id) }
-                                akcjaProsby = null
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        SzkloKarta {
-            if (kod.isNotBlank()) {
-                val trescQr = "${StaleFirebase.PREFIX_QR}$kod"
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Tap na QR = kopiuj kod (bez osobnego przycisku Kopiuj)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
-                                    Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
-                                }
+        item(key = "qr") {
+            SzkloKarta {
+                if (kod.isNotBlank()) {
+                    val trescQr = "${StaleFirebase.PREFIX_QR}$kod"
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            KodQrParowania(tresc = trescQr, rozmiar = 200.dp)
+                            // Tap na QR = kopiuj kod (bez osobnego przycisku Kopiuj)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
+                                        Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                KodQrParowania(tresc = trescQr, rozmiar = 200.dp)
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = kod.chunked(4).joinToString(" "),
+                                color = TekstGlowny,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 2.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
+                                        Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
+                                    }
+                            )
+                            if (ladowanie) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(22.dp))
+                            }
                         }
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = kod.chunked(4).joinToString(" "),
-                            color = TekstGlowny,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp,
-                            textAlign = TextAlign.Center,
+                        // Reset / nowy kod — róg karty
+                        FilledTonalIconButton(
+                            onClick = { potwierdzNowyKod = true },
+                            enabled = !ladowanie,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(ClipData.newPlainText("kod", kod))
-                                    Toast.makeText(kontekst, "Skopiowano kod", Toast.LENGTH_SHORT).show()
-                                }
-                        )
-                        if (ladowanie) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(22.dp))
+                                .align(Alignment.TopEnd)
+                                .size(40.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                contentColor = Ostrzezenie
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = "Nowy kod")
                         }
                     }
-                    // Reset / nowy kod — róg karty
-                    FilledTonalIconButton(
-                        onClick = { potwierdzNowyKod = true },
-                        enabled = !ladowanie,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(40.dp),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            contentColor = Ostrzezenie
-                        )
-                    ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "Nowy kod")
+                } else if (ladowanie) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(28.dp))
                     }
-                }
-            } else if (ladowanie) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AkcentNeon, modifier = Modifier.size(28.dp))
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Brush.horizontalGradient(listOf(AkcentNeon, AkcentMorski)))
-                        .clickable { uruchomParowanie(nowyKod = false) }
-                        .padding(vertical = 14.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Rounded.Link, null, tint = TekstNaAkcencie, modifier = Modifier.size(22.dp))
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Brush.horizontalGradient(listOf(AkcentNeon, AkcentMorski)))
+                            .clickable { uruchomParowanie(nowyKod = false) }
+                            .padding(vertical = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Link, null, tint = TekstNaAkcencie, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
 
         if (odbiorcy.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            SzkloKarta {
-                Text(
-                    "Urządzenia",
-                    color = TekstGlowny,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                odbiorcy.forEachIndexed { indeks, o ->
-                    if (indeks > 0) {
-                        HorizontalDivider(
-                            color = RamkaKarty,
-                            modifier = Modifier.padding(vertical = 4.dp)
+            item(key = "urzadzenia") {
+                Spacer(modifier = Modifier.height(16.dp))
+                SzkloKarta {
+                    Text(
+                        "Urządzenia",
+                        color = TekstGlowny,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    odbiorcy.forEachIndexed { indeks, o ->
+                        if (indeks > 0) {
+                            HorizontalDivider(
+                                color = RamkaKarty,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                        WierszUrzadzenia(
+                            odbiorca = o,
+                            onEdytuj = {
+                                nazwaEdycji = o.nazwa
+                                edytowanyOdbiorca = o
+                            },
+                            onAutoLogowanie = { wlacz ->
+                                zakres.launch {
+                                    runCatching {
+                                        SerwisParowania.ustawAutoLogowanie(kontekst, o.id, wlacz)
+                                    }
+                                }
+                            },
+                            onOdlacz = { doOdlaczenia = o }
                         )
                     }
-                    WierszUrzadzenia(
-                        odbiorca = o,
-                        onEdytuj = {
-                            nazwaEdycji = o.nazwa
-                            edytowanyOdbiorca = o
-                        },
-                        onAutoLogowanie = { wlacz ->
-                            zakres.launch {
-                                runCatching {
-                                    SerwisParowania.ustawAutoLogowanie(kontekst, o.id, wlacz)
-                                }
-                            }
-                        },
-                        onOdlacz = { doOdlaczenia = o }
-                    )
                 }
             }
         }

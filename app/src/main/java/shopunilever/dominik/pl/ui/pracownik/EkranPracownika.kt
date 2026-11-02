@@ -48,6 +48,7 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
     val badge by RepozytoriumParowaniaUi.badgeOczekujace.collectAsState()
     val prosby by RepozytoriumParowaniaUi.prosby.collectAsState()
     val prosbyLogowania by RepozytoriumParowaniaUi.prosbyLogowania.collectAsState()
+    val odbiorcy by RepozytoriumParowaniaUi.odbiorcy.collectAsState()
 
     val chceUrzadzenia by IntentyNawigacji.otworzUrzadzenia.collectAsState()
     LaunchedEffect(chceUrzadzenia) {
@@ -62,14 +63,24 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
         odwiedzone = odwiedzone + zakladka
     }
 
-    // Jeden zestaw listenerów RTDB + FGS SMS
+    // Jeden zestaw listenerów RTDB
     LaunchedEffect(restartNasluchu) {
         if (PreferencjeParowania.czyAktywne(kontekst)) {
-            runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
             RepozytoriumParowaniaUi.restart(kontekst)
         } else {
             runCatching { SerwisTlaNadajnika.zatrzymaj(kontekst) }
             RepozytoriumParowaniaUi.stop()
+        }
+    }
+
+    // FGS SMS tylko gdy są sparowane urządzenia (relay dla rodziny)
+    LaunchedEffect(restartNasluchu, odbiorcy.size) {
+        if (PreferencjeParowania.czyAktywne(kontekst)) {
+            runCatching {
+                SerwisTlaNadajnika.odswiezWgOdbiorcow(kontekst, odbiorcy.size)
+            }
+        } else {
+            runCatching { SerwisTlaNadajnika.zatrzymaj(kontekst) }
         }
     }
 

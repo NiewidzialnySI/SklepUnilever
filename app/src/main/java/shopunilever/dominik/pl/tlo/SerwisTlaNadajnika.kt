@@ -25,8 +25,9 @@ import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.sklep.NasluchSms
 
 /**
- * Tło pracownika przy aktywnym parowaniu:
+ * Tło pracownika tylko gdy są sparowane urządzenia (odbiorcy):
  * nasłuch SMS → publikacja kodu do Firebase (rodzina loguje się bez otwierania apki).
+ * Bez odbiorców FGS jest wyłączony — pracownik używa lokalnego NasluchSms w WebView.
  * Cicha, stała notyfikacja (wymóg FGS) — bez spamowania o każdej prośbie.
  */
 class SerwisTlaNadajnika : Service() {
@@ -44,6 +45,7 @@ class SerwisTlaNadajnika : Service() {
         }
 
         startForegroundBezpiecznie(zbudujNotyfikacje())
+        dziala = true
 
         zakres.launch {
             runCatching { SerwisParowania.upewnijSesjeNadajnika(this@SerwisTlaNadajnika) }
@@ -115,6 +117,7 @@ class SerwisTlaNadajnika : Service() {
     private fun stopSelfSafe() {
         nasluchSms?.stop()
         nasluchSms = null
+        dziala = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -122,6 +125,7 @@ class SerwisTlaNadajnika : Service() {
     override fun onDestroy() {
         nasluchSms?.stop()
         nasluchSms = null
+        dziala = false
         zakres.cancel()
         super.onDestroy()
     }
@@ -131,6 +135,10 @@ class SerwisTlaNadajnika : Service() {
         private const val KANAL = "parowanie_tlo"
         private const val ID_NOTYFIKACJI = 7201
         private const val AKCJA_STOP = "shopunilever.STOP_TLO_NADAJNIKA"
+
+        @Volatile
+        var dziala: Boolean = false
+            private set
 
         fun upewnijKanal(context: Context) {
             val mgr = context.getSystemService(NotificationManager::class.java) ?: return
@@ -145,14 +153,27 @@ class SerwisTlaNadajnika : Service() {
             mgr.createNotificationChannel(kanal)
         }
 
-        fun uruchomJesliTrzeba(context: Context) {
-            if (!PreferencjeParowania.czyAktywne(context)) {
+        /**
+         * FGS tylko przy aktywnym parowaniu i ≥1 odbiorcy (relay SMS dla rodziny).
+         * Sam kod QR bez sparowanych urządzeń nie trzyma pollingu SMS 24/7.
+         */
+        fun odswiezWgOdbiorcow(context: Context, liczbaOdbiorcow: Int) {
+            if (!PreferencjeParowania.czyAktywne(context) || liczbaOdbiorcow <= 0) {
                 zatrzymaj(context)
                 return
             }
+            if (dziala) return
             upewnijKanal(context)
             val intent = Intent(context, SerwisTlaNadajnika::class.java)
             ContextCompat.startForegroundService(context, intent)
+        }
+
+        /** Alias — bez liczby odbiorców nie startujemy (oszczędność baterii). */
+        fun uruchomJesliTrzeba(context: Context) {
+            // Bez wiedzy o odbiorcach nie włączaj FGS „na zapas”
+            if (!PreferencjeParowania.czyAktywne(context)) {
+                zatrzymaj(context)
+            }
         }
 
         fun zatrzymaj(context: Context) {
@@ -161,6 +182,7 @@ class SerwisTlaNadajnika : Service() {
             }
             runCatching { context.startService(intent) }
             runCatching { context.stopService(Intent(context, SerwisTlaNadajnika::class.java)) }
+            dziala = false
         }
     }
 }

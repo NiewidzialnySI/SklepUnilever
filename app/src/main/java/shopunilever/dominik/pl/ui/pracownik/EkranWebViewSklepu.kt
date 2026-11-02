@@ -65,6 +65,7 @@ import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeKoszykow
 import shopunilever.dominik.pl.dane.PreferencjeOdbiorcy
 import shopunilever.dominik.pl.dane.PreferencjeParowania
+import shopunilever.dominik.pl.tlo.SerwisTlaNadajnika
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.sklep.BusSms
 import shopunilever.dominik.pl.sklep.NasluchSms
@@ -889,13 +890,13 @@ fun EkranWebViewSklepu(
         )
     }
 
-    // Pracownik: gdy parowanie aktywne — FGS już ma NasluchSms → tylko BusSms.
-    // Bez parowania: lokalny NasluchSms. Rodzina: Firebase relay.
+    // Pracownik: FGS działa tylko przy ≥1 odbiorcy → wtedy BusSms.
+    // Bez FGS: lokalny NasluchSms na czas oczekiwania SMS. Rodzina: Firebase relay.
     DisposableEffect(stan.oczekujeSms, trybOdbiorcy) {
         if (!stan.oczekujeSms || trybOdbiorcy) {
             return@DisposableEffect onDispose { }
         }
-        if (PreferencjeParowania.czyAktywne(kontekst)) {
+        if (SerwisTlaNadajnika.dziala) {
             return@DisposableEffect onDispose { }
         }
         val od = stan.smsOdKiedyMs.get().takeIf { it > 0L } ?: System.currentTimeMillis()
@@ -917,7 +918,7 @@ fun EkranWebViewSklepu(
             SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
                 stan.naKodSms(kod)
             }
-        } else if (PreferencjeParowania.czyAktywne(kontekst)) {
+        } else if (SerwisTlaNadajnika.dziala) {
             BusSms.kody.collectLatest { kod -> stan.naKodSms(kod) }
         }
     }
