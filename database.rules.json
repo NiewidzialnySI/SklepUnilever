@@ -3,6 +3,7 @@
     ".read": false,
     ".write": false,
     "transmitters": {
+      ".indexOn": ["syncCode"],
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists() || root.child('transmitters').child($uid).child('accessRequests').child(auth.uid).exists())",
         "syncCode": {

@@ -12,7 +12,9 @@
  * 6. Zapisz wlasciwosci.
  * 7. Uruchom funkcje:  KROK1_sprawdzKonfiguracje
  * 8. Jak log = OK, uruchom:      KROK2_zainstalujTrigger
- * 9. Potem opcjonalnie:          testReczny
+ * 9. (Opcjonalnie) Wlasciwosc DOMYSLNY_TRANSMITTER_UID = UID z Firebase
+ *    transmitters/...  - gdy stare maile maja stary +KOD (np. WCYNEV47)
+ * 10. Potem: testReczny
  *
  * NIE wklejaj JSON obok var / function - bedzie blad skladni.
  * NIE wysylaj JSON na czat.
@@ -24,6 +26,8 @@ var RTDB_URL = 'https://sklepunilever-app-default-rtdb.europe-west1.firebasedata
 
 /** Nazwa wlasciwosci w Ustawieniach projektu - TO NIE JEST JSON. */
 var NAZWA_WLASCIWOSCI_SA = 'FIREBASE_SA_JSON';
+/** Gdy +KOD z maila nie ma wpisu w pairing_codes (stare maile) - UID nadajnika z apki. */
+var NAZWA_WLASCIWOSCI_DOMYSLNY_UID = 'DOMYSLNY_TRANSMITTER_UID';
 
 /** Uruchom TO NAJPIERW - sprawdzi czy klucz jest we wlasciwosciach. */
 function KROK1_sprawdzKonfiguracje() {
@@ -49,11 +53,61 @@ function KROK1_sprawdzKonfiguracje() {
     }
     Logger.log('OK - klucz SA znaleziony we wlasciwosciach.');
     Logger.log('client_email: ' + sa.client_email);
+    var uid = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_DOMYSLNY_UID);
+    if (uid) {
+      Logger.log('DOMYSLNY_TRANSMITTER_UID = ' + uid);
+    } else {
+      Logger.log('Brak DOMYSLNY_TRANSMITTER_UID (opcjonalne).');
+      Logger.log('Jesli log mowi "Brak pairing_codes/XXXX" - dodaj wlasciwosc:');
+      Logger.log('  DOMYSLNY_TRANSMITTER_UID = Twoj UID z Firebase /transmitters');
+      Logger.log('Albo uruchom powiazStaryKod("XXXX") po ustawieniu UID.');
+    }
     Logger.log('Teraz uruchom: KROK2_zainstalujTrigger');
   } catch (e) {
     Logger.log('Wartosc FIREBASE_SA_JSON nie jest poprawnym JSON: ' + e);
     Logger.log('Wklej caly plik .json do pola Wartosc (nie do Kod.gs).');
   }
+}
+
+/**
+ * Rejestruje stary kod z maila (np. WCYNEV47) w pairing_codes -> DOMYSLNY_TRANSMITTER_UID.
+ * Najpierw ustaw wlasciwosc DOMYSLNY_TRANSMITTER_UID, potem:
+ *   powiazStaryKod('WCYNEV47')
+ */
+function powiazStaryKod(kod) {
+  kod = String(kod || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  if (kod.length !== 8) {
+    Logger.log('Podaj 8-znakowy kod, np. powiazStaryKod("WCYNEV47")');
+    return;
+  }
+  var uid = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_DOMYSLNY_UID);
+  if (!uid) {
+    Logger.log('Najpierw ustaw wlasciwosc DOMYSLNY_TRANSMITTER_UID (UID z /transmitters w Firebase).');
+    return;
+  }
+  var token = pobierzTokenFirebase();
+  var url = RTDB_URL + '/pairing_codes/' + encodeURIComponent(kod) + '.json?access_token=' + token;
+  var resp = UrlFetchApp.fetch(url, {
+    method: 'put',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    payload: JSON.stringify({
+      transmitterUid: uid,
+      createdAt: Date.now(),
+      zrodlo: 'alias_stary_kod'
+    })
+  });
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('Blad zapisu pairing_codes: ' + resp.getContentText());
+    return;
+  }
+  Logger.log('OK - pairing_codes/' + kod + ' -> ' + uid);
+  Logger.log('Uruchom testReczny ponownie.');
+}
+
+/** Szybkie powiazanie kodu z Twoich maili UPS (widoczny w logu testReczny). */
+function powiazWCYNEV47() {
+  powiazStaryKod('WCYNEV47');
 }
 
 /** Uruchom PO KROK1 (gdy log = OK). */
@@ -226,15 +280,41 @@ function pobierzTokenFirebase() {
 }
 
 function rozwiazTransmitterUid(token, pairingCode) {
+  // 1) Oficjalna mapa aplikacji
   var url = RTDB_URL + '/pairing_codes/' + encodeURIComponent(pairingCode) + '.json?access_token=' + token;
   var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (resp.getResponseCode() === 404) return null;
-  if (resp.getResponseCode() !== 200) {
+  if (resp.getResponseCode() === 200) {
+    var dane = JSON.parse(resp.getContentText());
+    if (dane && dane.transmitterUid) return dane.transmitterUid;
+  } else if (resp.getResponseCode() !== 404) {
     throw new Error('Odczyt pairing_codes: ' + resp.getContentText());
   }
-  var dane = JSON.parse(resp.getContentText());
-  if (!dane) return null;
-  return dane.transmitterUid || null;
+
+  // 2) Szukaj nadajnika po syncCode (aktualny kod w apce)
+  var q =
+    RTDB_URL +
+    '/transmitters.json?orderBy="syncCode"&equalTo="' +
+    encodeURIComponent(pairingCode) +
+    '"&access_token=' +
+    token;
+  var resp2 = UrlFetchApp.fetch(q, { muteHttpExceptions: true });
+  if (resp2.getResponseCode() === 200) {
+    var mapa = JSON.parse(resp2.getContentText());
+    if (mapa) {
+      for (var uid in mapa) {
+        if (Object.prototype.hasOwnProperty.call(mapa, uid)) return uid;
+      }
+    }
+  }
+
+  // 3) Fallback dla starych maili (+KOD ze Sklepik / poprzedniego QR)
+  var fallback = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_DOMYSLNY_UID);
+  if (fallback && String(fallback).trim()) {
+    Logger.log('Brak pairing_codes/' + pairingCode + ' - uzywam DOMYSLNY_TRANSMITTER_UID');
+    return String(fallback).trim();
+  }
+
+  return null;
 }
 
 function pobierzIstniejacePrzesylki(token, transmitterUid) {
