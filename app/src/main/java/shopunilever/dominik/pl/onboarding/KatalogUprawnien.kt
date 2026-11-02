@@ -22,7 +22,6 @@ enum class RodzajProsby {
 
 /**
  * Jedna pozycja na ekranie uprawnień — zależna od roli.
- * Wszystkie pozycje są wymagane.
  */
 data class PozycjaUprawnienia(
     val id: String,
@@ -30,6 +29,8 @@ data class PozycjaUprawnienia(
     val opis: String,
     val ikona: ImageVector,
     val rodzaj: RodzajProsby,
+    /** Jeśli false — nie blokuje wejścia do sklepu. */
+    val wymagane: Boolean = true,
     val uprawnieniaRuntime: List<String> = emptyList()
 )
 
@@ -93,8 +94,9 @@ object KatalogUprawnien {
     private fun pozycjaAktualizacji() = PozycjaUprawnienia(
         id = "instalacja",
         tytul = "Instalacja aktualizacji",
-        opis = "Pozwala zainstalować nową wersję aplikacji bezpośrednio z okna aktualizacji.",
+        opis = "Pozwala zainstalować nową wersję aplikacji bezpośrednio z okna aktualizacji. Możesz pominąć i włączyć później.",
         ikona = Icons.Rounded.SystemUpdate,
-        rodzaj = RodzajProsby.INSTALACJA_APK
+        rodzaj = RodzajProsby.INSTALACJA_APK,
+        wymagane = false
     )
 }

@@ -139,7 +139,8 @@ fun EkranUprawnien(
         }
     }
 
-    val wszystkoOk = lista.all { stan[it.id] == true }
+    val wymaganeOk = lista.filter { it.wymagane }.all { stan[it.id] == true }
+    val brakujaceWymagane = lista.filter { it.wymagane && stan[it.id] != true }
 
     TloAplikacji(modifier = modifier) {
         Column(
@@ -225,7 +226,11 @@ fun EkranUprawnien(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = if (ok) "Włączone" else "Dotknij, aby włączyć",
+                                    text = when {
+                                        ok -> "Włączone"
+                                        pozycja.wymagane -> "Dotknij, aby włączyć"
+                                        else -> "Opcjonalne — dotknij, aby włączyć"
+                                    },
                                     color = if (ok) Sukces else AkcentNeon,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -239,15 +244,13 @@ fun EkranUprawnien(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (!wszystkoOk) {
+            if (brakujaceWymagane.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .background(AkcentNeon.copy(alpha = 0.14f))
-                        .clickable {
-                            lista.firstOrNull { stan[it.id] != true }?.let { popros(it) }
-                        }
+                        .clickable { popros(brakujaceWymagane.first()) }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -266,7 +269,7 @@ fun EkranUprawnien(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
                     .background(
-                        if (wszystkoOk) {
+                        if (wymaganeOk) {
                             Brush.horizontalGradient(listOf(AkcentNeon, AkcentMorski))
                         } else {
                             Brush.horizontalGradient(
@@ -277,23 +280,23 @@ fun EkranUprawnien(
                             )
                         }
                     )
-                    .clickable(enabled = wszystkoOk, onClick = onGotowe)
+                    .clickable(enabled = wymaganeOk, onClick = onGotowe)
                     .padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "Wejdź do sklepu",
-                    color = if (wszystkoOk) TekstNaAkcencie else TekstDrugi,
+                    color = if (wymaganeOk) TekstNaAkcencie else TekstDrugi,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (wszystkoOk) {
-                    "Wszystkie uprawnienia włączone."
+                text = if (wymaganeOk) {
+                    "Możesz wejść — instalację aktualizacji włączysz później."
                 } else {
-                    "Aby wejść dalej, włącz wszystkie uprawnienia z listy."
+                    "Aby wejść dalej, włącz wymagane uprawnienia."
                 },
                 color = TekstDrugi,
                 fontSize = 12.sp,
