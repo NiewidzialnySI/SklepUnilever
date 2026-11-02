@@ -1,14 +1,5 @@
 package shopunilever.dominik.pl.ui.pracownik
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -24,13 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.PowiadomieniaParowania
-import shopunilever.dominik.pl.firebase.ProsbaDostepu
-import shopunilever.dominik.pl.firebase.ProsbaLogowania
-import shopunilever.dominik.pl.firebase.SerwisParowania
+import shopunilever.dominik.pl.firebase.RepozytoriumParowaniaUi
 import shopunilever.dominik.pl.tlo.SerwisTlaNadajnika
 import shopunilever.dominik.pl.ui.IntentyNawigacji
 import shopunilever.dominik.pl.ui.components.TloAplikacji
@@ -40,11 +26,28 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
     val kontekst = LocalContext.current
     var zakladka by remember { mutableStateOf(ZakladkaPracownika.DOM) }
     var pokazSklep by remember { mutableStateOf(false) }
-    var prosbyOczekujace by remember { mutableIntStateOf(0) }
-    var restartNasluchu by remember { mutableIntStateOf(0) }
+    var restartNasluchu by remember { mutableStateOf(0) }
     val juzPowiadomione = remember { mutableSetOf<String>() }
     // Po pierwszym wejściu zakładka zostaje w pamięci — bez zimnego startu (QR + Firebase).
     var odwiedzone by remember { mutableStateOf(setOf(ZakladkaPracownika.DOM)) }
+
+    val onOtworzSklep = remember { { pokazSklep = true } }
+    val onZamknijSklep = remember { { pokazSklep = false } }
+    val onParowanieZmienione = remember {
+        {
+            restartNasluchu++
+            Unit
+        }
+    }
+    val onZmianaZakladki = remember {
+        { nowa: ZakladkaPracownika ->
+            zakladka = nowa
+        }
+    }
+
+    val badge by RepozytoriumParowaniaUi.badgeOczekujace.collectAsState()
+    val prosby by RepozytoriumParowaniaUi.prosby.collectAsState()
+    val prosbyLogowania by RepozytoriumParowaniaUi.prosbyLogowania.collectAsState()
 
     val chceUrzadzenia by IntentyNawigacji.otworzUrzadzenia.collectAsState()
     LaunchedEffect(chceUrzadzenia) {
@@ -59,122 +62,90 @@ fun EkranPracownika(modifier: Modifier = Modifier) {
         odwiedzone = odwiedzone + zakladka
     }
 
-    // Tło SMS + badge w aplikacji (bez spamowania powiadomieniami / skoków zakładek).
+    // Jeden zestaw listenerów RTDB + FGS SMS
     LaunchedEffect(restartNasluchu) {
         if (PreferencjeParowania.czyAktywne(kontekst)) {
             runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
+            RepozytoriumParowaniaUi.restart(kontekst)
         } else {
             runCatching { SerwisTlaNadajnika.zatrzymaj(kontekst) }
-            prosbyOczekujace = 0
-            return@LaunchedEffect
+            RepozytoriumParowaniaUi.stop()
         }
-        val kod = PreferencjeParowania.kod(kontekst)
-        if (kod.isBlank()) {
-            prosbyOczekujace = 0
-            return@LaunchedEffect
-        }
-        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
-        var pendingParowanie = 0
-        var pendingLogin = 0
-        fun odswiezBadge() {
-            prosbyOczekujace = pendingParowanie + pendingLogin
-        }
-        launch {
-            SerwisParowania.obserwujProsby(kontekst).collectLatest { lista: List<ProsbaDostepu> ->
-                val pending = lista.filter { it.status == "pending" }
-                pendingParowanie = pending.size
-                odswiezBadge()
-                pending.forEach { p ->
-                    if (juzPowiadomione.add("pair:${p.id}")) {
-                        PowiadomieniaParowania.pokazCichePrzypomnienie(
-                            kontekst,
-                            p.nazwaUrzadzenia,
-                            p.id
-                        )
-                    }
-                }
-                juzPowiadomione.removeAll { klucz ->
-                    klucz.startsWith("pair:") && pending.none { "pair:${it.id}" == klucz }
-                }
+    }
+
+    // Ciche powiadomienia o nowych prośbach (bez drugiego listenera)
+    LaunchedEffect(prosby, prosbyLogowania) {
+        prosby.filter { it.status == "pending" }.forEach { p ->
+            if (juzPowiadomione.add("pair:${p.id}")) {
+                PowiadomieniaParowania.pokazCichePrzypomnienie(kontekst, p.nazwaUrzadzenia, p.id)
             }
         }
-        launch {
-            SerwisParowania.obserwujProsbyLogowania(kontekst).collectLatest { lista: List<ProsbaLogowania> ->
-                val pending = lista.filter { it.status == "pending" }
-                pendingLogin = pending.size
-                odswiezBadge()
-                pending.forEach { p ->
-                    if (juzPowiadomione.add("login:${p.id}")) {
-                        PowiadomieniaParowania.pokazCichePrzypomnienie(
-                            kontekst,
-                            p.nazwaUrzadzenia,
-                            "login-${p.id}"
-                        )
-                    }
-                }
-                juzPowiadomione.removeAll { klucz ->
-                    klucz.startsWith("login:") && pending.none { "login:${it.id}" == klucz }
-                }
+        prosbyLogowania.filter { it.status == "pending" }.forEach { p ->
+            if (juzPowiadomione.add("login:${p.id}")) {
+                PowiadomieniaParowania.pokazCichePrzypomnienie(
+                    kontekst,
+                    p.nazwaUrzadzenia,
+                    "login-${p.id}"
+                )
+            }
+        }
+        juzPowiadomione.removeAll { klucz ->
+            when {
+                klucz.startsWith("pair:") ->
+                    prosby.none { it.status == "pending" && "pair:${it.id}" == klucz }
+                klucz.startsWith("login:") ->
+                    prosbyLogowania.none { it.status == "pending" && "login:${it.id}" == klucz }
+                else -> false
             }
         }
     }
 
-    AnimatedContent(
-        targetState = pokazSklep,
-        transitionSpec = {
-            if (targetState) {
-                (
-                    fadeIn(tween(220)) + slideInVertically(tween(260)) { it / 8 } +
-                        scaleIn(initialScale = 0.97f, animationSpec = tween(260))
-                    ) togetherWith (
-                    fadeOut(tween(160)) + scaleOut(targetScale = 0.98f, animationSpec = tween(160))
-                    )
-            } else {
-                (
-                    fadeIn(tween(200)) + scaleIn(initialScale = 0.98f, animationSpec = tween(220))
-                    ) togetherWith (
-                    fadeOut(tween(200)) + slideOutVertically(tween(280)) { it / 5 } +
-                        scaleOut(targetScale = 0.96f, animationSpec = tween(260))
-                    )
-            }
-        },
-        label = "animacja_sklepu",
-        modifier = modifier.fillMaxSize()
-    ) { sklep ->
-        if (sklep) {
-            EkranWebViewSklepu(
-                onZamknij = { pokazSklep = false },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            TloAplikacji(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (ZakladkaPracownika.DOM in odwiedzone) {
-                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.DOM) {
-                                EkranHomePracownika(onOtworzSklep = { pokazSklep = true })
-                            }
-                        }
-                        if (ZakladkaPracownika.URZADZENIA in odwiedzone) {
-                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.URZADZENIA) {
-                                EkranUrzadzen(
-                                    onParowanieZmienione = { restartNasluchu++ }
-                                )
-                            }
-                        }
-                        if (ZakladkaPracownika.USTAWIENIA in odwiedzone) {
-                            ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.USTAWIENIA) {
-                                EkranUstawien()
-                            }
+    // Sklep jako warstwa nad zakładkami — NIE niszczy keep-alive (QR/Firebase)
+    Box(modifier = modifier.fillMaxSize()) {
+        TloAplikacji(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(0f)
+                .graphicsLayer {
+                    // Lekkie przyciemnienie gdy sklep otwarty; composition zostaje
+                    alpha = if (pokazSklep) 0f else 1f
+                }
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.weight(1f)) {
+                    if (ZakladkaPracownika.DOM in odwiedzone) {
+                        ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.DOM && !pokazSklep) {
+                            EkranHomePracownika(onOtworzSklep = onOtworzSklep)
                         }
                     }
+                    if (ZakladkaPracownika.URZADZENIA in odwiedzone) {
+                        ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.URZADZENIA && !pokazSklep) {
+                            EkranUrzadzen(onParowanieZmienione = onParowanieZmienione)
+                        }
+                    }
+                    if (ZakladkaPracownika.USTAWIENIA in odwiedzone) {
+                        ZakladkaWarstwa(widoczna = zakladka == ZakladkaPracownika.USTAWIENIA && !pokazSklep) {
+                            EkranUstawien()
+                        }
+                    }
+                }
+                if (!pokazSklep) {
                     DolnyPasekPracownika(
                         aktywna = zakladka,
-                        onZmiana = { zakladka = it },
-                        badgeUrzadzenia = prosbyOczekujace
+                        onZmiana = onZmianaZakladki,
+                        badgeUrzadzenia = badge
                     )
                 }
             }
+        }
+
+        if (pokazSklep) {
+            EkranWebViewSklepu(
+                onZamknij = onZamknijSklep,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2f)
+            )
         }
     }
 }

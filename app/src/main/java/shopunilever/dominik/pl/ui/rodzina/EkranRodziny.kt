@@ -106,8 +106,9 @@ fun EkranRodziny(modifier: Modifier = Modifier) {
         pokazSklep = true
     }
 
-    LaunchedEffect(PreferencjeOdbiorcy.uidNadajnika(kontekst)) {
-        if (PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()) return@LaunchedEffect
+    LaunchedEffect(status) {
+        val tx = PreferencjeOdbiorcy.uidNadajnika(kontekst)
+        if (tx.isBlank()) return@LaunchedEffect
         SerwisParowania.obserwujStatusProsby(kontekst).collectLatest { st ->
             when (st) {
                 "approved" -> {

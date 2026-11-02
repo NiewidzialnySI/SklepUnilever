@@ -65,6 +65,7 @@ class SerwisTlaNadajnika : Service() {
     private fun naKodSms(kod: String) {
         if (kod.length < 4 || kod == ostatniKod) return
         ostatniKod = kod
+        // BusSms emit już w NasluchSms.zglos — tu tylko relay Firebase
         zakres.launch {
             runCatching {
                 SerwisParowania.publikujKodSms(applicationContext, kod)

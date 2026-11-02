@@ -45,7 +45,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,12 +63,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.OdbiorcaPolaczony
-import shopunilever.dominik.pl.firebase.ProsbaDostepu
-import shopunilever.dominik.pl.firebase.ProsbaLogowania
+import shopunilever.dominik.pl.firebase.RepozytoriumParowaniaUi
 import shopunilever.dominik.pl.firebase.SerwisParowania
 import shopunilever.dominik.pl.firebase.StaleFirebase
 import shopunilever.dominik.pl.tlo.SerwisTlaNadajnika
@@ -94,9 +92,10 @@ fun EkranUrzadzen(
     var kod by remember { mutableStateOf(PreferencjeParowania.kod(kontekst)) }
     var aktywne by remember { mutableStateOf(PreferencjeParowania.czyAktywne(kontekst)) }
     var ladowanie by remember { mutableStateOf(false) }
-    var prosby by remember { mutableStateOf<List<ProsbaDostepu>>(emptyList()) }
-    var prosbyLogowania by remember { mutableStateOf<List<ProsbaLogowania>>(emptyList()) }
-    var odbiorcy by remember { mutableStateOf<List<OdbiorcaPolaczony>>(emptyList()) }
+    // Shared RTDB — bez drugiego zestawu ValueEventListener
+    val prosby by RepozytoriumParowaniaUi.prosby.collectAsState()
+    val prosbyLogowania by RepozytoriumParowaniaUi.prosbyLogowania.collectAsState()
+    val odbiorcy by RepozytoriumParowaniaUi.odbiorcy.collectAsState()
     var akcjaProsby by remember { mutableStateOf<String?>(null) }
 
     var edytowanyOdbiorca by remember { mutableStateOf<OdbiorcaPolaczony?>(null) }
@@ -104,12 +103,9 @@ fun EkranUrzadzen(
     var doOdlaczenia by remember { mutableStateOf<OdbiorcaPolaczony?>(null) }
     var potwierdzNowyKod by remember { mutableStateOf(false) }
 
-    LaunchedEffect(aktywne, kod) {
-        if (kod.isBlank()) return@LaunchedEffect
-        runCatching { SerwisParowania.upewnijSesjeNadajnika(kontekst) }
-        launch { SerwisParowania.obserwujProsby(kontekst).collectLatest { prosby = it } }
-        launch { SerwisParowania.obserwujProsbyLogowania(kontekst).collectLatest { prosbyLogowania = it } }
-        launch { SerwisParowania.obserwujOdbiorcow(kontekst).collectLatest { odbiorcy = it } }
+    val oczekujace = remember(prosby) { prosby.filter { it.status == "pending" } }
+    val logowaniaOczekujace = remember(prosbyLogowania) {
+        prosbyLogowania.filter { it.status == "pending" }
     }
 
     fun uruchomParowanie(nowyKod: Boolean, odlaczWszystkich: Boolean = false) {
@@ -126,6 +122,7 @@ fun EkranUrzadzen(
                 aktywne = true
                 runCatching { SerwisTlaNadajnika.uruchomJesliTrzeba(kontekst) }
                 onParowanieZmienione()
+                RepozytoriumParowaniaUi.restart(kontekst)
                 if (odlaczWszystkich) {
                     Toast.makeText(kontekst, "Nowy kod — urządzenia odłączone", Toast.LENGTH_SHORT).show()
                 }
@@ -135,9 +132,6 @@ fun EkranUrzadzen(
             ladowanie = false
         }
     }
-
-    val oczekujace = prosby.filter { it.status == "pending" }
-    val logowaniaOczekujace = prosbyLogowania.filter { it.status == "pending" }
 
     if (potwierdzNowyKod) {
         AlertDialog(

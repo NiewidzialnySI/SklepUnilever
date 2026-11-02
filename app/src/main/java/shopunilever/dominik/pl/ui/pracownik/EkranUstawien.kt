@@ -101,14 +101,15 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
     var status by remember { mutableStateOf<String?>(null) }
     var blad by remember { mutableStateOf<String?>(null) }
     var logi by remember { mutableStateOf<List<LogWejsciaUrzadzenia>>(emptyList()) }
-    val emailZapisany = PreferencjeKonta.email(kontekst)
+    var emailZapisany by remember { mutableStateOf(PreferencjeKonta.email(kontekst)) }
     val emailZmieniony = email.trim() != emailZapisany
+    val parowanieAktywne = remember { PreferencjeParowania.czyAktywne(kontekst) }
     val formatCzasu = remember {
         SimpleDateFormat("dd.MM HH:mm", Locale("pl", "PL"))
     }
 
-    LaunchedEffect(PreferencjeParowania.czyAktywne(kontekst)) {
-        if (!PreferencjeParowania.czyAktywne(kontekst)) {
+    LaunchedEffect(parowanieAktywne) {
+        if (!parowanieAktywne) {
             logi = emptyList()
             return@LaunchedEffect
         }
@@ -153,6 +154,7 @@ fun EkranUstawien(modifier: Modifier = Modifier) {
         }
         val obecneHaslo = PreferencjeKonta.haslo(kontekst)
         PreferencjeKonta.zapiszDane(kontekst, email.trim(), obecneHaslo)
+        emailZapisany = email.trim()
         status = "Zapisano email."
         blad = null
         syncFirebaseJesliTrzeba()

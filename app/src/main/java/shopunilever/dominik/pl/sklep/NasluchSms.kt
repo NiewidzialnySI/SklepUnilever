@@ -8,20 +8,23 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
 
 /**
- * Odczyt kodu logowania z przychodzących SMS (jak useSklepikSms w Harmonogramie).
- * Broadcast RECEIVE_SMS + polling skrzynki przez ContentResolver.
+ * Odczyt kodu logowania z przychodzących SMS.
+ * Broadcast RECEIVE_SMS + ContentObserver; polling skrzynki na wątku IO (nie UI).
  */
 class NasluchSms(
     private val kontekst: Context,
     private val odKiedyMs: Long,
     private val onKod: (String) -> Unit
 ) {
-    private val handler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val watekIo = HandlerThread("NasluchSms-IO").apply { start() }
+    private val ioHandler = Handler(watekIo.looper)
     private var aktywny = false
     private var ostatniZgloszony: String? = null
 
@@ -36,9 +39,9 @@ class NasluchSms(
         }
     }
 
-    private val obserwator = object : ContentObserver(handler) {
+    private val obserwator = object : ContentObserver(ioHandler) {
         override fun onChange(selfChange: Boolean) {
-            if (aktywny) skanujSkrzynke()
+            if (aktywny) ioHandler.post { skanujSkrzynke() }
         }
     }
 
@@ -46,7 +49,8 @@ class NasluchSms(
         override fun run() {
             if (!aktywny) return
             skanujSkrzynke()
-            handler.postDelayed(this, 2_000L)
+            // Rzadszy poll — Broadcast + Observer pokrywają większość przypadków
+            ioHandler.postDelayed(this, 8_000L)
         }
     }
 
@@ -73,14 +77,14 @@ class NasluchSms(
         } catch (e: Exception) {
             Log.w(TAG, "ContentObserver SMS: ${e.message}")
         }
-        handler.postDelayed(polling, 800L)
-        skanujSkrzynke()
+        ioHandler.postDelayed(polling, 1_200L)
+        ioHandler.post { skanujSkrzynke() }
     }
 
     fun stop() {
         if (!aktywny) return
         aktywny = false
-        handler.removeCallbacks(polling)
+        ioHandler.removeCallbacks(polling)
         try {
             kontekst.unregisterReceiver(odbiorca)
         } catch (_: Exception) {
@@ -89,6 +93,7 @@ class NasluchSms(
             kontekst.contentResolver.unregisterContentObserver(obserwator)
         } catch (_: Exception) {
         }
+        watekIo.quitSafely()
     }
 
     private fun skanujSkrzynke() {
@@ -122,7 +127,8 @@ class NasluchSms(
         if (kod == ostatniZgloszony) return
         ostatniZgloszony = kod
         Log.i(TAG, "Odebrano kod SMS: $kod")
-        handler.post { onKod(kod) }
+        BusSms.emituj(kod)
+        mainHandler.post { onKod(kod) }
     }
 
     companion object {

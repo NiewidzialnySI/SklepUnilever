@@ -2,6 +2,8 @@ package shopunilever.dominik.pl.ui.pracownik
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,21 +54,23 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import shopunilever.dominik.pl.BuildConfig
 import shopunilever.dominik.pl.dane.PozycjaKoszyka
-import kotlinx.coroutines.flow.collectLatest
 import shopunilever.dominik.pl.dane.PreferencjeKonta
 import shopunilever.dominik.pl.dane.PreferencjeKoszykow
 import shopunilever.dominik.pl.dane.PreferencjeOdbiorcy
 import shopunilever.dominik.pl.dane.PreferencjeParowania
 import shopunilever.dominik.pl.firebase.SerwisParowania
+import shopunilever.dominik.pl.sklep.BusSms
 import shopunilever.dominik.pl.sklep.NasluchSms
 import shopunilever.dominik.pl.sklep.SkryptyKoszyka
 import shopunilever.dominik.pl.sklep.SkryptySklepu
 import shopunilever.dominik.pl.sklep.StaleSklepu
-import androidx.compose.runtime.LaunchedEffect
 import shopunilever.dominik.pl.ui.theme.AkcentNeon
 import shopunilever.dominik.pl.ui.theme.Ostrzezenie
 import shopunilever.dominik.pl.ui.theme.TekstDrugi
@@ -73,9 +78,11 @@ import shopunilever.dominik.pl.ui.theme.TekstGlowny
 import shopunilever.dominik.pl.ui.theme.TloAmoled
 import shopunilever.dominik.pl.ui.theme.TloWarstwa
 import java.util.ArrayDeque
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 private enum class EtapLogowania {
     LADOWANIE,
@@ -102,6 +109,9 @@ private class StanLogowaniaSklepu(
     val haslo: String
 ) {
     private val zakresTla = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val handlerUi = Handler(Looper.getMainLooper())
+    private val opoznione = CopyOnWriteArrayList<Runnable>()
+    private val aktualnyUrlRef = AtomicReference(StaleSklepu.URL_LOGOWANIA)
     var webView: WebView? = null
     val emailWyslany = AtomicBoolean(false)
     val emailWstrzykniety = AtomicBoolean(false)
@@ -117,9 +127,12 @@ private class StanLogowaniaSklepu(
     private val kolejkaDodawania = ArrayDeque<String>()
     private val dodawanieTrwa = AtomicBoolean(false)
     private val oczekujeDodaniaDoKoszyka = AtomicBoolean(false)
+    private val ciasteczkaWstrzykniete = AtomicBoolean(false)
 
     /** false = auto-login (klik/wypełnianie); true = tylko DIAG do Logcat. */
     val trybReczny = false
+    private val diagWlaczone: Boolean
+        get() = trybReczny || BuildConfig.DEBUG
 
     var etap by mutableStateOf(EtapLogowania.LADOWANIE)
     var status by mutableStateOf("Ładowanie sklepu…")
@@ -128,15 +141,59 @@ private class StanLogowaniaSklepu(
     var kodSms by mutableStateOf("")
     var ukryjNakladke by mutableStateOf(false)
     var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
+        private set
+
+    fun ustawUrl(url: String?) {
+        val u = url ?: return
+        aktualnyUrlRef.set(u)
+        // Snapshot Compose tylko gdy UI faktycznie potrzebuje (tytuł nie zależy od URL)
+        if (aktualnyUrl != u) aktualnyUrl = u
+    }
 
     fun toast(tekst: String) {
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
+        handlerUi.post {
             Toast.makeText(kontekstAplikacji, tekst, Toast.LENGTH_SHORT).show()
         }
     }
 
     fun wstrzyknij(skrypt: String) {
         webView?.evaluateJavascript(skrypt, null)
+    }
+
+    /** Odroczone zadanie z możliwością anulowania (nawigacja / dispose). */
+    fun opoznij(ms: Long, blok: () -> Unit) {
+        val r = object : Runnable {
+            override fun run() {
+                opoznione.remove(this)
+                if (zalogowany.get() && etap == EtapLogowania.GOTOWE) return
+                blok()
+            }
+        }
+        opoznione.add(r)
+        val wv = webView
+        if (wv != null) wv.postDelayed(r, ms) else handlerUi.postDelayed(r, ms)
+    }
+
+    fun anulujOpoznione() {
+        val kopia = opoznione.toList()
+        opoznione.clear()
+        kopia.forEach { r ->
+            webView?.removeCallbacks(r)
+            handlerUi.removeCallbacks(r)
+        }
+    }
+
+    fun zwolnij() {
+        anulujOpoznione()
+        zakresTla.cancel()
+        val wv = webView
+        webView = null
+        wv?.apply {
+            stopLoading()
+            loadUrl("about:blank")
+            removeAllViews()
+            destroy()
+        }
     }
 
     fun odswiez() {
@@ -255,6 +312,7 @@ private class StanLogowaniaSklepu(
 
     fun poZalogowaniu() {
         if (!zalogowany.compareAndSet(false, true)) return
+        anulujOpoznione()
         oczekujeSms = false
         probySesjiUnknown.set(0)
         etap = EtapLogowania.GOTOWE
@@ -390,14 +448,20 @@ private class StanLogowaniaSklepu(
     /** Po załadowaniu: cookies + diagnostyka; auto-akcje tylko gdy !trybReczny. */
     fun poZaladowaniuStrony(url: String?) {
         Log.i(TAG_LOGIN, "onPageFinished url=$url trybReczny=$trybReczny")
+        anulujOpoznione()
+        ustawUrl(url)
         wstrzyknij(SkryptySklepu.MOSTEK)
         wstrzyknij(SkryptySklepu.RESPONSYWNOSC)
-        wstrzyknij(SkryptySklepu.CIASTECZKA)
 
         if (zalogowany.get()) {
             ukryjNakladke = true
             etap = EtapLogowania.GOTOWE
+            // Po zalogowaniu: bez CIASTECZKA/SESJA/WYKRYJ/DIAG
             return
+        }
+
+        if (ciasteczkaWstrzykniete.compareAndSet(false, true)) {
+            wstrzyknij(SkryptySklepu.CIASTECZKA)
         }
 
         val u = url?.lowercase().orEmpty()
@@ -408,19 +472,16 @@ private class StanLogowaniaSklepu(
             else -> "Sprawdzam, czy jesteś już zalogowany…"
         }
 
-        // Zawsze: WYKRYJ + DIAG (obserwacja) — w trybie ręcznym BEZ klikania/wypełniania
-        fun skanDiagnostyczny() {
+        fun skanDiagnostyczny(zDiag: Boolean = diagWlaczone) {
             if (zalogowany.get()) return
-            wstrzyknij(SkryptySklepu.CIASTECZKA)
             wstrzyknij(SkryptySklepu.SESJA)
             wstrzyknij(SkryptySklepu.WYKRYJ)
-            wstrzyknij(SkryptySklepu.DIAG_STRONY)
+            if (zDiag) wstrzyknij(SkryptySklepu.DIAG_STRONY)
         }
 
         if (trybReczny) {
-            listOf(500L, 1500L, 3000L).forEach { opoznienie ->
-                webView?.postDelayed({ skanDiagnostyczny() }, opoznienie)
-            }
+            opoznij(500L) { skanDiagnostyczny(true) }
+            opoznij(2000L) { skanDiagnostyczny(true) }
             return
         }
 
@@ -433,13 +494,11 @@ private class StanLogowaniaSklepu(
             status = "Strona hasła — przygotowuję logowanie…"
             emailWyslany.set(true)
             smsWstrzykniety.set(true)
-            listOf(400L, 1000L, 2000L, 3500L).forEach { opoznienie ->
-                webView?.postDelayed({
-                    if (zalogowany.get() || hasloWstrzykniete.get()) return@postDelayed
-                    wstrzyknij(SkryptySklepu.CIASTECZKA)
-                    wstrzyknij(SkryptySklepu.DIAG_STRONY)
-                    naStronieHaslaWymusz(aktualnyUrl)
-                }, opoznienie)
+            opoznij(400L) {
+                if (!zalogowany.get() && !hasloWstrzykniete.get()) naStronieHaslaWymusz(aktualnyUrlRef.get())
+            }
+            opoznij(1600L) {
+                if (!zalogowany.get() && !hasloWstrzykniete.get()) naStronieHaslaWymusz(aktualnyUrlRef.get())
             }
             return
         }
@@ -447,18 +506,12 @@ private class StanLogowaniaSklepu(
         // Po wpisaniu SMS: nie spamuj WYKRYJ — skrypt JS czeka na captcha i kliknie sam
         if (StaleSklepu.czyStronaKoduSms(u) && smsWstrzykniety.get()) {
             status = "Kod SMS wpisany — czekam aż captcha się załaduje…"
-            webView?.postDelayed({
-                if (!zalogowany.get() && StaleSklepu.czyStronaKoduSms(aktualnyUrl)) {
-                    wstrzyknij(SkryptySklepu.DIAG_STRONY)
-                }
-            }, 2000)
             return
         }
 
-        webView?.postDelayed({ skanDiagnostyczny() }, 500)
-        listOf(1200L, 2500L).forEach { opoznienie ->
-            webView?.postDelayed({ skanDiagnostyczny() }, opoznienie)
-        }
+        // 1 skan + 1 retry (zamiast 3× pełnego DIAG)
+        opoznij(450L) { skanDiagnostyczny() }
+        opoznij(1600L) { skanDiagnostyczny() }
     }
 
     fun obsluzWiadomosc(json: String) {
@@ -836,9 +889,13 @@ fun EkranWebViewSklepu(
         )
     }
 
-    // Pracownik: lokalny SMS. Rodzina: kod z Firebase (relay z telefonu pracownika).
+    // Pracownik: gdy parowanie aktywne — FGS już ma NasluchSms → tylko BusSms.
+    // Bez parowania: lokalny NasluchSms. Rodzina: Firebase relay.
     DisposableEffect(stan.oczekujeSms, trybOdbiorcy) {
         if (!stan.oczekujeSms || trybOdbiorcy) {
+            return@DisposableEffect onDispose { }
+        }
+        if (PreferencjeParowania.czyAktywne(kontekst)) {
             return@DisposableEffect onDispose { }
         }
         val od = stan.smsOdKiedyMs.get().takeIf { it > 0L } ?: System.currentTimeMillis()
@@ -852,13 +909,21 @@ fun EkranWebViewSklepu(
     }
 
     LaunchedEffect(stan.oczekujeSms, trybOdbiorcy) {
-        if (!trybOdbiorcy || !stan.oczekujeSms) return@LaunchedEffect
-        if (!PreferencjeOdbiorcy.czyZatwierdzony(kontekst) &&
-            PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()
-        ) return@LaunchedEffect
-        SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
-            stan.naKodSms(kod)
+        if (!stan.oczekujeSms) return@LaunchedEffect
+        if (trybOdbiorcy) {
+            if (!PreferencjeOdbiorcy.czyZatwierdzony(kontekst) &&
+                PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()
+            ) return@LaunchedEffect
+            SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
+                stan.naKodSms(kod)
+            }
+        } else if (PreferencjeParowania.czyAktywne(kontekst)) {
+            BusSms.kody.collectLatest { kod -> stan.naKodSms(kod) }
         }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { stan.zwolnij() }
     }
 
     BackHandler {
@@ -969,7 +1034,7 @@ fun EkranWebViewSklepu(
                             }
 
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                if (!url.isNullOrBlank()) stan.aktualnyUrl = url
+                                if (!url.isNullOrBlank()) stan.ustawUrl(url)
                                 if (!stan.zalogowany.get() &&
                                     stan.etap != EtapLogowania.SMS &&
                                     stan.etap != EtapLogowania.HASLO
@@ -981,7 +1046,7 @@ fun EkranWebViewSklepu(
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
-                                if (!url.isNullOrBlank()) stan.aktualnyUrl = url
+                                if (!url.isNullOrBlank()) stan.ustawUrl(url)
                                 if (StaleSklepu.czyPodejrzany404(url)) {
                                     stan.napraw404JesliTrzeba(url)
                                     return
