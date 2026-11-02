@@ -152,12 +152,15 @@ true;
         return true;
     }
     function sklepikCzyStronaHasla() {
+        // UWAGA: Magento trzyma ukryte #pass / #login-form też na /access i na home —
+        // NIE wolno brać samego istnienia w DOM. Tylko URL login LUB WIDOCZNE hasło.
         var href = (location.href || '').toLowerCase();
         var bodyCls = (document.body && document.body.className) || '';
         if (href.indexOf('customer/account/login') >= 0) return true;
         if (bodyCls.indexOf('customer-account-login') >= 0) return true;
-        if (document.querySelector('form#login-form, form.form-login, #customer-login-form')) return true;
-        if (document.getElementById('pass') || document.querySelector('input[name="login[password]"]')) return true;
+        var pass = document.getElementById('pass') ||
+            document.querySelector('input[name="login[password]"]');
+        if (sklepikWidoczny(pass)) return true;
         return false;
     }
     function sklepikCzyZalogowanySklep() {
@@ -215,18 +218,8 @@ $JS_HELPERY
             return;
         }
         var href = (location.href || '').toLowerCase();
-        // Po SMS Magento ląduje na /customer/account/login?access-email=...
-        // — to ekran hasła, NIE wybór metody i NIE „już zalogowany”.
-        if (sklepikCzyStronaHasla()) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
-            return;
-        }
-        // Najpierw: już w sklepie / sesja aktywna
-        if (sklepikCzyZalogowanySklep()) {
-            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
-            return;
-        }
-        // Formularze logowania PRZED wyborem metody
+        // Kolejność: WIDOCZNE pola access → hasło → wybór metody → sesja.
+        // Ukryte #pass na /access i na home NIE liczą się.
         var tokenField = document.getElementById('access_token') ||
             document.querySelector('input[name="access_token"]') ||
             document.querySelector('input[name="token"]');
@@ -239,24 +232,35 @@ $JS_HELPERY
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'EMAIL_FIELD' });
             return;
         }
+        // Prawdziwy ekran hasła: URL Magento login LUB widoczne #pass
+        if (sklepikCzyStronaHasla()) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
+            return;
+        }
         var passwordField = document.getElementById('pass') ||
             document.querySelector('input[name="login[password]"]');
         if (sklepikWidoczny(passwordField)) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'PASSWORD_FIELD' });
             return;
         }
-        // /access — wybór: Autologowanie / Kod SMS / Karta (nigdy na customer/login)
+        // /access — wybór: Autologowanie / Kod SMS / Karta
         var linkSms = document.querySelector('a[href*="access-email"]') ||
             document.querySelector('a.pagebuilder-button-link[href*="access-email"]');
-        var naWyborzeUrl = href.indexOf('/access') >= 0 && href.indexOf('access-email') < 0 &&
-            href.indexOf('access-code') < 0 && href.indexOf('customer/account') < 0;
+        var naWyborzeUrl = (href.indexOf('/access') >= 0 || href.endsWith('/access')) &&
+            href.indexOf('access-email') < 0 &&
+            href.indexOf('access-code') < 0 &&
+            href.indexOf('customer/account') < 0;
         var maWyborMetod = naWyborzeUrl && (
-            !!document.getElementById('ad_login') ||
+            sklepikWidoczny(document.getElementById('ad_login')) ||
             !!document.querySelector('.access-azure-login, .autologin-content') ||
-            !!linkSms
+            (linkSms && sklepikWidoczny(linkSms))
         );
-        if (maWyborMetod && !sklepikWidoczny(document.getElementById('access_email'))) {
+        if (maWyborMetod) {
             if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ACCESS_METHOD_CHOICE' });
+            return;
+        }
+        if (sklepikCzyZalogowanySklep()) {
+            if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'ALREADY_LOGGED_IN' });
             return;
         }
         if (window.SklepikPost) window.SklepikPost({ type: 'WYKRYJ', wynik: 'NO_RECOGNIZED_ELEMENTS' });
@@ -553,10 +557,26 @@ true;
         return !!gdpr.checked;
     }
     function zaznaczCheckbox() {
+        var ok = false;
+        // Unilever: zgoda to często HIDDEN input value=0 → ustaw 1
+        var ukryte = document.querySelectorAll(
+            'input[name="amgdpr_agreement[statute_ap]"], input[name*="amgdpr_agreement"], input[type="hidden"][name*="gdpr"], input[type="hidden"][name*="statute"]'
+        );
+        for (var h = 0; h < ukryte.length; h++) {
+            try {
+                ukryte[h].value = '1';
+                ukryte[h].setAttribute('value', '1');
+                ukryte[h].dispatchEvent(new Event('input', { bubbles: true }));
+                ukryte[h].dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) {
+                    try { window.jQuery(ukryte[h]).val('1').trigger('change'); } catch (e) {}
+                }
+                ok = true;
+            } catch (e) {}
+        }
         var selektory = [
-            'input[id^="amprivacy-checkbox-"]',
-            'input[name="amgdpr_agreement[statute_ap]"]',
-            'input[name*="amgdpr_agreement"]',
+            'input[type="checkbox"][id^="amprivacy-checkbox-"]',
+            'input[type="checkbox"][name*="amgdpr_agreement"]',
             'input[type="checkbox"][name*="gdpr"]',
             'input[type="checkbox"][name*="privacy"]',
             'input[type="checkbox"][name*="statute"]',
@@ -569,15 +589,14 @@ true;
             '.form-customer-login input[type="checkbox"]',
             '#customer-login-form input[type="checkbox"]'
         ];
-        var ok = false;
         for (var s = 0; s < selektory.length; s++) {
             var lista = document.querySelectorAll(selektory[s]);
             for (var i = 0; i < lista.length; i++) {
                 if (zaznaczJeden(lista[i])) ok = true;
             }
         }
-        // Etykiety z tekstem polityki / regulaminu
-        var labels = document.querySelectorAll('label, .amprivacy-checkbox, .statute-info');
+        // Etykiety / klikalne bloki regulaminu
+        var labels = document.querySelectorAll('label, .amprivacy-checkbox, .statute-info, .amgdpr-checkbox, [data-amgdpr-js]');
         for (var L = 0; L < labels.length; L++) {
             var txt = ((labels[L].textContent || '') + '').toLowerCase();
             if (txt.indexOf('polityk') >= 0 || txt.indexOf('regulamin') >= 0 ||
