@@ -122,13 +122,6 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Połącz telefon rodziny — automatyczny, bezpieczny przekaz kodów SMS przez Firebase.",
-            color = TekstDrugi,
-            fontSize = 14.sp,
-            lineHeight = 20.sp
-        )
         Spacer(modifier = Modifier.height(22.dp))
 
         SzkloKarta {
@@ -145,21 +138,18 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(12.dp))
 
             if (kod.isNotBlank()) {
+                val trescQr = "${StaleFirebase.PREFIX_QR}$kod"
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    KodQrParowania(tresc = trescQr, rozmiar = 220.dp)
+                }
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = kod.chunked(4).joinToString(" "),
                     color = TekstGlowny,
-                    fontSize = 28.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 2.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${StaleFirebase.PREFIX_QR}$kod",
-                    color = TekstDrugi,
-                    fontSize = 11.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -183,7 +173,7 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
                 }
             } else {
                 Text(
-                    text = "Wygeneruj kod i podaj go na telefonie rodziny / znajomych.",
+                    text = "Wygeneruj kod i zeskanuj go na drugim telefonie.",
                     color = TekstDrugi,
                     fontSize = 13.sp,
                     lineHeight = 18.sp
@@ -235,9 +225,9 @@ fun EkranUrzadzen(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = if (aktywne) {
-                    "Aktywny — przy auto-logowaniu kod SMS trafia zaszyfrowanym kanałem Firebase tylko do sparowanych urządzeń (sam kod, bez treści wiadomości)."
+                    "Aktywny — przy logowaniu kod SMS trafia tylko do sparowanych urządzeń (sam kod, bez treści wiadomości)."
                 } else {
-                    "Włącz parowanie, żeby rodzina dostawała kody SMS automatycznie."
+                    "Włącz parowanie, żeby sparowane urządzenia dostawały kody SMS automatycznie."
                 },
                 color = TekstDrugi,
                 fontSize = 13.sp,

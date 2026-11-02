@@ -8,8 +8,8 @@ import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
 
 /**
- * Osobna instancja Firebase „sklepik” (bez google-services.json) —
- * ta sama baza co Harmonogram.
+ * Własna instancja Firebase projektu sklepunilever-app
+ * (inicjalizacja ręczna, bez google-services plugin).
  */
 object FirebaseSklepik {
 

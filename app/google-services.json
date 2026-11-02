@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "10704936907",
+    "project_id": "sklepunilever-app",
+    "storage_bucket": "sklepunilever-app.firebasestorage.app",
+    "firebase_url": "https://sklepunilever-app-default-rtdb.europe-west1.firebasedatabase.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10704936907:android:101d45c96a9c9df8cee04e",
+        "android_client_info": {
+          "package_name": "shopunilever.dominik.pl"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDh3LsPO5qiGPbkxRuXRe43TcZzgBqVUK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

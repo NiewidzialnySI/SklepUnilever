@@ -1,0 +1,44 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "transmitters": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "accessRequests": {
+          "$reqId": {
+            ".read": "auth != null && (auth.uid == $uid || data.child('requesterUid').val() == auth.uid)",
+            ".write": "auth != null && (auth.uid == $uid || (!data.exists() && newData.child('requesterUid').val() == auth.uid))"
+          }
+        },
+        "receivers": {
+          "$receiverId": {
+            ".read": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)",
+            ".write": "auth != null && (auth.uid == $uid || auth.uid == $receiverId)"
+          }
+        },
+        "credentials": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists())",
+          ".write": "auth != null && auth.uid == $uid"
+        },
+        "smsRelay": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('transmitters').child($uid).child('receivers').child(auth.uid).exists())",
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    },
+    "pairing_codes": {
+      "$kod": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "receiver_sessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
