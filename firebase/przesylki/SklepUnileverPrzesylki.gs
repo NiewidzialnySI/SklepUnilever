@@ -1,20 +1,69 @@
 /**
- * Sklep Unilever - przetwarzanie maili UPS/DHL z Gmaila
- * Tryb SPARK (bez Cloud Function) - zapis bezposrednio do Firebase RTDB.
+ * Sklep Unilever - maile UPS/DHL -> Firebase RTDB
  *
- * Wklej CALOSC do https://script.google.com (plik Kod.gs).
- * Instrukcja: firebase/przesylki/INSTALACJA.md
+ * ============================================================
+ * JAK USTAWIC KLUCZ (WAZNE - NIE WKLEJAJ JSON DO TEGO PLIKU)
+ * ============================================================
+ * 1. Pobierz JSON z Firebase (Service accounts -> Generuj klucz).
+ * 2. W Apps Script kliknij IKONE ZEBATKI (Ustawienia projektu) PO LEWEJ.
+ * 3. Przewin w dol do "Wlasciwosci skryptu" -> "Dodaj wlasciwosc skryptu".
+ * 4. Pole "Wlasciwosc" (nazwa):   FIREBASE_SA_JSON
+ * 5. Pole "Wartosc":              wklej CALY plik JSON (Ctrl+A w pliku .json)
+ * 6. Zapisz wlasciwosci.
+ * 7. Uruchom funkcje:  KROK1_sprawdzKonfiguracje
+ * 8. Jak log = OK, uruchom:      KROK2_zainstalujTrigger
+ * 9. Potem opcjonalnie:          testReczny
  *
- * Zapis: /transmitters/{transmitterUid}/shipments/{id}
- * Mapowanie: /pairing_codes/{KOD}.transmitterUid
+ * NIE wklejaj JSON obok var / function - bedzie blad skladni.
+ * NIE wysylaj JSON na czat.
+ * ============================================================
  */
 
 var ETYKIETA_PRZETWORZONE = 'SklepUnileverPrzetworzone';
 var RTDB_URL = 'https://sklepunilever-app-default-rtdb.europe-west1.firebasedatabase.app';
 
-var WLASCIWOSCI = {
-  FIREBASE_SA_JSON: 'FIREBASE_SA_JSON'
-};
+/** Nazwa wlasciwosci w Ustawieniach projektu - TO NIE JEST JSON. */
+var NAZWA_WLASCIWOSCI_SA = 'FIREBASE_SA_JSON';
+
+/** Uruchom TO NAJPIERW - sprawdzi czy klucz jest we wlasciwosciach. */
+function KROK1_sprawdzKonfiguracje() {
+  var raw = PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_SA);
+  if (!raw) {
+    Logger.log('BRAK KLUCZA.');
+    Logger.log('Zrob tak:');
+    Logger.log('1) Zebatka (Ustawienia projektu) po lewej');
+    Logger.log('2) Wlasciwosci skryptu -> Dodaj wlasciwosc skryptu');
+    Logger.log('3) Wlasciwosc = FIREBASE_SA_JSON');
+    Logger.log('4) Wartosc = caly JSON z Firebase (wklej tutaj, NIE do Kod.gs)');
+    Logger.log('5) Zapisz, potem uruchom KROK1_sprawdzKonfiguracje jeszcze raz');
+    return;
+  }
+  try {
+    var sa = JSON.parse(raw);
+    if (!sa.private_key || !sa.client_email) {
+      Logger.log('JSON jest, ale brak private_key lub client_email - wklej CALY plik JSON do Wartosci.');
+      return;
+    }
+    if (sa.project_id && sa.project_id !== 'sklepunilever-app') {
+      Logger.log('UWAGA: project_id=' + sa.project_id + ' (oczekiwane: sklepunilever-app)');
+    }
+    Logger.log('OK - klucz SA znaleziony we wlasciwosciach.');
+    Logger.log('client_email: ' + sa.client_email);
+    Logger.log('Teraz uruchom: KROK2_zainstalujTrigger');
+  } catch (e) {
+    Logger.log('Wartosc FIREBASE_SA_JSON nie jest poprawnym JSON: ' + e);
+    Logger.log('Wklej caly plik .json do pola Wartosc (nie do Kod.gs).');
+  }
+}
+
+/** Uruchom PO KROK1 (gdy log = OK). */
+function KROK2_zainstalujTrigger() {
+  if (!PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_SA)) {
+    Logger.log('Najpierw ustaw klucz - uruchom KROK1_sprawdzKonfiguracje');
+    return;
+  }
+  zainstalujTrigger();
+}
 
 function zainstalujTrigger() {
   var istniejace = ScriptApp.getProjectTriggers();
@@ -28,7 +77,7 @@ function zainstalujTrigger() {
     .everyMinutes(5)
     .create();
   utworzEtykieteJesliBrak();
-  Logger.log('Trigger co 5 min - OK. Ustaw FIREBASE_SA_JSON w Wlasciwosciach skryptu.');
+  Logger.log('Trigger co 5 min - OK.');
 }
 
 function testReczny() {
@@ -36,8 +85,8 @@ function testReczny() {
 }
 
 function przetworzNoweMaile(reczny) {
-  if (!PropertiesService.getScriptProperties().getProperty(WLASCIWOSCI.FIREBASE_SA_JSON)) {
-    Logger.log('Brak FIREBASE_SA_JSON w Wlasciwosciach skryptu.');
+  if (!PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_SA)) {
+    Logger.log('Brak FIREBASE_SA_JSON we Wlasciwosciach skryptu. Uruchom KROK1_sprawdzKonfiguracje');
     return;
   }
 
@@ -144,7 +193,7 @@ function przetworzWiadomosc(wiadomosc) {
 }
 
 function pobierzTokenFirebase() {
-  var sa = JSON.parse(PropertiesService.getScriptProperties().getProperty(WLASCIWOSCI.FIREBASE_SA_JSON));
+  var sa = JSON.parse(PropertiesService.getScriptProperties().getProperty(NAZWA_WLASCIWOSCI_SA));
   var header = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=+$/, '');
   var now = Math.floor(Date.now() / 1000);
   var claim = Utilities.base64EncodeWebSafe(JSON.stringify({
