@@ -173,17 +173,6 @@ fun EkranUprawnien(
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (rola == RolaUzytkownika.PRACOWNIK) {
-                        "Te zgody są potrzebne do auto-logowania, syncu SMS i aktualizacji."
-                    } else {
-                        "Te zgody są potrzebne do powiadomień o dostępie i aktualizacji aplikacji."
-                    },
-                    color = TekstDrugi,
-                    fontSize = 15.sp,
-                    lineHeight = 21.sp
-                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -291,17 +280,6 @@ fun EkranUprawnien(
                     fontSize = 16.sp
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = if (wymaganeOk) {
-                    "Możesz wejść — instalację aktualizacji włączysz później."
-                } else {
-                    "Aby wejść dalej, włącz wymagane uprawnienia."
-                },
-                color = TekstDrugi,
-                fontSize = 12.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
         }
     }
 }
