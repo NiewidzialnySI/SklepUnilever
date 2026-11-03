@@ -166,25 +166,17 @@ object SerwisPrzesylek {
     }
 
     /**
-     * Kanoniczne deep-linki PL (Shoper / najszybsza.pl / gist przemoc):
-     * UPS → wwwapps.ups.com/WebTracking
-     * DHL → mojdhl.pl (krajowe) / sprawdz.dhl.com.pl
+     * Deep-linki śledzenia PL:
+     * UPS → www.ups.com/track (stary wwwapps bywa pusty)
+     * DHL eCommerce → sprawdz.dhl.com.pl/laststatus (mojdhl.pl/paczki/dostawa → login)
      */
     fun zbudujLinkSledzenia(kurier: String, numer: String, zapisany: String? = null): String {
         val n = numer.trim()
         if (n.isBlank()) return zapisany.orEmpty()
         val enc = Uri.encode(n)
         return when (kurier.lowercase().trim()) {
-            "ups" -> "https://wwwapps.ups.com/WebTracking?loc=pl_PL&tracknum=$enc"
-            "dhl" -> {
-                val krajowy = n.matches(Regex("""(?i)JJD[A-Z0-9]{10,}""")) ||
-                    n.matches(Regex("""\d{10,14}"""))
-                if (krajowy) {
-                    "https://mojdhl.pl/paczki/dostawa/$enc"
-                } else {
-                    "https://sprawdz.dhl.com.pl/szukaj.aspx?m=0&sn=$enc"
-                }
-            }
+            "ups" -> "https://www.ups.com/track?loc=pl_PL&tracknum=$enc"
+            "dhl" -> "https://sprawdz.dhl.com.pl/laststatus.aspx?NR1=$enc"
             else -> zapisany?.takeIf { it.startsWith("http") }.orEmpty()
         }
     }

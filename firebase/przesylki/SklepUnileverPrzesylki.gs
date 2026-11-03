@@ -584,9 +584,11 @@ function wyciagnijPinOdbioru(tekst) {
 function wyciagnijTelefonKuriera(tekst) {
   var t = normalizujTrescMaila(tekst);
   var m =
-    t.match(/Kontakt do kuriera\s*[:.]?\s*(\d{9,11})/i) ||
-    t.match(/telefon(?:\s+kuriera)?\s*[:.]?\s*(\d{9,11})/i);
-  return m ? m[1] : null;
+    t.match(/Kontakt do kuriera\s*[:.]?\s*(\+?\d[\d\s-]{7,14}\d)/i) ||
+    t.match(/telefon(?:\s+kuriera)?\s*[:.]?\s*(\+?\d[\d\s-]{7,14}\d)/i) ||
+    t.match(/kurier[^\d]{0,40}(\d{9})\b/i);
+  if (!m) return null;
+  return String(m[1]).replace(/[\s-]/g, '');
 }
 
 function wyciagnijNadawcePaczki(tekst) {
@@ -631,14 +633,12 @@ function filtrujZagniezdzoneNumery(wyniki) {
 }
 
 function wyciagnijLinkSledzenia(tekst, kurier, numer) {
-  // Kanoniczne deep-linki PL (Shoper / najszybsza.pl) — apka i tak przebudowuje link przy otwarciu
+  // Apka i tak przebudowuje link — tu zapisujemy działające URL-e
   if (kurier === 'ups') {
-    return 'https://wwwapps.ups.com/WebTracking?loc=pl_PL&tracknum=' + encodeURIComponent(numer);
+    return 'https://www.ups.com/track?loc=pl_PL&tracknum=' + encodeURIComponent(numer);
   }
-  if (/^JJD/i.test(numer) || /^\d{10,14}$/.test(numer)) {
-    return 'https://mojdhl.pl/paczki/dostawa/' + encodeURIComponent(numer);
-  }
-  return 'https://sprawdz.dhl.com.pl/szukaj.aspx?m=0&sn=' + encodeURIComponent(numer);
+  // mojdhl.pl/paczki/dostawa → login; laststatus wypełnia numer i pokazuje status
+  return 'https://sprawdz.dhl.com.pl/laststatus.aspx?NR1=' + encodeURIComponent(numer);
 }
 
 function wyciagnijSzacowanaDostawe(tekst) {

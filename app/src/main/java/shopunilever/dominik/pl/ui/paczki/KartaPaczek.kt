@@ -1,7 +1,11 @@
 package shopunilever.dominik.pl.ui.paczki
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -29,12 +33,15 @@ import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.LocalShipping
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Unarchive
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -317,6 +324,16 @@ private fun WierszPaczki(
     onAkcja: () -> Unit,
     onUsunNaZawsze: (() -> Unit)? = null
 ) {
+    var dialogTelefon by remember { mutableStateOf<String?>(null) }
+    val telefon = przesylka.telefonKuriera?.filter { it.isDigit() || it == '+' }?.takeIf { it.length >= 9 }
+
+    if (dialogTelefon != null) {
+        DialogNumeruKuriera(
+            numer = dialogTelefon!!,
+            onZamknij = { dialogTelefon = null }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -374,9 +391,32 @@ private fun WierszPaczki(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            if (telefon != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { dialogTelefon = telefon }
+                        .padding(vertical = 2.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.Phone,
+                        contentDescription = null,
+                        tint = AkcentMorski,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Text(
+                        text = "Kurier: $telefon",
+                        color = AkcentMorski,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        maxLines = 1
+                    )
+                }
+            }
             val podtytul = listOfNotNull(
                 przesylka.statusTekst?.takeIf { it.isNotBlank() },
-                przesylka.telefonKuriera?.takeIf { it.isNotBlank() }?.let { "Kurier: $it" },
                 przesylka.nadawcaPaczki?.takeIf { it.isNotBlank() }
             ).firstOrNull() ?: przesylka.temat.ifBlank { "Śledzenie" }
             Text(
@@ -415,11 +455,86 @@ private fun WierszPaczki(
     }
 }
 
-private fun otworzSledzenie(kontekst: android.content.Context, p: PrzesylkaPaczki) {
+@Composable
+private fun DialogNumeruKuriera(
+    numer: String,
+    onZamknij: () -> Unit
+) {
+    val kontekst = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onZamknij,
+        title = { Text("Kurier", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                text = numer,
+                color = TekstGlowny,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                letterSpacing = 1.sp
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    zadzwonDoKuriera(kontekst, numer)
+                    onZamknij()
+                }
+            ) { Text("Zadzwoń", color = AkcentNeon) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(
+                    onClick = {
+                        kopiujNumer(kontekst, numer)
+                        onZamknij()
+                    }
+                ) { Text("Kopiuj", color = TekstDrugi) }
+                TextButton(
+                    onClick = {
+                        smsDoKuriera(kontekst, numer)
+                        onZamknij()
+                    }
+                ) { Text("SMS", color = TekstDrugi) }
+            }
+        }
+    )
+}
+
+private fun otworzSledzenie(kontekst: Context, p: PrzesylkaPaczki) {
     val link = p.linkDoOtwarcia().takeIf { it.isNotBlank() } ?: return
     runCatching {
         kontekst.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
+}
+
+private fun zadzwonDoKuriera(kontekst: Context, numer: String) {
+    val tel = numer.filter { it.isDigit() || it == '+' }
+    runCatching {
+        kontekst.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_DIAL, Uri.parse("tel:$tel")),
+                "Zadzwoń do kuriera"
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+}
+
+private fun smsDoKuriera(kontekst: Context, numer: String) {
+    val tel = numer.filter { it.isDigit() || it == '+' }
+    runCatching {
+        kontekst.startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:$tel")),
+                "SMS do kuriera"
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }
+}
+
+private fun kopiujNumer(kontekst: Context, numer: String) {
+    val cm = kontekst.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText("telefon_kuriera", numer))
+    Toast.makeText(kontekst, "Skopiowano $numer", Toast.LENGTH_SHORT).show()
 }
