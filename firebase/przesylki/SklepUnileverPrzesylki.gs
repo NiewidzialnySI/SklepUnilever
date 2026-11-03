@@ -643,28 +643,38 @@ function wyciagnijLinkSledzenia(tekst, kurier, numer) {
 
 function wyciagnijSzacowanaDostawe(tekst) {
   var t = normalizujTrescMaila(tekst);
+  // DHL: "Planowane doręczenie 22.10.2026 w godzinach 11:00 - 13:00"
   var zGodzinami = t.match(
-    /Planowane dor[e\u0119]czenie\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s*w godzinach\s*(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/i
+    /Planowane dor[e\u0119]czenie\s*[:.]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s*(?:w\s+godzinach\s*)?(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/i
   );
   if (zGodzinami) {
-    return (zGodzinami[1] + ' ' + zGodzinami[2]).replace(/\//g, '-');
+    return formatujOknoDoreczenia(zGodzinami[1], zGodzinami[2]);
   }
+  // Data i osobno "w godzinach 11:00 - 13:00" (HTML / forward)
+  var dataSama =
+    t.match(/Planowane dor[e\u0119]czenie\s*[:.]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i) ||
+    t.match(/dor[e\u0119]czenie\s*[:.]?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i);
+  var godziny = t.match(/w\s+godzinach\s*(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/i);
+  if (dataSama && godziny) {
+    return formatujOknoDoreczenia(dataSama[1], godziny[1]);
+  }
+  if (dataSama) return dataSama[1].replace(/\//g, '-');
   var wzorce = [
-    /Planowane dor[e\u0119]czenie\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
-    /dor[e\u0119]czenie\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s*w godzinach\s*(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/i,
     /Dor[e\u0119]czenie\s+\S+\s+(\d{2}\/\d{2}\/\d{4})/i,
-    /(?:delivery|dostaw[a\u0105])\s*(?:on|date|:|-)?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
-    /(\d{4}-\d{2}-\d{2})/
+    /(?:delivery|dostaw[a\u0105])\s*(?:on|date|:|-)?\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})(?:\s*(?:by|do|between)?\s*(\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?))?/i,
+    /(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?))?/
   ];
   for (var i = 0; i < wzorce.length; i++) {
     var m = t.match(wzorce[i]);
-    if (m && m[1]) {
-      var out = m[1].replace(/\//g, '-');
-      if (m[2]) out += ' ' + m[2];
-      return out;
-    }
+    if (m && m[1]) return formatujOknoDoreczenia(m[1], m[2]);
   }
   return null;
+}
+
+function formatujOknoDoreczenia(data, godziny) {
+  var out = String(data).replace(/\//g, '-').trim();
+  if (godziny) out += ' ' + String(godziny).replace(/\s*–\s*/g, ' - ').replace(/\s+/g, ' ').trim();
+  return out;
 }
 
 function wyciagnijFragmentStatusu(tekst, subject) {

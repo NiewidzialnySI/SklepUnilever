@@ -327,9 +327,19 @@ private fun WierszPaczki(
                     maxLines = 1
                 )
             }
+            val oknoDoreczenia = przesylka.szacowanaDostawa?.takeIf { it.isNotBlank() }
+            if (oknoDoreczenia != null) {
+                Text(
+                    text = "Doręczenie: $oknoDoreczenia",
+                    color = Ostrzezenie,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             val podtytul = listOfNotNull(
                 przesylka.statusTekst?.takeIf { it.isNotBlank() },
-                przesylka.szacowanaDostawa?.takeIf { it.isNotBlank() }?.let { "Dostawa: $it" },
                 przesylka.telefonKuriera?.takeIf { it.isNotBlank() }?.let { "Kurier: $it" },
                 przesylka.nadawcaPaczki?.takeIf { it.isNotBlank() }
             ).firstOrNull() ?: przesylka.temat.ifBlank { "Śledzenie" }
