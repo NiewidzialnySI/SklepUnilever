@@ -2,6 +2,11 @@ package shopunilever.dominik.pl.ui.paczki
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,7 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.LocalShipping
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -30,7 +35,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import shopunilever.dominik.pl.firebase.PrzesylkaPaczki
@@ -61,7 +64,7 @@ import shopunilever.dominik.pl.ui.theme.TekstDrugi
 import shopunilever.dominik.pl.ui.theme.TekstGlowny
 
 /**
- * Kafelek PACZKI — aktywne + archiwum (pracownik i znajomi).
+ * Kafelek PACZKI — aktywne + archiwum rozwijane pod spodem (bez dialogu).
  * Usunięcie = przeniesienie do archiwum.
  */
 @Composable
@@ -80,6 +83,7 @@ fun KartaPaczek(
         if (!aktywneParowanie) {
             paczki = emptyList()
             archiwum = emptyList()
+            pokazArchiwum = false
             return@LaunchedEffect
         }
         launch {
@@ -90,184 +94,216 @@ fun KartaPaczek(
         }
     }
 
-    if (pokazArchiwum) {
-        DialogArchiwumPaczek(
-            lista = archiwum,
-            onZamknij = { pokazArchiwum = false },
-            onPrzywroc = { id ->
-                zakres.launch { runCatching { SerwisPrzesylek.przywroc(kontekst, id) } }
-            },
-            onUsunNaZawsze = { id ->
-                zakres.launch { runCatching { SerwisPrzesylek.usunZArchiwum(kontekst, id) } }
-            },
-            onOtworz = { p -> otworzSledzenie(kontekst, p) }
-        )
-    }
-
-    SzkloKarta(modifier = modifier) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 40.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
+    Column(modifier = modifier.fillMaxWidth()) {
+        SzkloKarta {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Row(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(AkcentMorski.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(end = 40.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(AkcentMorski.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Inventory2,
+                            contentDescription = null,
+                            tint = AkcentMorski,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "PACZKI",
+                            color = AkcentNeon,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.4.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = when {
+                                !aktywneParowanie -> "Brak połączenia"
+                                paczki.isEmpty() -> "Brak aktywnych paczek"
+                                else -> "${paczki.size} · ${paczki.count { !it.odczytano }} nowych"
+                            },
+                            color = TekstGlowny,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { pokazArchiwum = !pokazArchiwum },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(40.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = AkcentMorski,
+                        if (pokazArchiwum) Icons.Rounded.ExpandLess else Icons.Rounded.Unarchive,
+                        contentDescription = if (pokazArchiwum) "Zwiń archiwum" else "Archiwum",
+                        tint = when {
+                            pokazArchiwum -> AkcentNeon
+                            archiwum.isNotEmpty() -> AkcentNeon
+                            else -> TekstDrugi
+                        },
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                Column(modifier = Modifier.weight(1f)) {
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            when {
+                !aktywneParowanie -> {
                     Text(
-                        text = "PACZKI",
-                        color = AkcentNeon,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.4.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = when {
-                            !aktywneParowanie -> "Brak połączenia"
-                            paczki.isEmpty() -> "Brak aktywnych paczek"
-                            else -> "${paczki.size} · ${paczki.count { !it.odczytano }} nowych"
-                        },
-                        color = TekstGlowny,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        text = "Połącz urządzenia, aby widzieć przesyłki UPS/DHL.",
+                        color = TekstDrugi,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
                     )
                 }
-            }
-            IconButton(
-                onClick = { pokazArchiwum = true },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(40.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.Unarchive,
-                    contentDescription = "Archiwum",
-                    tint = if (archiwum.isNotEmpty()) AkcentNeon else TekstDrugi,
-                    modifier = Modifier.size(22.dp)
-                )
+                paczki.isEmpty() -> {
+                    Text(
+                        text = if (podpowiedzKod.isNotBlank()) {
+                            "Brak paczek. Kurier: adres Gmail z +$podpowiedzKod."
+                        } else {
+                            "Brak aktywnych paczek"
+                        },
+                        color = TekstDrugi,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
+                else -> {
+                    paczki.take(12).forEachIndexed { indeks, p ->
+                        if (indeks > 0) {
+                            HorizontalDivider(
+                                color = RamkaKarty,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                        WierszPaczki(
+                            przesylka = p,
+                            archiwum = false,
+                            onOtworz = {
+                                otworzSledzenie(kontekst, p)
+                                if (!p.odczytano) {
+                                    zakres.launch {
+                                        runCatching { SerwisPrzesylek.oznaczOdczytana(kontekst, p.id) }
+                                    }
+                                }
+                            },
+                            onAkcja = {
+                                zakres.launch {
+                                    runCatching { SerwisPrzesylek.archiwizuj(kontekst, p.id) }
+                                }
+                            }
+                        )
+                    }
+                    if (paczki.size > 12) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "+${paczki.size - 12} starszych",
+                            color = TekstDrugi,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-        when {
-            !aktywneParowanie -> {
-                Text(
-                    text = "Połącz urządzenia, aby widzieć przesyłki UPS/DHL.",
-                    color = TekstDrugi,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-            }
-            paczki.isEmpty() -> {
-                Text(
-                    text = if (podpowiedzKod.isNotBlank()) {
-                        "Brak paczek. Kurier: adres Gmail z +$podpowiedzKod."
-                    } else {
-                        "Brak aktywnych paczek"
+        AnimatedVisibility(
+            visible = pokazArchiwum,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                PanelArchiwumPaczek(
+                    lista = archiwum,
+                    onZwin = { pokazArchiwum = false },
+                    onPrzywroc = { id ->
+                        zakres.launch { runCatching { SerwisPrzesylek.przywroc(kontekst, id) } }
                     },
-                    color = TekstDrugi,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    onUsunNaZawsze = { id ->
+                        zakres.launch { runCatching { SerwisPrzesylek.usunZArchiwum(kontekst, id) } }
+                    },
+                    onOtworz = { p -> otworzSledzenie(kontekst, p) }
                 )
-            }
-            else -> {
-                paczki.take(12).forEachIndexed { indeks, p ->
-                    if (indeks > 0) {
-                        HorizontalDivider(
-                            color = RamkaKarty,
-                            modifier = Modifier.padding(vertical = 6.dp)
-                        )
-                    }
-                    WierszPaczki(
-                        przesylka = p,
-                        archiwum = false,
-                        onOtworz = {
-                            otworzSledzenie(kontekst, p)
-                            if (!p.odczytano) {
-                                zakres.launch {
-                                    runCatching { SerwisPrzesylek.oznaczOdczytana(kontekst, p.id) }
-                                }
-                            }
-                        },
-                        onAkcja = {
-                            zakres.launch {
-                                runCatching { SerwisPrzesylek.archiwizuj(kontekst, p.id) }
-                            }
-                        }
-                    )
-                }
-                if (paczki.size > 12) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "+${paczki.size - 12} starszych",
-                        color = TekstDrugi,
-                        fontSize = 12.sp
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun DialogArchiwumPaczek(
+private fun PanelArchiwumPaczek(
     lista: List<PrzesylkaPaczki>,
-    onZamknij: () -> Unit,
+    onZwin: () -> Unit,
     onPrzywroc: (String) -> Unit,
     onUsunNaZawsze: (String) -> Unit,
     onOtworz: (PrzesylkaPaczki) -> Unit
 ) {
-    Dialog(onDismissRequest = onZamknij) {
-        SzkloKarta {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+    SzkloKarta {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Archiwum",
+                    text = "ARCHIWUM",
+                    color = AkcentNeon,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (lista.isEmpty()) "Pusto" else "${lista.size} paczek",
                     color = TekstGlowny,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    modifier = Modifier.weight(1f)
+                    fontSize = 15.sp
                 )
-                IconButton(onClick = onZamknij) {
-                    Icon(Icons.Rounded.Close, "Zamknij", tint = TekstDrugi)
-                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            if (lista.isEmpty()) {
-                Text("Pusto", color = TekstDrugi, fontSize = 14.sp)
-            } else {
-                LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                    items(lista, key = { it.id }) { p ->
-                        WierszPaczki(
-                            przesylka = p,
-                            archiwum = true,
-                            onOtworz = { onOtworz(p) },
-                            onAkcja = { onPrzywroc(p.id) },
-                            onUsunNaZawsze = { onUsunNaZawsze(p.id) }
-                        )
-                        HorizontalDivider(color = RamkaKarty, modifier = Modifier.padding(vertical = 4.dp))
-                    }
-                }
+            IconButton(onClick = onZwin, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Rounded.Close, contentDescription = "Zwiń", tint = TekstDrugi)
             }
-            TextButton(onClick = onZamknij) {
-                Text("Zamknij", color = AkcentNeon)
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (lista.isEmpty()) {
+            Text(
+                text = "Brak zarchiwizowanych paczek",
+                color = TekstDrugi,
+                fontSize = 13.sp
+            )
+        } else {
+            // Stała wysokość — przewija się tylko ta lista, reszta ekranu zostaje
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(260.dp),
+                userScrollEnabled = true
+            ) {
+                items(lista, key = { it.id }) { p ->
+                    WierszPaczki(
+                        przesylka = p,
+                        archiwum = true,
+                        onOtworz = { onOtworz(p) },
+                        onAkcja = { onPrzywroc(p.id) },
+                        onUsunNaZawsze = { onUsunNaZawsze(p.id) }
+                    )
+                    HorizontalDivider(
+                        color = RamkaKarty,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
             }
         }
     }
