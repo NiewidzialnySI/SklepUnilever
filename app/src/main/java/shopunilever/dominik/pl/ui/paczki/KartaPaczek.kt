@@ -316,9 +316,21 @@ private fun WierszPaczki(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            val pin = przesylka.pinOdbioru?.takeIf { it.isNotBlank() }
+            if (pin != null) {
+                Text(
+                    text = "PIN: $pin",
+                    color = AkcentNeon,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    letterSpacing = 1.2.sp,
+                    maxLines = 1
+                )
+            }
             val podtytul = listOfNotNull(
                 przesylka.statusTekst?.takeIf { it.isNotBlank() },
                 przesylka.szacowanaDostawa?.takeIf { it.isNotBlank() }?.let { "Dostawa: $it" },
+                przesylka.telefonKuriera?.takeIf { it.isNotBlank() }?.let { "Kurier: $it" },
                 przesylka.nadawcaPaczki?.takeIf { it.isNotBlank() }
             ).firstOrNull() ?: przesylka.temat.ifBlank { "Śledzenie" }
             Text(

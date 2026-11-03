@@ -22,6 +22,8 @@ data class PrzesylkaPaczki(
     val szacowanaDostawa: String?,
     val linkSledzenia: String?,
     val nadawcaPaczki: String?,
+    val pinOdbioru: String? = null,
+    val telefonKuriera: String? = null,
     val dodano: Long,
     val dataMaila: Long,
     val odczytano: Boolean,
@@ -89,6 +91,10 @@ object SerwisPrzesylek {
             szacowanaDostawa = dziecko.child("szacowanaDostawa").getValue(String::class.java),
             linkSledzenia = dziecko.child("linkSledzenia").getValue(String::class.java),
             nadawcaPaczki = dziecko.child("nadawcaPaczki").getValue(String::class.java),
+            pinOdbioru = dziecko.child("pinOdbioru").getValue(String::class.java)
+                ?.takeIf { it.isNotBlank() },
+            telefonKuriera = dziecko.child("telefonKuriera").getValue(String::class.java)
+                ?.takeIf { it.isNotBlank() },
             dodano = dziecko.child("dodano").getValue(Long::class.java) ?: 0L,
             dataMaila = dziecko.child("dataMaila").getValue(Long::class.java) ?: 0L,
             odczytano = dziecko.child("odczytano").getValue(Boolean::class.java) == true,

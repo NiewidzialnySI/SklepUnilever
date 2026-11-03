@@ -62,7 +62,18 @@ Wdróż reguły:
 firebase deploy --only database
 ```
 
+## Forwardy (Outlook / Unilever)
+
+Skrypt łapie też **przekazane** maile DHL/UPS (From = pracownik, nie kurier):
+`from:unilever.com`, `to:sklepik.unilever.paczki`, tematy `Powiadomienie` / `[External]`, treść `PIN do odbioru`.
+
+Po wklejeniu nowej wersji `.gs` uruchom w edytorze **`odblokujIPrzetworz`** — zdejmie starą etykietę z ostatnich 14 dni i przetworzy maile ponownie (w tym PIN).
+
+## PIN odbioru
+
+Z treści DHL wyciągane są `pinOdbioru` i `telefonKuriera` → RTDB → kafelek PACZKI w apce (linia **PIN: 828078**).
+
 ## Aplikacja
 
 Na ekranie **Dom** (pracownik) sekcja **PACZKI** pokazuje listę z RTDB na żywo.  
-Tap = otwarcie linku śledzenia; nieprzeczytane oznaczane po otwarciu.
+Tap = otwarcie linku śledzenia; nieprzeczytane oznaczane po otwarciu. PIN z maila DHL wyświetla się na kafelku.
