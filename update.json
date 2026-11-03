@@ -1,6 +1,6 @@
 {
-  "versionCode": 18,
-  "versionName": "1.0.17",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.17/sklep-unilever-v1.0.17.apk",
-  "changelog": "Fix auto-update + paczki. Zainstaluj raz recznie z linku Releases, potem update znowu dziala."
+  "versionCode": 19,
+  "versionName": "1.0.18",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.18/sklep-unilever-v1.0.18.apk",
+  "changelog": "PIN odbioru z DHL + planowane doreczenie (data i godziny). Forwardy z Outlooka znowu sie lapia."
 }
