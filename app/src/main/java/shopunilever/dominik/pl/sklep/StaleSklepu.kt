@@ -9,9 +9,52 @@ object StaleSklepu {
     const val URL_MARKET = URL_GLOWNA
     const val HOST_SKLEPU = "sklepfirmowyunilever.pl"
 
+    /**
+     * Hosty bramki płatności sklepiku (PayU + typowe przekierowania BLIK/3DS/bank).
+     * Bez tej listy WebView odcina „Zapłać” i wraca na stronę główną.
+     */
+    private val HOSTY_BRAMKI_PLATNOSCI = listOf(
+        "payu.com",
+        "payu.pl",
+        "secure.payu.com",
+        "przelewy24.pl",
+        "p24.pl",
+        "paypal.com",
+        "paypal.pl",
+        "tpay.com",
+        "dotpay.pl",
+        "imoje.pl",
+        "blik.com",
+        "blik.pl",
+        "cardinalcommerce.com",
+        "3dsecure"
+    )
+
     fun czyUrlSklepu(url: String?): Boolean {
         val u = url?.lowercase().orEmpty()
         return u.contains(HOST_SKLEPU)
+    }
+
+    /** Zewnętrzna bramka płatności (PayU itd.) — wolno otworzyć w tym samym WebView. */
+    fun czyUrlBramkiPlatnosci(url: String?): Boolean {
+        val u = url?.lowercase().orEmpty()
+        if (u.isBlank() || u.startsWith("about:")) return false
+        if (czyUrlSklepu(u)) return false
+        return HOSTY_BRAMKI_PLATNOSCI.any { u.contains(it) } ||
+            u.contains("3dsecure") ||
+            u.contains("/acs/") ||
+            u.contains("acs.")
+    }
+
+    /**
+     * Czy WebView może zostać na tym URL zamiast wymuszać powrót na sklep.
+     * [sesjaPlatnosci] = true po wejściu w PayU, żeby przepuścić też strony banków (BLIK/przelew).
+     */
+    fun czyDozwolonaNawigacja(url: String?, sesjaPlatnosci: Boolean): Boolean {
+        if (url.isNullOrBlank()) return true
+        if (czyUrlSklepu(url)) return true
+        if (czyUrlBramkiPlatnosci(url)) return true
+        return sesjaPlatnosci
     }
 
     /** Magento po SMS: /customer/account/login?access-email=… — ekran hasła. */

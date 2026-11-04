@@ -144,11 +144,26 @@ private class StanLogowaniaSklepu(
     var aktualnyUrl by mutableStateOf(StaleSklepu.URL_LOGOWANIA)
         private set
 
+    /**
+     * Po wejściu w PayU/bramkę — true, dopóki nie wrócimy na domenę sklepu.
+     * Dzięki temu kolejne przekierowania banków (BLIK/przelew) nie wracają na główną.
+     */
+    var sesjaPlatnosci by mutableStateOf(false)
+        private set
+
     fun ustawUrl(url: String?) {
         val u = url ?: return
         aktualnyUrlRef.set(u)
+        aktualizujSesjePlatnosci(u)
         // Snapshot Compose tylko gdy UI faktycznie potrzebuje (tytuł nie zależy od URL)
         if (aktualnyUrl != u) aktualnyUrl = u
+    }
+
+    private fun aktualizujSesjePlatnosci(url: String) {
+        when {
+            StaleSklepu.czyUrlBramkiPlatnosci(url) -> sesjaPlatnosci = true
+            StaleSklepu.czyUrlSklepu(url) -> sesjaPlatnosci = false
+        }
     }
 
     fun toast(tekst: String) {
@@ -201,17 +216,28 @@ private class StanLogowaniaSklepu(
         webView?.reload()
     }
 
-    /** Wstecz w obrębie sklepu — nigdy nie zamyka ekranu. */
+    /** Wstecz w obrębie sklepu / bramki płatności — nigdy nie zamyka ekranu. */
     fun obsluzWstecz() {
         val wv = webView ?: return
         if (wv.canGoBack()) {
             wv.goBack()
             wv.postDelayed({
                 val url = wv.url
-                if (!StaleSklepu.czyUrlSklepu(url) || StaleSklepu.czyPodejrzany404(url)) {
+                if (StaleSklepu.czyPodejrzany404(url)) {
+                    wv.loadUrl(StaleSklepu.URL_GLOWNA)
+                    return@postDelayed
+                }
+                // Nie wyrzucaj z PayU/banku z powrotem na główną sklepu
+                if (!StaleSklepu.czyDozwolonaNawigacja(url, sesjaPlatnosci)) {
                     wv.loadUrl(StaleSklepu.URL_GLOWNA)
                 }
             }, 350)
+            return
+        }
+        if (sesjaPlatnosci) {
+            // Koniec historii bramki — wróć do koszyka, nie zamykaj sklepu
+            sesjaPlatnosci = false
+            wv.loadUrl(SkryptyKoszyka.URL_KOSZYKA)
             return
         }
         if (!StaleSklepu.czyGlownaSklepu(aktualnyUrl)) {
@@ -967,8 +993,16 @@ fun EkranWebViewSklepu(
                 onClick = { stan.obsluzWstecz() }
             )
             Text(
-                text = if (stan.trybReczny) "Sklep — tryb ręczny" else "Sklep firmowy",
-                color = if (stan.trybReczny) Ostrzezenie else TekstGlowny,
+                text = when {
+                    stan.sesjaPlatnosci -> "Płatność"
+                    stan.trybReczny -> "Sklep — tryb ręczny"
+                    else -> "Sklep firmowy"
+                },
+                color = when {
+                    stan.sesjaPlatnosci -> AkcentNeon
+                    stan.trybReczny -> Ostrzezenie
+                    else -> TekstGlowny
+                },
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 modifier = Modifier.weight(1f),
@@ -1023,15 +1057,22 @@ fun EkranWebViewSklepu(
                             ): Boolean {
                                 val url = request?.url?.toString().orEmpty()
                                 if (url.isBlank()) return false
-                                if (!StaleSklepu.czyUrlSklepu(url)) {
-                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
-                                    return true
+                                // PayU / banki w sesji płatności — ładuj w tym WebView
+                                if (StaleSklepu.czyDozwolonaNawigacja(url, stan.sesjaPlatnosci)) {
+                                    if (StaleSklepu.czyUrlBramkiPlatnosci(url)) {
+                                        stan.ustawUrl(url)
+                                    }
+                                    if (StaleSklepu.czyUrlSklepu(url) &&
+                                        StaleSklepu.czyPodejrzany404(url)
+                                    ) {
+                                        view?.loadUrl(StaleSklepu.URL_GLOWNA)
+                                        return true
+                                    }
+                                    return false
                                 }
-                                if (StaleSklepu.czyPodejrzany404(url)) {
-                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
-                                    return true
-                                }
-                                return false
+                                // Obcy link poza sklepem i poza płatnością — zostań w sklepie
+                                view?.loadUrl(StaleSklepu.URL_GLOWNA)
+                                return true
                             }
 
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -1043,7 +1084,10 @@ fun EkranWebViewSklepu(
                                     stan.etap = EtapLogowania.LADOWANIE
                                     stan.status = "Ładowanie…"
                                 }
-                                view?.evaluateJavascript(SkryptySklepu.MOSTEK, null)
+                                // Mostek JS tylko na domenie sklepu (nie na PayU)
+                                if (StaleSklepu.czyUrlSklepu(url)) {
+                                    view?.evaluateJavascript(SkryptySklepu.MOSTEK, null)
+                                }
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
@@ -1052,8 +1096,8 @@ fun EkranWebViewSklepu(
                                     stan.napraw404JesliTrzeba(url)
                                     return
                                 }
-                                if (!StaleSklepu.czyUrlSklepu(url) && stan.zalogowany.get()) {
-                                    view?.loadUrl(StaleSklepu.URL_GLOWNA)
+                                // Bramka PayU / bank: nie wracaj na główną sklepu
+                                if (!StaleSklepu.czyUrlSklepu(url)) {
                                     return
                                 }
                                 // Po udanym logowaniu Magento samo prowadzi na sklep —
@@ -1165,14 +1209,19 @@ fun EkranWebViewSklepu(
         }
 
         // miejsce na wysokość dolnego paska (panel nakłada się overlayem)
-        Spacer(modifier = Modifier.height(72.dp))
+        if (!stan.sesjaPlatnosci) {
+            Spacer(modifier = Modifier.height(72.dp))
+        }
     }
 
-        DolnyPasekSklepu(
-            onZapiszKoszyk = { nazwa -> stan.zapiszAktualnyKoszyk(nazwa) },
-            onOtworzKoszykSklepu = { stan.otworzKoszykSklepu() },
-            onDodajPozycje = { pozycje -> stan.dodajZapisaneDoKoszyka(pozycje) },
-            modifier = Modifier.fillMaxSize()
-        )
+        // Na PayU/banku chowamy pasek koszyka — nie zasłania bramki
+        if (!stan.sesjaPlatnosci) {
+            DolnyPasekSklepu(
+                onZapiszKoszyk = { nazwa -> stan.zapiszAktualnyKoszyk(nazwa) },
+                onOtworzKoszykSklepu = { stan.otworzKoszykSklepu() },
+                onDodajPozycje = { pozycje -> stan.dodajZapisaneDoKoszyka(pozycje) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
