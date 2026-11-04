@@ -1,6 +1,6 @@
 {
-  "versionCode": 13,
-  "versionName": "1.0.12",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.12/sklep-unilever-v1.0.12.apk",
-  "changelog": "Hotfix: crash przy starcie (ikona Home). Ikona aplikacji z warstw drawable zamiast adaptive mipmap."
+  "versionCode": 22,
+  "versionName": "1.0.21",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.21/sklep-unilever-v1.0.21.apk",
+  "changelog": "Fix: Zaplac otwiera bramke PayU zamiast wracac na strone glowna sklepu."
 }
