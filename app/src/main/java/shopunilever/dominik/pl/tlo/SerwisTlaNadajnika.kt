@@ -52,11 +52,15 @@ class SerwisTlaNadajnika : Service() {
         }
 
         if (nasluchSms == null) {
-            val od = System.currentTimeMillis() - 15_000L
+            // Od „teraz” — bez lookbacku, żeby nie republikać starego kodu z inboxu
+            val od = System.currentTimeMillis()
+            zakres.launch {
+                runCatching { SerwisParowania.wyczyscKodSms(applicationContext) }
+            }
             nasluchSms = NasluchSms(
                 kontekst = applicationContext,
                 odKiedyMs = od,
-                onKod = { kod -> naKodSms(kod) }
+                onKod = { kod, otrzymanoMs -> naKodSms(kod, otrzymanoMs) }
             ).also { it.start() }
             Log.i(TAG, "Nasłuch SMS w tle uruchomiony")
         }
@@ -64,14 +68,14 @@ class SerwisTlaNadajnika : Service() {
         return START_STICKY
     }
 
-    private fun naKodSms(kod: String) {
+    private fun naKodSms(kod: String, otrzymanoMs: Long) {
         if (kod.length < 4 || kod == ostatniKod) return
         ostatniKod = kod
-        // BusSms emit już w NasluchSms.zglos — tu tylko relay Firebase
+        // BusSms emit już w NasluchSms.zglos — tu tylko relay Firebase (ts = czas SMS)
         zakres.launch {
             runCatching {
-                SerwisParowania.publikujKodSms(applicationContext, kod)
-                Log.i(TAG, "Opublikowano kod SMS do relay")
+                SerwisParowania.publikujKodSms(applicationContext, kod, otrzymanoMs)
+                Log.i(TAG, "Opublikowano kod SMS do relay (ts=$otrzymanoMs)")
             }.onFailure {
                 Log.w(TAG, "Publikacja SMS: ${it.message}")
             }

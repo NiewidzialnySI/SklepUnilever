@@ -14,8 +14,8 @@ android {
         applicationId = "shopunilever.dominik.pl"
         minSdk = 31
         targetSdk = 37
-        versionCode = 22
-        versionName = "1.0.21"
+        versionCode = 25
+        versionName = "1.0.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -26,8 +26,30 @@ android {
         )
     }
 
+    // Stały klucz uploadu (keystore/cloud-upload.keystore) — ten sam co APK na GitHub Releases.
+    // Bez niego każde nowe VM generuje inny debug.keystore → „Podpis APK nie pasuje”.
+    val uploadKeystore = rootProject.file("keystore/cloud-upload.keystore")
+    if (uploadKeystore.isFile) {
+        signingConfigs {
+            create("upload") {
+                storeFile = uploadKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (uploadKeystore.isFile) {
+                signingConfig = signingConfigs.getByName("upload")
+            }
+        }
         release {
+            if (uploadKeystore.isFile) {
+                signingConfig = signingConfigs.getByName("upload")
+            }
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")

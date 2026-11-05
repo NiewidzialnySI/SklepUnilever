@@ -1,6 +1,6 @@
 {
-  "versionCode": 22,
-  "versionName": "1.0.21",
-  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.21/sklep-unilever-v1.0.21.apk",
-  "changelog": "Fix: Zaplac otwiera bramke PayU zamiast wracac na strone glowna sklepu."
+  "versionCode": 25,
+  "versionName": "1.0.24",
+  "apkUrl": "https://github.com/NiewidzialnySI/SklepUnilever/releases/download/v1.0.24/sklep-unilever-v1.0.24.apk",
+  "changelog": "Fix: podpis APK (ten sam klucz co 1.0.21); auto-koszyk; stary kod SMS znajomego."
 }

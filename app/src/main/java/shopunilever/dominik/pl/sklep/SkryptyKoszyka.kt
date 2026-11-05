@@ -65,7 +65,10 @@ true;
         return """window.location.href="$bezpieczny"; true;"""
     }
 
-    /** Po wejściu na kartę produktu — jedno kliknięcie „Dodaj do koszyka” (bez podwójnego submit). */
+    /**
+     * Po wejściu na kartę produktu — czeka aż DOM/Magento domknie formularz,
+     * dopiero wtedy jedno kliknięcie „Dodaj do koszyka” (bez strzału w pustkę).
+     */
     const val KLIKNIJ_DODAJ_DO_KOSZYKA = """
 (function() {
     if (window.__sklepikDodajeTeraz) {
@@ -73,45 +76,110 @@ true;
         return true;
     }
     window.__sklepikDodajeTeraz = true;
+    var start = Date.now();
+    var maxMs = 12000;
+    var gotowyOd = 0;
+    var minStabilnyMs = 450;
+
     function post(sukces, info) {
         if (window.SklepikPost) window.SklepikPost({ type: 'KOSZYK_DODANO', sukces: !!sukces, info: info || '' });
     }
-    function kliknijRaz(el) {
-        if (!el) return false;
-        try { el.click(); return true; } catch (e) { return false; }
-    }
-    var url = (location.href || '').toLowerCase();
-    var tekst = ((document.body && (document.body.innerText || document.body.textContent)) || '').toLowerCase();
-    var niedostepny = !!document.querySelector('.stock.unavailable, .out-of-stock, .product-info-stock-sku .unavailable') ||
-        url.indexOf('/noroute') >= 0 ||
-        url.indexOf('404') >= 0 ||
-        /nie\s*znaleziono|strona nie istnieje|out of stock|produkt.*niedost/.test(tekst);
-    if (niedostepny && !document.querySelector('#product-addtocart-button, form#product_addtocart_form')) {
+    function resetFlag() {
         window.__sklepikDodajeTeraz = false;
-        post(false, url.indexOf('noroute') >= 0 || url.indexOf('404') >= 0 ? 'STRONA_404' : 'BRAK_PRODUKTU');
-        return true;
     }
-    var btn = document.querySelector('#product-addtocart-button') ||
-        document.querySelector('form#product_addtocart_form button.action.tocart') ||
-        document.querySelector('button.action.tocart#product-addtocart-button') ||
-        document.querySelector('button[data-role="tocart"]');
-    if (!btn) {
-        var all = document.querySelectorAll('button.action.tocart, button[type="submit"]');
-        for (var i = 0; i < all.length; i++) {
-            var t = ((all[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
-            if (t.indexOf('dodaj do koszyka') >= 0 || t.indexOf('add to cart') >= 0) {
-                btn = all[i];
-                break;
+    function widoczny(el) {
+        if (!el) return false;
+        if (el.disabled) return false;
+        if (el.getAttribute && el.getAttribute('disabled') != null) return false;
+        if (el.classList && (el.classList.contains('disabled') || el.classList.contains('loading'))) return false;
+        var st = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (st && (st.visibility === 'hidden' || st.display === 'none' || st.opacity === '0')) return false;
+        return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+    }
+    function znajdzPrzycisk() {
+        var btn = document.querySelector('#product-addtocart-button') ||
+            document.querySelector('form#product_addtocart_form button.action.tocart') ||
+            document.querySelector('button.action.tocart#product-addtocart-button') ||
+            document.querySelector('button[data-role="tocart"]');
+        if (!btn) {
+            var all = document.querySelectorAll('button.action.tocart, button[type="submit"]');
+            for (var i = 0; i < all.length; i++) {
+                var t = ((all[i].textContent || '') + '').toLowerCase().replace(/\s+/g, ' ').trim();
+                if (t.indexOf('dodaj do koszyka') >= 0 || t.indexOf('add to cart') >= 0) {
+                    btn = all[i];
+                    break;
+                }
             }
         }
+        return btn;
     }
-    if (btn && !btn.disabled && kliknijRaz(btn)) {
-        setTimeout(function() { window.__sklepikDodajeTeraz = false; }, 2500);
-        post(true, 'OK');
-        return true;
+    function stronaProduktuGotowa() {
+        var form = document.querySelector('form#product_addtocart_form, form[data-role="tocart-form"]');
+        var btn = znajdzPrzycisk();
+        if (!btn || !widoczny(btn)) return null;
+        // Magento: przycisk bywa w DOM zanim widget catalogAddToCart się podłączy
+        if (!form && !document.querySelector('.product-info-main, .product-add-form, #product_addtocart_form')) {
+            return null;
+        }
+        if (document.readyState !== 'complete' && document.readyState !== 'interactive') return null;
+        return btn;
     }
-    window.__sklepikDodajeTeraz = false;
-    post(false, niedostepny ? 'BRAK_PRODUKTU' : 'BRAK_PRZYCISKU');
+    function niedostepnyBezFormy() {
+        var url = (location.href || '').toLowerCase();
+        var tekst = ((document.body && (document.body.innerText || document.body.textContent)) || '').toLowerCase();
+        var maForme = !!document.querySelector('#product-addtocart-button, form#product_addtocart_form, form[data-role="tocart-form"]');
+        if (maForme) return null;
+        if (url.indexOf('/noroute') >= 0 || url.indexOf('404') >= 0) return 'STRONA_404';
+        if (!!document.querySelector('.stock.unavailable, .out-of-stock, .product-info-stock-sku .unavailable')) {
+            return 'BRAK_PRODUKTU';
+        }
+        if (/nie\s*znaleziono|strona nie istnieje|out of stock|produkt.*niedost/.test(tekst)) {
+            return 'BRAK_PRODUKTU';
+        }
+        return null;
+    }
+    function kliknijRaz(el) {
+        try {
+            el.focus();
+            el.click();
+            return true;
+        } catch (e) {
+            try {
+                var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                el.dispatchEvent(ev);
+                return true;
+            } catch (e2) { return false; }
+        }
+    }
+    function tick() {
+        if (!window.__sklepikDodajeTeraz) return;
+        var brak = niedostepnyBezFormy();
+        if (brak) {
+            resetFlag();
+            post(false, brak);
+            return;
+        }
+        var btn = stronaProduktuGotowa();
+        if (btn) {
+            if (!gotowyOd) gotowyOd = Date.now();
+            if (Date.now() - gotowyOd >= minStabilnyMs) {
+                if (kliknijRaz(btn)) {
+                    setTimeout(resetFlag, 2800);
+                    post(true, 'OK');
+                    return;
+                }
+            }
+        } else {
+            gotowyOd = 0;
+        }
+        if (Date.now() - start > maxMs) {
+            resetFlag();
+            post(false, znajdzPrzycisk() ? 'BRAK_PRODUKTU' : 'BRAK_PRZYCISKU');
+            return;
+        }
+        setTimeout(tick, 350);
+    }
+    setTimeout(tick, 200);
     true;
 })();
 """

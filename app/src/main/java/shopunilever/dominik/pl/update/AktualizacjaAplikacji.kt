@@ -347,7 +347,9 @@ object AktualizacjaAplikacji {
         }
         require(nasze.isNotEmpty() && zApk.isNotEmpty()) { "Brak certyfikatów podpisu" }
         require(nasze.any { a -> zApk.any { b -> a.contentEquals(b) } }) {
-            "Podpis APK nie pasuje do zainstalowanej aplikacji"
+            "Podpis APK nie pasuje do zainstalowanej aplikacji. " +
+                "Odinstaluj starą apkę i zainstaluj ponownie z GitHub Releases " +
+                "(v${BuildConfig.VERSION_NAME}), potem autoaktualizacja znów zadziała."
         }
     }
 

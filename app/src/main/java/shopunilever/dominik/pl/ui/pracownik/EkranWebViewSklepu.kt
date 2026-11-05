@@ -250,6 +250,9 @@ private class StanLogowaniaSklepu(
 
     private val pominięteProdukty = mutableListOf<String>()
     private var aktualnyProduktUrl: String = ""
+    /** Żeby nie wstrzykiwać skryptu dodawania przy każdym iframe/onPageFinished. */
+    private val skryptDodawaniaWstrzykniety = AtomicBoolean(false)
+    private var awariaDodawania: Runnable? = null
 
     fun zapiszAktualnyKoszyk(nazwa: String) {
         nazwaKoszykaDoZapisu = nazwa.trim().ifBlank {
@@ -296,9 +299,19 @@ private class StanLogowaniaSklepu(
         nastepnyProduktZKolejki()
     }
 
+    private fun anulujAwariaDodawania() {
+        awariaDodawania?.let { r ->
+            webView?.removeCallbacks(r)
+            handlerUi.removeCallbacks(r)
+        }
+        awariaDodawania = null
+    }
+
     private fun nastepnyProduktZKolejki() {
         val wv = webView ?: return
         if (!dodawanieTrwa.get()) return
+        anulujAwariaDodawania()
+        skryptDodawaniaWstrzykniety.set(false)
         val url = kolejkaDodawania.pollFirst()
         if (url == null) {
             dodawanieTrwa.set(false)
@@ -318,23 +331,49 @@ private class StanLogowaniaSklepu(
         }
         aktualnyProduktUrl = url
         oczekujeDodaniaDoKoszyka.set(true)
+        // Klik dopiero po onPageFinished + retry w JS (nie na ślepo po 1,4 s)
         wv.loadUrl(url)
-        wv.postDelayed({
+        val awaria = Runnable {
+            if (oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) {
+                Log.w(TAG_LOGIN, "Timeout dodawania do koszyka: $url")
+                nastepnyProduktZKolejki()
+            }
+        }
+        awariaDodawania = awaria
+        wv.postDelayed(awaria, 16_000L)
+    }
+
+    /** Wywołane z onPageFinished — strona produktu musi się załadować zanim klikniemy. */
+    private fun sprobujDodacPoZaladowaniuStrony(url: String?) {
+        if (!dodawanieTrwa.get() || !oczekujeDodaniaDoKoszyka.get()) return
+        val u = url.orEmpty()
+        if (u.isBlank()) return
+        // Jeszcze przekierowanie / koszyk / konto — czekaj na właściwą kartę produktu
+        val lower = u.lowercase()
+        if (lower.contains("/checkout/cart") ||
+            lower.contains("/customer/") ||
+            lower.contains("/access")
+        ) {
+            return
+        }
+        if (!skryptDodawaniaWstrzykniety.compareAndSet(false, true)) return
+        Log.i(TAG_LOGIN, "Wstrzykuję Dodaj do koszyka po załadowaniu: $u")
+        wstrzyknij(SkryptySklepu.MOSTEK)
+        // Reset flagi z poprzedniego produktu (ten sam WebView / window)
+        wstrzyknij("window.__sklepikDodajeTeraz = false; true;")
+        // Krótka pauza: Magento dokłada widgety tuż po onPageFinished
+        webView?.postDelayed({
             if (!dodawanieTrwa.get() || !oczekujeDodaniaDoKoszyka.get()) return@postDelayed
-            wstrzyknij(SkryptySklepu.MOSTEK)
             wstrzyknij(SkryptyKoszyka.KLIKNIJ_DODAJ_DO_KOSZYKA)
-            // Awaryjne przejście dalej, jeśli JS nie odpowie
-            wv.postDelayed({
-                if (oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) {
-                    nastepnyProduktZKolejki()
-                }
-            }, 2800)
-        }, 1400)
+        }, 600L)
     }
 
     fun poDodaniuDoKoszyka() {
         if (!oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) return
-        webView?.postDelayed({ nastepnyProduktZKolejki() }, 900)
+        anulujAwariaDodawania()
+        skryptDodawaniaWstrzykniety.set(false)
+        // Daj czas na AJAX Magento przed następnym produktem
+        webView?.postDelayed({ nastepnyProduktZKolejki() }, 1200L)
     }
 
     fun poZalogowaniu() {
@@ -439,19 +478,32 @@ private class StanLogowaniaSklepu(
         if (smsOdKiedyMs.get() == 0L) {
             smsOdKiedyMs.set(System.currentTimeMillis())
         }
+        // Pracownik: wyzeruj stary relay, żeby rodzina nie dostała poprzedniego kodu
+        if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
+            zakresTla.launch {
+                runCatching { SerwisParowania.wyczyscKodSms(kontekstAplikacji) }
+            }
+        }
         oczekujeSms = true
         etap = EtapLogowania.SMS
         status = "Odczytuję kod z SMS — wpisze się sam…"
     }
 
-    fun naKodSms(kod: String) {
+    fun naKodSms(kod: String, otrzymanoMs: Long = System.currentTimeMillis()) {
         if (kod.length < 4 || zalogowany.get()) return
+        val od = smsOdKiedyMs.get()
+        if (od > 0L && otrzymanoMs < od) {
+            Log.i(TAG_LOGIN, "POMINIĘTO stary kod SMS (otrzymano=$otrzymanoMs od=$od)")
+            return
+        }
         if (trybReczny) {
             Log.i(TAG_LOGIN, "POMINIĘTO naKodSms (trybReczny) kodLen=${kod.length} url=$aktualnyUrl")
             // Relay do pary nadal OK — sam kod, bez auto-wpisywania w WebView
             if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
                 zakresTla.launch {
-                    runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+                    runCatching {
+                        SerwisParowania.publikujKodSms(kontekstAplikacji, kod, otrzymanoMs)
+                    }
                 }
             }
             return
@@ -467,7 +519,9 @@ private class StanLogowaniaSklepu(
         // Bezpieczny relay do sparowanych urządzeń (tylko kod, bez treści SMS)
         if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
             zakresTla.launch {
-                runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+                runCatching {
+                    SerwisParowania.publikujKodSms(kontekstAplikacji, kod, otrzymanoMs)
+                }
             }
         }
     }
@@ -479,6 +533,9 @@ private class StanLogowaniaSklepu(
         ustawUrl(url)
         wstrzyknij(SkryptySklepu.MOSTEK)
         wstrzyknij(SkryptySklepu.RESPONSYWNOSC)
+
+        // Auto-dodawanie z zapisanych koszyków — zawsze po pełnym load, nie na timerze
+        sprobujDodacPoZaladowaniuStrony(url)
 
         if (zalogowany.get()) {
             ukryjNakladke = true
@@ -618,7 +675,10 @@ private class StanLogowaniaSklepu(
                     Log.i(TAG_LOGIN, "EMAIL_WYNIK wynik=${obj.optString("wynik")} trybReczny=$trybReczny")
                     if (trybReczny) return
                     if (obj.optString("wynik") == "EMAIL_SENT" && emailWyslany.compareAndSet(false, true)) {
-                        smsOdKiedyMs.set(System.currentTimeMillis())
+                        // Nie nadpisuj — rodzina ustawia od przy kliknięciu „Zaloguj”
+                        if (smsOdKiedyMs.get() == 0L) {
+                            smsOdKiedyMs.set(System.currentTimeMillis())
+                        }
                         zacznijOczekiwanieSms()
                     }
                 }
@@ -908,12 +968,18 @@ fun EkranWebViewSklepu(
     modifier: Modifier = Modifier
 ) {
     val kontekst = LocalContext.current
-    val stan = remember {
+    val stan = remember(trybOdbiorcy) {
         StanLogowaniaSklepu(
             kontekstAplikacji = kontekst.applicationContext,
             email = PreferencjeKonta.email(kontekst),
             haslo = PreferencjeKonta.haslo(kontekst)
-        )
+        ).also { s ->
+            // Rodzina/znajomi: punkt odniesienia = kliknięcie „Zaloguj do sklepu”
+            // (otwarcie WebView) — stary smsRelay pracownika musi być odrzucony.
+            if (trybOdbiorcy) {
+                s.smsOdKiedyMs.set(System.currentTimeMillis())
+            }
+        }
     }
 
     // Pracownik: FGS działa tylko przy ≥1 odbiorcy → wtedy BusSms.
@@ -929,7 +995,7 @@ fun EkranWebViewSklepu(
         val nasluch = NasluchSms(
             kontekst = kontekst.applicationContext,
             odKiedyMs = od,
-            onKod = { kod -> stan.naKodSms(kod) }
+            onKod = { kod, otrzymanoMs -> stan.naKodSms(kod, otrzymanoMs) }
         )
         nasluch.start()
         onDispose { nasluch.stop() }
@@ -937,15 +1003,19 @@ fun EkranWebViewSklepu(
 
     LaunchedEffect(stan.oczekujeSms, trybOdbiorcy) {
         if (!stan.oczekujeSms) return@LaunchedEffect
+        val od = stan.smsOdKiedyMs.get().takeIf { it > 0L } ?: System.currentTimeMillis()
         if (trybOdbiorcy) {
             if (!PreferencjeOdbiorcy.czyZatwierdzony(kontekst) &&
                 PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()
             ) return@LaunchedEffect
-            SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
+            // Tylko kody nowsze niż kliknięcie „Zaloguj do sklepu”
+            SerwisParowania.obserwujKodSms(kontekst, odKiedyMs = od).collectLatest { kod ->
                 stan.naKodSms(kod)
             }
         } else if (SerwisTlaNadajnika.dziala) {
-            BusSms.kody.collectLatest { kod -> stan.naKodSms(kod) }
+            BusSms.kody.collectLatest { odebrany ->
+                stan.naKodSms(odebrany.kod, odebrany.otrzymanoMs)
+            }
         }
     }
 
@@ -1191,7 +1261,7 @@ fun EkranWebViewSklepu(
                                 onClick = {
                                     if (stan.kodSms.length >= 4) {
                                         stan.smsWstrzykniety.set(false)
-                                        stan.naKodSms(stan.kodSms)
+                                        stan.naKodSms(stan.kodSms, System.currentTimeMillis())
                                     }
                                 }
                             ) {
