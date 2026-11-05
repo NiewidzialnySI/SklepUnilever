@@ -250,6 +250,9 @@ private class StanLogowaniaSklepu(
 
     private val pominięteProdukty = mutableListOf<String>()
     private var aktualnyProduktUrl: String = ""
+    /** Żeby nie wstrzykiwać skryptu dodawania przy każdym iframe/onPageFinished. */
+    private val skryptDodawaniaWstrzykniety = AtomicBoolean(false)
+    private var awariaDodawania: Runnable? = null
 
     fun zapiszAktualnyKoszyk(nazwa: String) {
         nazwaKoszykaDoZapisu = nazwa.trim().ifBlank {
@@ -296,9 +299,19 @@ private class StanLogowaniaSklepu(
         nastepnyProduktZKolejki()
     }
 
+    private fun anulujAwariaDodawania() {
+        awariaDodawania?.let { r ->
+            webView?.removeCallbacks(r)
+            handlerUi.removeCallbacks(r)
+        }
+        awariaDodawania = null
+    }
+
     private fun nastepnyProduktZKolejki() {
         val wv = webView ?: return
         if (!dodawanieTrwa.get()) return
+        anulujAwariaDodawania()
+        skryptDodawaniaWstrzykniety.set(false)
         val url = kolejkaDodawania.pollFirst()
         if (url == null) {
             dodawanieTrwa.set(false)
@@ -318,23 +331,49 @@ private class StanLogowaniaSklepu(
         }
         aktualnyProduktUrl = url
         oczekujeDodaniaDoKoszyka.set(true)
+        // Klik dopiero po onPageFinished + retry w JS (nie na ślepo po 1,4 s)
         wv.loadUrl(url)
-        wv.postDelayed({
+        val awaria = Runnable {
+            if (oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) {
+                Log.w(TAG_LOGIN, "Timeout dodawania do koszyka: $url")
+                nastepnyProduktZKolejki()
+            }
+        }
+        awariaDodawania = awaria
+        wv.postDelayed(awaria, 16_000L)
+    }
+
+    /** Wywołane z onPageFinished — strona produktu musi się załadować zanim klikniemy. */
+    private fun sprobujDodacPoZaladowaniuStrony(url: String?) {
+        if (!dodawanieTrwa.get() || !oczekujeDodaniaDoKoszyka.get()) return
+        val u = url.orEmpty()
+        if (u.isBlank()) return
+        // Jeszcze przekierowanie / koszyk / konto — czekaj na właściwą kartę produktu
+        val lower = u.lowercase()
+        if (lower.contains("/checkout/cart") ||
+            lower.contains("/customer/") ||
+            lower.contains("/access")
+        ) {
+            return
+        }
+        if (!skryptDodawaniaWstrzykniety.compareAndSet(false, true)) return
+        Log.i(TAG_LOGIN, "Wstrzykuję Dodaj do koszyka po załadowaniu: $u")
+        wstrzyknij(SkryptySklepu.MOSTEK)
+        // Reset flagi z poprzedniego produktu (ten sam WebView / window)
+        wstrzyknij("window.__sklepikDodajeTeraz = false; true;")
+        // Krótka pauza: Magento dokłada widgety tuż po onPageFinished
+        webView?.postDelayed({
             if (!dodawanieTrwa.get() || !oczekujeDodaniaDoKoszyka.get()) return@postDelayed
-            wstrzyknij(SkryptySklepu.MOSTEK)
             wstrzyknij(SkryptyKoszyka.KLIKNIJ_DODAJ_DO_KOSZYKA)
-            // Awaryjne przejście dalej, jeśli JS nie odpowie
-            wv.postDelayed({
-                if (oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) {
-                    nastepnyProduktZKolejki()
-                }
-            }, 2800)
-        }, 1400)
+        }, 600L)
     }
 
     fun poDodaniuDoKoszyka() {
         if (!oczekujeDodaniaDoKoszyka.compareAndSet(true, false)) return
-        webView?.postDelayed({ nastepnyProduktZKolejki() }, 900)
+        anulujAwariaDodawania()
+        skryptDodawaniaWstrzykniety.set(false)
+        // Daj czas na AJAX Magento przed następnym produktem
+        webView?.postDelayed({ nastepnyProduktZKolejki() }, 1200L)
     }
 
     fun poZalogowaniu() {
@@ -494,6 +533,9 @@ private class StanLogowaniaSklepu(
         ustawUrl(url)
         wstrzyknij(SkryptySklepu.MOSTEK)
         wstrzyknij(SkryptySklepu.RESPONSYWNOSC)
+
+        // Auto-dodawanie z zapisanych koszyków — zawsze po pełnym load, nie na timerze
+        sprobujDodacPoZaladowaniuStrony(url)
 
         if (zalogowany.get()) {
             ukryjNakladke = true
