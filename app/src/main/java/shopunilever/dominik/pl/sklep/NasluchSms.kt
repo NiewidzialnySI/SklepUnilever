@@ -16,11 +16,13 @@ import android.util.Log
 /**
  * Odczyt kodu logowania z przychodzących SMS.
  * Broadcast RECEIVE_SMS + ContentObserver; polling skrzynki na wątku IO (nie UI).
+ *
+ * Tylko SMS nowsze niż [odKiedyMs] — bez „podbierania” starego kodu z inboxu.
  */
 class NasluchSms(
     private val kontekst: Context,
     private val odKiedyMs: Long,
-    private val onKod: (String) -> Unit
+    private val onKod: (kod: String, otrzymanoMs: Long) -> Unit
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val watekIo = HandlerThread("NasluchSms-IO").apply { start() }
@@ -34,8 +36,8 @@ class NasluchSms(
             val msgs = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
             val tresc = msgs.joinToString("") { it.messageBody.orEmpty() }
             val czas = msgs.maxOfOrNull { it.timestampMillis } ?: System.currentTimeMillis()
-            if (czas < odKiedyMs - 5_000L) return
-            wyciagnijKod(tresc)?.let { zglos(it) }
+            if (czas < odKiedyMs) return
+            wyciagnijKod(tresc)?.let { zglos(it, czas) }
         }
     }
 
@@ -103,17 +105,20 @@ class NasluchSms(
                 uri,
                 arrayOf("body", "date"),
                 "date >= ?",
-                arrayOf((odKiedyMs - 5_000L).toString()),
+                arrayOf(odKiedyMs.toString()),
                 "date DESC"
             )?.use { c ->
                 val iBody = c.getColumnIndex("body")
+                val iDate = c.getColumnIndex("date")
                 if (iBody < 0) return
                 var odczytane = 0
                 while (c.moveToNext() && odczytane < 12) {
                     odczytane++
                     val body = c.getString(iBody).orEmpty()
+                    val data = if (iDate >= 0) c.getLong(iDate) else System.currentTimeMillis()
+                    if (data < odKiedyMs) continue
                     wyciagnijKod(body)?.let {
-                        zglos(it)
+                        zglos(it, data)
                         return
                     }
                 }
@@ -123,12 +128,12 @@ class NasluchSms(
         }
     }
 
-    private fun zglos(kod: String) {
+    private fun zglos(kod: String, otrzymanoMs: Long) {
         if (kod == ostatniZgloszony) return
         ostatniZgloszony = kod
-        Log.i(TAG, "Odebrano kod SMS: $kod")
-        BusSms.emituj(kod)
-        mainHandler.post { onKod(kod) }
+        Log.i(TAG, "Odebrano kod SMS: $kod (ts=$otrzymanoMs)")
+        BusSms.emituj(kod, otrzymanoMs)
+        mainHandler.post { onKod(kod, otrzymanoMs) }
     }
 
     companion object {

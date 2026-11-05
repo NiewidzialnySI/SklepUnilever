@@ -59,6 +59,10 @@ sealed class WynikWejsciaSklepu {
  */
 object SerwisParowania {
 
+    /** Kod z relay jest OK tylko gdy jego ts jest ściśle po momencie „Zaloguj”. */
+    fun czyKodSmsNowszyNiz(tsKodu: Long, odKiedyMs: Long): Boolean =
+        tsKodu > odKiedyMs
+
     suspend fun uruchomJakoNadajnik(context: Context): String {
         FirebaseSklepik.upewnijSie(context)
         val uid = FirebaseSklepik.zalogujAnonimowo(context)
@@ -141,8 +145,15 @@ object SerwisParowania {
             ).await()
     }
 
-    /** Bezpieczny relay: tylko krótkotrwały kod SMS + timestamp, bez treści wiadomości. */
-    suspend fun publikujKodSms(context: Context, kodSms: String) {
+    /**
+     * Bezpieczny relay: tylko krótkotrwały kod SMS + timestamp wiadomości, bez treści SMS.
+     * [otrzymanoMs] = czas SMS z telefonu pracownika — rodzina odrzuca kody sprzed kliknięcia „Zaloguj”.
+     */
+    suspend fun publikujKodSms(
+        context: Context,
+        kodSms: String,
+        otrzymanoMs: Long = System.currentTimeMillis()
+    ) {
         val uid = PreferencjeParowania.uid(context).ifBlank { return }
         if (!PreferencjeParowania.czyAktywne(context)) return
         val sync = PreferencjeParowania.kod(context)
@@ -153,10 +164,22 @@ object SerwisParowania {
             .setValue(
                 mapOf(
                     "kod" to kodSms,
-                    "ts" to System.currentTimeMillis(),
+                    "ts" to otrzymanoMs,
                     "syncCode" to sync
                 )
             ).await()
+    }
+
+    /** Usuwa stary kod z relay — przed nowym logowaniem / startem nasłuchu. */
+    suspend fun wyczyscKodSms(context: Context) {
+        val uid = PreferencjeParowania.uid(context).ifBlank { return }
+        if (!PreferencjeParowania.czyAktywne(context)) return
+        FirebaseSklepik.baza(context).reference
+            .child(StaleFirebase.Sciezki.TRANSMITTERS)
+            .child(uid)
+            .child("smsRelay")
+            .removeValue()
+            .await()
     }
 
     /**
@@ -672,8 +695,15 @@ object SerwisParowania {
         }
     }.distinctUntilChanged()
 
-    /** SMS relay z telefonu pracownika → rodzina. */
-    fun obserwujKodSms(context: Context): Flow<String> = callbackFlow {
+    /**
+     * SMS relay z telefonu pracownika → rodzina.
+     * Przyjmuje wyłącznie kody nowsze niż [odKiedyMs] (moment kliknięcia „Zaloguj do sklepu”),
+     * żeby nie wciągać starego kodu po wcześniejszym logowaniu pracownika.
+     */
+    fun obserwujKodSms(
+        context: Context,
+        odKiedyMs: Long = System.currentTimeMillis()
+    ): Flow<String> = callbackFlow {
         val tx = PreferencjeOdbiorcy.uidNadajnika(context)
         if (tx.isBlank()) {
             close()
@@ -683,12 +713,14 @@ object SerwisParowania {
             .child(StaleFirebase.Sciezki.TRANSMITTERS)
             .child(tx)
             .child("smsRelay")
-        var ostatniTs = 0L
+        // Start od momentu „Zaloguj” — pierwszy snapshot ze starym kodem (ts <= odKiedyMs) odpada
+        var ostatniTs = odKiedyMs
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                if (!snapshot.exists()) return
                 val kod = snapshot.child("kod").getValue(String::class.java).orEmpty()
                 val ts = snapshot.child("ts").getValue(Long::class.java) ?: 0L
-                if (kod.length >= 4 && ts > ostatniTs) {
+                if (kod.length >= 4 && czyKodSmsNowszyNiz(ts, ostatniTs)) {
                     ostatniTs = ts
                     trySend(kod)
                 }

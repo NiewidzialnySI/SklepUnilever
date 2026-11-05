@@ -439,19 +439,32 @@ private class StanLogowaniaSklepu(
         if (smsOdKiedyMs.get() == 0L) {
             smsOdKiedyMs.set(System.currentTimeMillis())
         }
+        // Pracownik: wyzeruj stary relay, żeby rodzina nie dostała poprzedniego kodu
+        if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
+            zakresTla.launch {
+                runCatching { SerwisParowania.wyczyscKodSms(kontekstAplikacji) }
+            }
+        }
         oczekujeSms = true
         etap = EtapLogowania.SMS
         status = "Odczytuję kod z SMS — wpisze się sam…"
     }
 
-    fun naKodSms(kod: String) {
+    fun naKodSms(kod: String, otrzymanoMs: Long = System.currentTimeMillis()) {
         if (kod.length < 4 || zalogowany.get()) return
+        val od = smsOdKiedyMs.get()
+        if (od > 0L && otrzymanoMs < od) {
+            Log.i(TAG_LOGIN, "POMINIĘTO stary kod SMS (otrzymano=$otrzymanoMs od=$od)")
+            return
+        }
         if (trybReczny) {
             Log.i(TAG_LOGIN, "POMINIĘTO naKodSms (trybReczny) kodLen=${kod.length} url=$aktualnyUrl")
             // Relay do pary nadal OK — sam kod, bez auto-wpisywania w WebView
             if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
                 zakresTla.launch {
-                    runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+                    runCatching {
+                        SerwisParowania.publikujKodSms(kontekstAplikacji, kod, otrzymanoMs)
+                    }
                 }
             }
             return
@@ -467,7 +480,9 @@ private class StanLogowaniaSklepu(
         // Bezpieczny relay do sparowanych urządzeń (tylko kod, bez treści SMS)
         if (PreferencjeParowania.czyAktywne(kontekstAplikacji)) {
             zakresTla.launch {
-                runCatching { SerwisParowania.publikujKodSms(kontekstAplikacji, kod) }
+                runCatching {
+                    SerwisParowania.publikujKodSms(kontekstAplikacji, kod, otrzymanoMs)
+                }
             }
         }
     }
@@ -618,7 +633,10 @@ private class StanLogowaniaSklepu(
                     Log.i(TAG_LOGIN, "EMAIL_WYNIK wynik=${obj.optString("wynik")} trybReczny=$trybReczny")
                     if (trybReczny) return
                     if (obj.optString("wynik") == "EMAIL_SENT" && emailWyslany.compareAndSet(false, true)) {
-                        smsOdKiedyMs.set(System.currentTimeMillis())
+                        // Nie nadpisuj — rodzina ustawia od przy kliknięciu „Zaloguj”
+                        if (smsOdKiedyMs.get() == 0L) {
+                            smsOdKiedyMs.set(System.currentTimeMillis())
+                        }
                         zacznijOczekiwanieSms()
                     }
                 }
@@ -908,12 +926,18 @@ fun EkranWebViewSklepu(
     modifier: Modifier = Modifier
 ) {
     val kontekst = LocalContext.current
-    val stan = remember {
+    val stan = remember(trybOdbiorcy) {
         StanLogowaniaSklepu(
             kontekstAplikacji = kontekst.applicationContext,
             email = PreferencjeKonta.email(kontekst),
             haslo = PreferencjeKonta.haslo(kontekst)
-        )
+        ).also { s ->
+            // Rodzina/znajomi: punkt odniesienia = kliknięcie „Zaloguj do sklepu”
+            // (otwarcie WebView) — stary smsRelay pracownika musi być odrzucony.
+            if (trybOdbiorcy) {
+                s.smsOdKiedyMs.set(System.currentTimeMillis())
+            }
+        }
     }
 
     // Pracownik: FGS działa tylko przy ≥1 odbiorcy → wtedy BusSms.
@@ -929,7 +953,7 @@ fun EkranWebViewSklepu(
         val nasluch = NasluchSms(
             kontekst = kontekst.applicationContext,
             odKiedyMs = od,
-            onKod = { kod -> stan.naKodSms(kod) }
+            onKod = { kod, otrzymanoMs -> stan.naKodSms(kod, otrzymanoMs) }
         )
         nasluch.start()
         onDispose { nasluch.stop() }
@@ -937,15 +961,19 @@ fun EkranWebViewSklepu(
 
     LaunchedEffect(stan.oczekujeSms, trybOdbiorcy) {
         if (!stan.oczekujeSms) return@LaunchedEffect
+        val od = stan.smsOdKiedyMs.get().takeIf { it > 0L } ?: System.currentTimeMillis()
         if (trybOdbiorcy) {
             if (!PreferencjeOdbiorcy.czyZatwierdzony(kontekst) &&
                 PreferencjeOdbiorcy.uidNadajnika(kontekst).isBlank()
             ) return@LaunchedEffect
-            SerwisParowania.obserwujKodSms(kontekst).collectLatest { kod ->
+            // Tylko kody nowsze niż kliknięcie „Zaloguj do sklepu”
+            SerwisParowania.obserwujKodSms(kontekst, odKiedyMs = od).collectLatest { kod ->
                 stan.naKodSms(kod)
             }
         } else if (SerwisTlaNadajnika.dziala) {
-            BusSms.kody.collectLatest { kod -> stan.naKodSms(kod) }
+            BusSms.kody.collectLatest { odebrany ->
+                stan.naKodSms(odebrany.kod, odebrany.otrzymanoMs)
+            }
         }
     }
 
@@ -1191,7 +1219,7 @@ fun EkranWebViewSklepu(
                                 onClick = {
                                     if (stan.kodSms.length >= 4) {
                                         stan.smsWstrzykniety.set(false)
-                                        stan.naKodSms(stan.kodSms)
+                                        stan.naKodSms(stan.kodSms, System.currentTimeMillis())
                                     }
                                 }
                             ) {
