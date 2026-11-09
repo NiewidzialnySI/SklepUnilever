@@ -528,7 +528,7 @@ function renderRoster() {
     <section class="panel">
       <p class="step-kicker">Skład stołu · ${playersLabel(state.players)}</p>
       <h1>Imiona i szkoły</h1>
-      <div id="roster-forms" class="roster-grid">
+      <div id="roster-forms" class="roster-grid roster-grid--${state.players}">
         ${state.roster
           .map((p, i) => {
             const orderHint = state.players === 1 ? "Ty" : `Gracz ${i + 1}`;
@@ -540,17 +540,21 @@ function renderRoster() {
                 <span class="roster-card-badge" style="background:${escapeAttr(color)}">${schoolIcon(
                   p.schoolId
                 )}</span>
-                <strong>${orderHint}</strong>
+                <div class="roster-card-title">
+                  <strong>${orderHint}</strong>
+                  <span class="school-start-hint">Start: <strong>${escapeHtml(
+                    locById(schoolStartId(p.schoolId))?.name || "—"
+                  )}</strong></span>
+                </div>
               </header>
-              <label>Imię
-                <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
-              </label>
-              <label>Szkoła
-                <select data-field="schoolId">${schoolOptionsHtml(i)}</select>
-              </label>
-              <p class="note school-start-hint">Start: <strong>${escapeHtml(
-                locById(schoolStartId(p.schoolId))?.name || "—"
-              )}</strong></p>
+              <div class="roster-card-fields">
+                <label>Imię
+                  <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
+                </label>
+                <label>Szkoła
+                  <select data-field="schoolId">${schoolOptionsHtml(i)}</select>
+                </label>
+              </div>
             </div>`;
           })
           .join("")}

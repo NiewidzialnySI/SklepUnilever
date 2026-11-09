@@ -293,17 +293,11 @@ function buildMultiSetupSteps(n, roster = []) {
       `,
     },
     {
-      id: "monsters",
-      title: "Potwory na start",
-      body: buildMonsterSetupHtml(n),
-    },
-    {
-      id: "first-player",
-      title: "Pierwszy gracz i karty pomocy",
+      id: "help-cards",
+      title: "Karty pomocy",
       body: `
-        <p>Pierwszy gracz: kto <strong>ostatnio czytał książkę o wiedźminie</strong> (albo inaczej).</p>
         <p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>
-        <p class="tip">Przygotowanie: od osoby <strong>po prawej</strong> pierwszego, <strong>przeciwnie do zegara</strong>. Pierwszy wybiera wiedźmina jako <strong>ostatni</strong>.</p>
+        <p class="tip">Pierwszy gracz = nr 1 z ekranu kolejności. Przygotowanie idzie od ostatniego gracza do pierwszego.</p>
       `,
     },
   ];
@@ -346,10 +340,6 @@ function buildMultiSetupSteps(n, roster = []) {
   });
 
   return steps;
-}
-
-function buildMonsterSetupHtml(_n) {
-  return ``;
 }
 
 function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEntry) {
@@ -452,7 +442,6 @@ export function phase2Choices(
         <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
-      <p class="note">Walka jest <strong>opcjonalna</strong> (instrukcja: „możesz walczyć”). W solo nie ma walki z innymi wiedźminami. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
     `;
   }
   return `
@@ -462,7 +451,6 @@ export function phase2Choices(
       <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
-    <p class="note">Walka jest <strong>opcjonalna</strong> — nawet z potworem na polu możesz wybrać medytację albo eksplorację. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
   `;
 }
 
