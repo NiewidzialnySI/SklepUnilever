@@ -264,9 +264,12 @@ export function iconsLegendHtml() {
     <h3>Inne przy stole</h3>
     ${row([
       [ICO.move, "Ruch", "Faza I — odrzucasz karty z symbolem terenu i idziesz"],
-      [ICO.monster, "Potwór", "Walka / trop / żeton na mapie"],
-      [ICO.quest, "Zadanie", "Eksploracja ze słowem „zadanie”"],
+      [ICO.monster, "Potwór", "Walka / figurka na mapie"],
+      [ICO.quest, "Zadanie / trop", "Zadanie tropienia = żeton obszaru + złoto; po dojściu → żeton tropu (teren)"],
     ])}
+    <div class="tip">
+      <strong>Żeton tropu ≠ nowe żetony z pudełka.</strong> To zwykły <em>żeton obszaru</em> (las/góry/woda). Najpierw leży u Ciebie <em>nazwą lokacji do góry</em> (zadanie), potem po wejściu na tę lokację odwracasz go na symbol terenu = masz trop. Szczegóły: Ściąga / Leksykon.
+    </div>
 
     <h3>Szkoły</h3>
     ${row([

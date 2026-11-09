@@ -413,13 +413,13 @@ export function phase1AfterMove(isSolo) {
   return `
   <h3>Po ruchu możesz (w dowolnej kolejności)</h3>
   <ul class="checklist">
-    <li><strong>Akcja obszaru</strong> — każdą konkretną akcję obszaru najwyżej raz na turę (nawet po wyjściu i powrocie).</li>
+    <li><strong>Akcja obszaru</strong> — każdą konkretną akcję obszaru najwyżej raz na turę (nawet po wyjściu i powrocie). Tropienie = zobacz ściągę „Żeton tropu”.</li>
     <li><strong>Poker</strong> — ${
       isSolo
         ? "z miejscowymi (solo: vs tabela na karcie pomocy)"
         : "z wiedźminem na tym samym obszarze (raz z każdym; oboje ≥1 złoto)"
     }.</li>
-    <li><strong>Zadanie</strong> — jeśli weszłeś na obszar zadania.</li>
+    <li><strong>Zadanie / tropienie:</strong> jeśli weszłeś na obszar z nazwy na żetonie zadania tropienia → zbierz złoto z żetonu i odwróć go (staje się żetonem tropu). Inne zadania z kart eksploracji — wg karty.</li>
   </ul>
   ${
     isSolo
@@ -473,7 +473,7 @@ export function fightMonster(isSolo) {
     <li>Sprawdź zdolność specjalną potwora (może być koszt wejścia).</li>
     <li><strong>Wytrzymałość:</strong> tasujesz talię + odrzucone → talia wytrzymałości (ręka zostaje).</li>
     <li>Talia potwora z kart walki (PW z karty).</li>
-    <li>Trop tego potwora → Ty zaczynasz; inaczej potwór.</li>
+    <li><strong>Żeton tropu</strong> tego potwora (odwrócony żeton obszaru przy planszetce) → <strong>Ty zaczynasz</strong>; inaczej potwór.</li>
     ${
       isSolo
         ? `<li><strong>Solo — atak potwora:</strong> rzuć kością. <strong>1–3</strong> = szarża, <strong>4–6</strong> = ugryzienie.</li>`
@@ -579,6 +579,34 @@ export function phase3(isSolo) {
 `;
 }
 
+/** Żeton obszaru / zadanie tropienia / żeton tropu — często mylone przy stole. */
+export const TRAIL_HELP = `
+  <h3>${ICO.monster()}${ICO.quest()} Żeton tropu — co to jest?</h3>
+  <p class="lead">To <strong>ten sam drewniany/kartonowy żeton obszaru</strong> (las / góry / woda), tylko w innej roli. Masz trzy stosy żetonów obszarów obok planszy — z nich bierzesz tropy.</p>
+  <ol class="checklist">
+    <li><strong>Akcja tropienia (faza I, na obszarze z taką akcją):</strong>
+      <div>
+        1) Weź <strong>1 złoto</strong> z banku do swojej kieszeni.<br>
+        2) Wybierz <strong>1 potwora</strong> na mapie, którego chcesz tropić.<br>
+        3) Dobierz <strong>wierzchni żeton</strong> ze stosu terenu, na którym <em>teraz stoi ten potwór</em> (np. potwór w górach → stos gór).<br>
+        4) Połóż żeton <strong>odkryty nazwą obszaru do góry</strong> na swojej planszetce i połóż na nim <strong>1 złoto z banku</strong> — to jest <em>zadanie tropienia</em>.<br>
+        5) Nazwa na żetonie <strong>nie może</strong> być Twoją obecną lokacją — wtedy dobierz kolejny i wtasuj zły z powrotem.
+      </div>
+    </li>
+    <li><strong>Wykonanie zadania:</strong> w którejś kolejnej turze <strong>wejdź ruchem</strong> na obszar z nazwy na żetonie.
+      <div>
+        → Zabierz złoto z żetonu do siebie.<br>
+        → <strong>Odwróć</strong> żeton na stronę z symbolem terenu — od tej chwili to już <strong>żeton tropu</strong> tego potwora (leży przy Twojej planszetce).
+      </div>
+    </li>
+    <li><strong>Po co żeton tropu?</strong> Gdy walczysz z potworem, do którego masz trop (ten sam rodzaj terenu / ten trop) — <strong>Ty zaczynasz walkę</strong> (zamiast potwora). To duża przewaga.</li>
+    <li><strong>Limit:</strong> możesz mieć najwyżej <strong>1 żeton tropu na każdy rodzaj terenu</strong> (1 las, 1 góry, 1 woda). FAQ: nowy trop tego samego terenu → odrzucasz stare zadanie/trop <em>bez</em> zbierania złota z żetonu.</li>
+    <li><strong>Pusty stos:</strong> brak żetonów danego terenu = nie startujesz zadania tropienia na ten teren.</li>
+    <li><strong>„Weź dowolny żeton tropu” na karcie:</strong> bierzesz żeton obszaru (jako trop) wg tekstu karty — zwykle zakryty / wg instrukcji efektu; nie myl z zadaniem tropienia z akcji obszaru.</li>
+  </ol>
+  <p class="tip"><strong>Przykład (instrukcja):</strong> harpie w Doldeth (góry) → bierzesz żeton górski → wypada „Ard Modron” + 1 złoto na żetonie. Gdy dojdziesz do Ard Modron: bierzesz złoto, odwracasz żeton → masz trop harpii.</p>
+`;
+
 export const LOCATION_ACTIONS = `
   <h3>Szybka ściąga akcji obszarów</h3>
   <ul class="checklist">
@@ -587,9 +615,10 @@ export const LOCATION_ACTIONS = `
     <li>${ICO.alchemy()} <strong>Eliksir:</strong> dobierz 1 (limit 4).</li>
     <li>${ICO.dice()} <strong>Poker z miejscowymi:</strong> 1 złoto + 2 z banku (multi) / solo: 1 złoto + tabela.</li>
     <li><strong>Wymiana:</strong> usuń 1 kartę z ręki, kup z puli o koszcie ≤ usuniętej + 1.</li>
-    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie:</strong> +1 złoto, żeton terenu potwora jako zadanie tropienia.</li>
+    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie:</strong> +1 złoto do kieszeni, potem zadanie tropienia (żeton obszaru + 1 złoto na żetonie) — szczegóły poniżej.</li>
     <li><strong>Czyszczenie puli:</strong> bez złota → 1 złoto; możesz usunąć 1–2 karty z puli.</li>
   </ul>
+  ${TRAIL_HELP}
 `;
 
 export function quickRef(isSolo) {

@@ -111,8 +111,8 @@ export const RULE_CORRECTIONS = [
     body: "Koszt w złocie = aktualny poziom atrybutu + 1 (czyli tyle, ile wynosi poziom docelowy). Zdolność specjalną rozwijasz tylko w swojej szkole.",
   },
   {
-    title: "Tropy",
-    body: "Max 1 żeton tropu na każdy rodzaj terenu. Konflikt z nowym tropem tego samego terenu → odrzucasz stare zadanie tropienia bez złota z żetonu (FAQ #10).",
+    title: "Tropy / żeton tropu",
+    body: "Żeton tropu = żeton obszaru odwrócony na symbol terenu (po wykonaniu zadania tropienia). Zadanie: najpierw żeton nazwą do góry + złoto na nim; po wejściu na lokację bierzesz złoto i odwracasz. Trop → często Ty zaczynasz walkę z tym potworem. Max 1 na rodzaj terenu; konflikt → stare znika bez złota (FAQ #10).",
   },
   {
     title: "Koszt karty z eksploracji",

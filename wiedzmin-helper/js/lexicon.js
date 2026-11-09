@@ -75,6 +75,16 @@ export const LEVEL_UP = `
   </ul>
 `;
 
+export const TRAIL_LEXICON = `
+  <h3>Żeton obszaru vs żeton tropu</h3>
+  <ul class="checklist">
+    <li><strong>Żeton obszaru</strong> — żeton z puli las/góry/woda obok planszy. Jedna strona: nazwa lokacji, druga: symbol terenu.</li>
+    <li><strong>Zadanie tropienia</strong> — żeton leży u Ciebie <em>nazwą do góry</em> + 1 złoto na nim. Cel: dojść ruchem na tę lokację.</li>
+    <li><strong>Żeton tropu</strong> — po dojściu zbierasz złoto i odwracasz żeton na symbol terenu. Oznacza, że tropisz potwora z tego terenu → w walce z nim często <strong>zaczynasz pierwszy</strong>.</li>
+    <li>Max <strong>1 trop na rodzaj terenu</strong>. Konflikt (nowy tego samego) → stare zadanie/trop znika bez złota z żetonu (FAQ #10).</li>
+  </ul>
+`;
+
 export const WHAT_WE_DONT_HAVE = `
   <h3>Czego helper NIE zastąpi</h3>
   <p class="lead">Nie mam dostępu do pełnej bazy ilustracji ani pełnych tekstów wszystkich kart z pudełka.</p>
@@ -103,6 +113,7 @@ export function lexiconHtml() {
     <h3>Zdolności szkół (podstawka)</h3>
     <ul class="checklist">${schools}</ul>
     <p class="note">Dokładne liczby obrażeń/doboru na każdym poziomie I–V są na <strong>planszetce</strong> (ikony obok toru) — helper nie zastępuje ikon.</p>
+    ${TRAIL_LEXICON}
     ${COMBAT_STEPS}
   `;
 }
