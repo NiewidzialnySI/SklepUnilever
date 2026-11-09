@@ -26,11 +26,10 @@ import {
   playerTrackerHtml,
   fatigueForReputation,
   phase3DrawHint,
+  locById,
 } from "./board.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
-
-const state = loadState() || defaultState();
 
 const appEl = document.getElementById("app");
 
@@ -50,17 +49,84 @@ function isSolo() {
   return state.players === 1;
 }
 
+function normalizeState(raw) {
+  const base = defaultState();
+  if (!raw || typeof raw !== "object") return base;
+  const players = Math.min(5, Math.max(1, Number(raw.players) || 3));
+  const turn =
+    raw.turn && typeof raw.turn === "object"
+      ? {
+          phase: String(raw.turn.phase || "hub"),
+          screen: String(raw.turn.screen || "hub"),
+        }
+      : base.turn;
+  const board =
+    raw.board && typeof raw.board === "object"
+      ? { ...defaultBoard(), ...raw.board, monsters: raw.board.monsters || {} }
+      : defaultBoard();
+  // migracja Oxenfurt → Loc Ichaer
+  if (board.monsters?.oxenfurt) {
+    board.monsters["loc-ichaer"] = board.monsters.oxenfurt;
+    delete board.monsters.oxenfurt;
+  }
+  if (board.selectedLoc === "oxenfurt") board.selectedLoc = "loc-ichaer";
+  const roster = Array.isArray(raw.roster)
+    ? raw.roster.map((p) => {
+        const copy = { ...(p || {}) };
+        if (copy.locationId === "oxenfurt") copy.locationId = "loc-ichaer";
+        if (copy.locationId && !locByIdSafe(copy.locationId)) copy.locationId = null;
+        return copy;
+      })
+    : [];
+  const views = new Set([
+    "home",
+    "roster",
+    "setup",
+    "board",
+    "turn",
+    "ref",
+    "icons",
+    "lexicon",
+    "sources",
+  ]);
+  return {
+    ...base,
+    view: views.has(raw.view) ? raw.view : "home",
+    players,
+    roster,
+    activeIndex: Math.max(0, Number(raw.activeIndex) || 0),
+    setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
+    turn,
+    board,
+  };
+}
+
+function locByIdSafe(id) {
+  return Boolean(locById(id));
+}
+
 function loadState() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    return normalizeState(raw);
   } catch {
-    return null;
+    return defaultState();
   }
 }
 
+let saveTimer = null;
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      /* quota / private mode */
+    }
+  }, 200);
 }
+
+const state = loadState();
 
 function ensureRoster() {
   const n = state.players;
@@ -104,6 +170,15 @@ function playerLabel(p) {
 }
 
 function setPlayers(n) {
+  if (n < state.roster.length) {
+    if (
+      !window.confirm(
+        `Zmniejszenie do ${n} graczy usunie dane końcówki składu. Kontynuować?`
+      )
+    ) {
+      return;
+    }
+  }
   state.players = n;
   state.setupIndex = 0;
   state.activeIndex = 0;
@@ -152,15 +227,22 @@ function shell(inner) {
         <small>Pomocnik · podstawka${isSolo() ? " · solo" : ""}</small>
       </div>
       <div class="top-actions">
-        <button class="btn btn-ghost" data-nav="home">Start</button>
-        <button class="btn btn-ghost" data-nav="roster">Gracze</button>
-        <button class="btn btn-ghost" data-nav="setup">Przygotowanie</button>
-        <button class="btn btn-ghost" data-nav="board">Stół</button>
-        <button class="btn btn-ghost" data-nav="turn">Tura</button>
-        <button class="btn btn-ghost" data-nav="ref">Ściąga</button>
-        <button class="btn btn-ghost" data-nav="icons">Ikony</button>
-        <button class="btn btn-ghost" data-nav="lexicon">Leksykon</button>
-        <button class="btn btn-ghost" data-nav="sources">Źródła</button>
+        ${[
+          ["home", "Start"],
+          ["roster", "Gracze"],
+          ["setup", "Przygotowanie"],
+          ["board", "Stół"],
+          ["turn", "Tura"],
+          ["ref", "Ściąga"],
+          ["icons", "Ikony"],
+          ["lexicon", "Leksykon"],
+          ["sources", "Źródła"],
+        ]
+          .map(
+            ([id, label]) =>
+              `<button class="btn btn-ghost ${state.view === id ? "nav-active" : ""}" data-nav="${id}">${label}</button>`
+          )
+          .join("")}
       </div>
     </header>
     ${inner}
@@ -170,8 +252,13 @@ function shell(inner) {
   appEl.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const view = btn.getAttribute("data-nav");
-      if (view === "turn") go("turn", { turn: { phase: "hub", screen: "hub" } });
-      else go(view);
+      if (view === "turn") {
+        // Nie resetuj mid-fazy — wróć do bieżącego ekranu tury
+        if (!state.turn || typeof state.turn !== "object") {
+          state.turn = { phase: "hub", screen: "hub" };
+        }
+        go("turn");
+      } else go(view);
     });
   });
 }
@@ -319,7 +406,12 @@ function renderRoster() {
 }
 
 function escapeAttr(s) {
-  return String(s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 function renderSetup() {
@@ -825,6 +917,13 @@ function renderBoard() {
       if (!p || p.reputation >= 4) return;
       const next = p.reputation + 1;
       const lose = fatigueForReputation(next);
+      if (
+        !window.confirm(
+          `+1 reputacja → ${next}. Usunąć z gry ${lose} kart(y) z ręki (uproszczenie trackera)? Na stole możesz brać też z talii/odrzuconych.`
+        )
+      ) {
+        return;
+      }
       p.reputation = next;
       p.cards = Math.max(0, (p.cards || 0) - lose);
       saveState();
@@ -844,9 +943,7 @@ function renderBoard() {
     });
   });
 
-  appEl.querySelector("#to-turn").addEventListener("click", () =>
-    go("turn", { turn: { phase: "hub", screen: "hub" } })
-  );
+  appEl.querySelector("#to-turn").addEventListener("click", () => go("turn"));
   appEl.querySelector("#to-icons").addEventListener("click", () => go("icons"));
   appEl.querySelector("#reset-board").addEventListener("click", () => {
     if (!window.confirm("Wyczyścić tylko mapę (potwory i pozycje wiedźminów)?")) return;
@@ -887,9 +984,7 @@ function renderRef() {
       </div>
     </section>
   `);
-  appEl.querySelector("#to-turn").addEventListener("click", () =>
-    go("turn", { turn: { phase: "hub", screen: "hub" } })
-  );
+  appEl.querySelector("#to-turn").addEventListener("click", () => go("turn"));
   appEl.querySelector("#to-sources").addEventListener("click", () => go("sources"));
   appEl.querySelector("#reset").addEventListener("click", () => {
     if (!window.confirm("Wyczyścić cały zapis helpera (gracze, mapa, reputacja)?")) return;
@@ -911,9 +1006,7 @@ function renderIcons() {
       </div>
     </section>
   `);
-  appEl.querySelector("#to-turn").addEventListener("click", () =>
-    go("turn", { turn: { phase: "hub", screen: "hub" } })
-  );
+  appEl.querySelector("#to-turn").addEventListener("click", () => go("turn"));
   appEl.querySelector("#to-lexicon").addEventListener("click", () => go("lexicon"));
 }
 
@@ -936,9 +1029,7 @@ function renderLexicon() {
       </div>
     </section>
   `);
-  appEl.querySelector("#to-turn").addEventListener("click", () =>
-    go("turn", { turn: { phase: "hub", screen: "hub" } })
-  );
+  appEl.querySelector("#to-turn").addEventListener("click", () => go("turn"));
   appEl.querySelector("#to-sources").addEventListener("click", () => go("sources"));
 }
 

@@ -413,7 +413,7 @@ export function phase1AfterMove(isSolo) {
   return `
   <h3>Po ruchu możesz (w dowolnej kolejności)</h3>
   <ul class="checklist">
-    <li><strong>Akcja obszaru</strong> — raz na dany typ w tej turze.</li>
+    <li><strong>Akcja obszaru</strong> — każdą konkretną akcję obszaru najwyżej raz na turę (nawet po wyjściu i powrocie).</li>
     <li><strong>Poker</strong> — ${
       isSolo
         ? "z miejscowymi (solo: vs tabela na karcie pomocy)"
@@ -464,7 +464,7 @@ export const FIGHT_BRANCH = `
     <button class="choice" data-goto="fight-monster"><strong>Walka z potworem</strong><span>Żeton na Twoim obszarze</span></button>
     <button class="choice" data-goto="fight-witcher"><strong>Walka z wiedźminem</strong><span>Na tym samym obszarze</span></button>
   </div>
-  <p class="note">Tylko 1 walka na turę. Bez walki na szkole / zamkniętej karczmie. Bez walki z kimś po pokerze w tej turze.</p>
+  <p class="note">Tylko 1 walka na turę. <strong>Walka z wiedźminem</strong> zabroniona na szkole i na zamkniętej karczmie. Bez walki z kimś po pokerze w tej turze.</p>
 `;
 
 export function fightMonster(isSolo) {
@@ -479,20 +479,25 @@ export function fightMonster(isSolo) {
         ? `<li><strong>Solo — atak potwora:</strong> rzuć kością. <strong>1–3</strong> = szarża, <strong>4–6</strong> = ugryzienie.</li>`
         : `<li>Kontrolujący potwora wybiera: szarża albo ugryzienie.</li>`
     }
-    <li>Twoja tura: eliksiry / zdolność → kombinacja → obrażenia → dobór wg ataku.</li>
+    <li>Twoja tura: eliksiry / zdolność → kombinacja (≥1 karta, jeśli masz karty) → obrażenia (tarcza → talia → ręka) → dobór wg ataku.</li>
   </ol>
-  <p class="tip"><strong>Pokonanie:</strong> złoto, odwróć kartę, +reputacja, zmęczenie, trofeum.
-  ${
-    isSolo
-      ? ` <strong>Solo: NIE dobieraj nowego potwora</strong> po zabiciu.`
-      : ` Potem zwykle nowy potwór.`
-  }
-  → Faza III.</p>
-  <p class="tip"><strong>Odpędzenie:</strong> ${
-    isSolo
-      ? `umieść <strong>nowy żeton tego samego poziomu</strong> (jak w multi).`
-      : `nagrody wg instrukcji.`
-  } → Faza III.</p>
+  <h3>Wynik walki z potworem</h3>
+  <ul class="checklist">
+    <li><strong>Pokonanie</strong> (0 kart w talii potwora): <strong>2 złota</strong>, odwróć kartę potwora, +reputacja, zmęczenie, trofeum.
+      ${
+        isSolo
+          ? ` <strong>Solo: NIE dobieraj nowego potwora</strong>.`
+          : ` Potem zwykle nowy potwór (poziom +1; III→III).`
+      }
+    </li>
+    <li><strong>Odpędzenie</strong> (została 0–1 karta PW wg instrukcji / skrótu pomocy): nagrody wg karty pomocy; ${
+      isSolo
+        ? `umieść <strong>nowy żeton tego samego poziomu</strong>.`
+        : `nowy potwór tego samego poziomu.`
+    }</li>
+    <li><strong>Klęska</strong> (≥2 karty PW u potwora): nagrody/kary wg instrukcji; w fazie III często dobór tylko do 2.</li>
+  </ul>
+  <p class="lead">Potem → Faza III.</p>
 `;
 }
 
@@ -557,7 +562,7 @@ export function phase3(isSolo) {
   <ol class="checklist">
     <li><strong>Opcjonalnie</strong> odrzuć dowolną liczbę kart z ręki (instrukcja).</li>
     <li>Dobierz tyle, by mieć <strong>dokładnie 3</strong> karty na ręce (nie mylić z limitem 7). Pusta talia → tasuj odrzucone.</li>
-    <li>Kup <strong>1 kartę</strong> z puli (koszt nadrukowany ± pole −1/+1). Weź na rękę, przesuń pulę w prawo, odkryj nową na skrajne lewe.</li>
+    <li>Kup <strong>1 kartę</strong> z puli. <strong>Koszt = odrzucenie tylu kart z ręki</strong>, ile wynosi koszt nadrukowany ± pole −1/+1 — <em>nie płacisz złotem</em>. Weź kartę na rękę, przesuń pulę w prawo, odkryj nową na skrajne lewe.</li>
     ${
       isSolo
         ? `<li><strong>Solo:</strong> jeśli kupiłeś kartę <em>nie</em> ze skrajnie prawego pola — na koniec fazy <strong>odrzuć kartę ze skrajnie prawego pola</strong> na wspólny stos odrzuconych.</li>`

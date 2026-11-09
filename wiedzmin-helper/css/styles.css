@@ -277,6 +277,12 @@ h3 {
   border: 1px solid rgba(240, 230, 210, 0.22);
 }
 
+.btn-ghost.nav-active {
+  background: rgba(212, 176, 90, 0.28);
+  border-color: rgba(212, 176, 90, 0.55);
+  color: #fff6df;
+}
+
 .btn-danger {
   background: var(--danger);
   color: #fff7f2;

@@ -22,7 +22,7 @@ export const LOCATIONS = [
   { id: "ban-ard", name: "Ban Ard", terrain: "forest", x: 58, y: 40 },
   { id: "vengerberg", name: "Vengerberg", terrain: "water", x: 52, y: 52 },
   { id: "novigrad", name: "Novigrad", terrain: "water", x: 40, y: 42 },
-  { id: "oxenfurt", name: "Oxenfurt", terrain: "forest", x: 44, y: 50 },
+  { id: "loc-ichaer", name: "Loc Ichaer", terrain: "water", x: 44, y: 50 },
   { id: "wyzima", name: "Wyzima", terrain: "forest", x: 38, y: 58 },
   { id: "cidaris", name: "Cidaris", terrain: "water", x: 28, y: 48 },
   { id: "cintra", name: "Cintra", terrain: "forest", x: 32, y: 72 },
@@ -30,6 +30,7 @@ export const LOCATIONS = [
   { id: "glenmore", name: "Glenmore", terrain: "forest", x: 48, y: 68 },
   { id: "doldeth", name: "Doldeth", terrain: "mountain", x: 68, y: 62 },
   { id: "ard-modron", name: "Ard Modron", terrain: "mountain", x: 75, y: 72 },
+  { id: "dhuwod", name: "Dhuwod", terrain: "forest", x: 58, y: 58 },
   { id: "mantikora", name: "Szkoła Mantikory (0)", terrain: "school", x: 88, y: 55 },
 ];
 
@@ -40,8 +41,8 @@ export const ROADS = [
   ["hengfors", "ban-ard"],
   ["ban-ard", "vengerberg"],
   ["vengerberg", "novigrad"],
-  ["novigrad", "oxenfurt"],
-  ["oxenfurt", "wyzima"],
+  ["novigrad", "loc-ichaer"],
+  ["loc-ichaer", "wyzima"],
   ["novigrad", "cidaris"],
   ["cidaris", "beauclair"],
   ["beauclair", "cintra"],
@@ -55,7 +56,10 @@ export const ROADS = [
   ["haern-caduch", "cidaris"],
   ["haern-caduch", "hengfors"],
   ["ard-modron", "mantikora"],
-  ["ban-ard", "oxenfurt"],
+  ["ban-ard", "loc-ichaer"],
+  ["ban-ard", "dhuwod"],
+  ["dhuwod", "vengerberg"],
+  ["dhuwod", "doldeth"],
 ];
 
 export function locById(id) {

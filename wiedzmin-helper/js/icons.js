@@ -246,7 +246,7 @@ export function iconsLegendHtml() {
     <h3>Usuwanie kart vs odrzucenie</h3>
     ${row([
       [ICO.burn, "Usuń z gry / burn / trash", "Karta wraca do pudełka na stałe (też zmęczenie)."],
-      [ICO.discard, "Odrzuć", "Na Twój stos odrzuconych — wróci przy medytacji / tasowaniu."],
+      [ICO.discard, "Odrzuć", "Na Twój stos odrzuconych. Wraca do talii przy tasowaniu (np. pusta talia poza walką / po walce) — nie przy medytacji."],
       [ICO.fatigue, "Zmęczenie", "Przy wejściu na pole reputacji: usuń z gry tyle kart, ile mówi symbol przy polu (1→1, 2→2…)."],
       [ICO.reputation, "Reputacja", "Tor 0→4. 4. z walki wygrywa; medytacja jako „ostatnie” nie kończy gry."],
     ])}
@@ -255,7 +255,7 @@ export function iconsLegendHtml() {
     ${row([
       [ICO.attack, "Atak", "Dobór kart w walce"],
       [ICO.defense, "Obrona", "Limit tarczy; +1 obrona → +1 tarcza"],
-      [ICO.specialty, "Zdolność szkoły", "Raz na walkę (w swojej szkole / wg karty)"],
+      [ICO.specialty, "Zdolność szkoły", "Użycie w walce: raz na walkę (gdziekolwiek). Trening zdolności: tylko w swojej szkole."],
       [ICO.gold, "Złoto", "Bank / koszty / nagrody"],
       [ICO.shield, "Tarcza", "Blokuje obrażenia; po walce reset do obrony"],
       [ICO.trophy, "Trofeum", "Potwór / wiedźmin / medytacja → reputacja"],

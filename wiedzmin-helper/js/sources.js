@@ -96,7 +96,7 @@ export const RULE_CORRECTIONS = [
   },
   {
     title: "Faza III — kupno",
-    body: "Instrukcja każe kupić 1 kartę. FAQ Rebel #26: jeśli obiektywnie nie możesz kupić — nie kupujesz.",
+    body: "Koszt karty z puli = odrzucenie kart z ręki (nie złoto), wg nadruku ± pole. Kupno obowiązkowe; FAQ Rebel #26: jeśli obiektywnie nie możesz — pomijasz.",
   },
   {
     title: "Eliksiry",
