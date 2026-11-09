@@ -274,7 +274,11 @@ function renderRoster() {
   function syncFromDom() {
     appEl.querySelectorAll(".roster-card").forEach((card) => {
       const i = Number(card.dataset.idx);
-      const name = card.querySelector('[data-field="name"]').value.trim() || `Gracz ${i + 1}`;
+      const name =
+        card
+          .querySelector('[data-field="name"]')
+          .value.replace(/[<>]/g, "")
+          .trim() || `Gracz ${i + 1}`;
       const schoolId = card.querySelector('[data-field="schoolId"]').value;
       const prev = state.roster[i] || {};
       const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
@@ -555,10 +559,10 @@ function renderTurn() {
     turnShell(
       "Faza I — start",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: obowiązkowy ruch albo od razu faza II.</p>
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: instrukcja — <em>1 obowiązkowy ruch albo przejście do fazy II</em>. Nie zaczynasz akcją na obszarze, na którym już stoisz.</p>
         <div class="choice-grid">
-          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Odrzucam karty i idę</span></button>
-          <button class="choice" data-goto="phase2"><strong>Idę do fazy II</strong><span>Bez ruchu</span></button>
+          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Obowiązkowy ruch, potem akcje</span></button>
+          <button class="choice" data-goto="phase2"><strong>Idę do fazy II</strong><span>Bez ruchu i bez akcji obszaru</span></button>
         </div>
         ${MOVE_HELP}
       `
@@ -845,6 +849,7 @@ function renderBoard() {
   );
   appEl.querySelector("#to-icons").addEventListener("click", () => go("icons"));
   appEl.querySelector("#reset-board").addEventListener("click", () => {
+    if (!window.confirm("Wyczyścić tylko mapę (potwory i pozycje wiedźminów)?")) return;
     state.board = defaultBoard();
     state.roster.forEach((p) => {
       p.locationId = null;
@@ -887,6 +892,7 @@ function renderRef() {
   );
   appEl.querySelector("#to-sources").addEventListener("click", () => go("sources"));
   appEl.querySelector("#reset").addEventListener("click", () => {
+    if (!window.confirm("Wyczyścić cały zapis helpera (gracze, mapa, reputacja)?")) return;
     localStorage.removeItem(STORAGE_KEY);
     Object.assign(state, defaultState());
     render();

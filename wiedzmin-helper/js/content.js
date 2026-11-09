@@ -555,8 +555,8 @@ export function explore(isSolo) {
 export function phase3(isSolo) {
   return `
   <ol class="checklist">
-    <li>Odrzuć z ręki, by mieć <strong>max 3</strong> karty.</li>
-    <li>Dobierz do <strong>3</strong> kart na ręce (pusta talia → tasuj odrzucone; poza walką zawsze możesz tak odnowić talię).</li>
+    <li><strong>Opcjonalnie</strong> odrzuć dowolną liczbę kart z ręki (instrukcja).</li>
+    <li>Dobierz tyle, by mieć <strong>dokładnie 3</strong> karty na ręce (nie mylić z limitem 7). Pusta talia → tasuj odrzucone.</li>
     <li>Kup <strong>1 kartę</strong> z puli (koszt nadrukowany ± pole −1/+1). Weź na rękę, przesuń pulę w prawo, odkryj nową na skrajne lewe.</li>
     ${
       isSolo

@@ -80,7 +80,11 @@ export const SOURCES = [
 export const RULE_CORRECTIONS = [
   {
     title: "Start tury — najpierw ruch",
-    body: "Nie możesz zacząć tury akcją na obszarze, na którym już stoisz. Albo obowiązkowy ruch, albo od razu faza II (FAQ społeczności + instrukcja).",
+    body: "Instrukcja: na początku fazy I musisz wykonać 1 obowiązkowy ruch albo przejść do fazy II. Nie zaczynasz tury akcją obszaru, na którym już stoisz.",
+  },
+  {
+    title: "Faza III — dobór do 3 (nie do 7)",
+    body: "Po opcjonalnym odrzuceniu dobierasz, by mieć 3 karty na ręce, potem kupujesz 1. Limit 7 to osobny sufit (FAQ Rebel #25).",
   },
   {
     title: "Usuwanie kart ≠ odrzucenie",
@@ -136,10 +140,12 @@ export function sourcesHtml() {
 
   return `
     <p class="lead">Zasady w helperze są oparte na instrukcji Rebel + FAQ oficjalnym. Poniżej skróty filmów/forów (tylko podstawka).</p>
-    <p class="note">YouTube blokuje bezpośrednie pobieranie napisów z serwerów chmurowych — użyto publicznie dostępnych opisów, rozdziałów i fragmentów napisów z wyszukiwarek oraz pełnego FAQ PDF.</p>
+    <p class="note">YouTube blokuje bezpośrednie pobieranie napisów z serwerów chmurowych — w projekcie jest pakiet <code>research/</code> ze spisami rozdziałów YT, cytatami z PDF Rebel i FAQ społeczności.</p>
     <h3>Źródła</h3>
     <ul class="checklist">${list}</ul>
     <h3>Pułapki i doprecyzowania (zweryfikowane)</h3>
     <ul class="checklist">${fixes}</ul>
+    <h3>Faza III — nie mylić z limitem 7</h3>
+    <p class="tip">Instrukcja: dobierz do <strong>3</strong> kart na ręce, potem kup 1. Limit <strong>7</strong> to sufit (FAQ #25), nie cel doboru w fazie III.</p>
   `;
 }

@@ -41,17 +41,24 @@ export function handAfterFatigue(cards, rep) {
   return { lose, after, before: cards };
 }
 
+/** Faza III (instrukcja): opcjonalnie odrzuć dowolną liczbę, potem dobierz do 3 na ręce, kup 1.
+ *  Limit 7 to osobny sufit (FAQ #25), nie cel doboru w fazie III. */
 export function phase3DrawHint(cardsInHand) {
-  const limit = 7;
-  const need = Math.max(0, limit - cardsInHand);
+  const phase3Target = 3;
+  const hardLimit = 7;
+  const afterDiscardAssume = Math.min(cardsInHand, phase3Target);
+  const need = Math.max(0, phase3Target - afterDiscardAssume);
   return {
-    limit,
+    limit: hardLimit,
+    phase3Target,
     drawUpTo: need,
-    afterDraw: Math.min(limit, cardsInHand + need),
+    afterDraw: phase3Target,
     note:
-      cardsInHand >= limit
-        ? "Masz już 7 — poza walką najpierw odrzuć, by po dobraniu mieć ≤7 (FAQ #25)."
-        : `Dobierz do 7: teoretycznie do ${need} kart(y), potem obowiązkowy zakup 1 z puli.`,
+      cardsInHand > phase3Target
+        ? `Masz ${cardsInHand} → w fazie III zwykle odrzucasz (dowolną liczbę), potem dobierasz do 3, potem kupujesz 1 (limit ręki nadal 7).`
+        : cardsInHand < phase3Target
+          ? `Dobierz do 3: +${need} kart(y), potem kup 1 z puli (limit ręki 7).`
+          : "Masz 3 — w fazie III możesz odrzucić część i dobrać z powrotem do 3, potem kup 1.",
   };
 }
 
@@ -285,22 +292,22 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
           <details class="tracker-math">
             <summary><strong>Ile kart: traci / zostaje / dobiera</strong></summary>
             <ul class="checklist">
-              <li><strong>Teraz na ręce:</strong> ${p.cards ?? 0} (limit 7 poza walką)</li>
+              <li><strong>Teraz na ręce:</strong> ${p.cards ?? 0} (sufit 7; w fazie III cel doboru = <strong>3</strong>)</li>
               <li><strong>Przy +1 reputacji (→ ${nextRep}):</strong> zmęczenie usuwa z gry <strong>${afterFat.lose}</strong> kart(y)
-                → zostało by <strong>${afterFat.after}</strong>
-                <div>Instrukcja: symbol zmęczenia przy polu reputacji; przykład: 1. trofeum = usuń 1.</div>
+                → ręka orientacyjnie <strong>${afterFat.after}</strong> (jeśli usuwasz z ręki)
+                <div>Instrukcja: możesz usuwać z ręki / talii / odrzuconych; potem tasujesz talię. Przykład: 1. trofeum = 1 karta.</div>
               </li>
-              <li><strong>Faza III (dobór do 7):</strong> ${escapeHtml(draw.note)}
-                <div>Po dobraniu orientacyjnie: ${draw.afterDraw}, potem kup 1 z puli (na rękę).</div>
+              <li><strong>Faza III (dobór do 3):</strong> ${escapeHtml(draw.note)}
+                <div>Po kroku doboru orientacyjnie: ${draw.afterDraw} na ręce, potem kup 1 z puli.</div>
               </li>
               <li><strong>Start tej pozycji przy stole:</strong> ${start.cards} kart, ${start.gold} złota</li>
             </ul>
             <div class="actions" style="margin-top:0.6rem">
               <button type="button" class="btn btn-primary" data-apply-fatigue data-idx="${i}">
-                +1 reputacja i odejmij zmęczenie (${fat} kart)
+                +1 reputacja i odejmij zmęczenie z ręki (${fat} kart)
               </button>
               <button type="button" class="btn btn-secondary" data-apply-draw7 data-idx="${i}">
-                Ustaw rękę jak po doborze do 7
+                Ustaw rękę jak po doborze fazy III (3)
               </button>
             </div>
           </details>
