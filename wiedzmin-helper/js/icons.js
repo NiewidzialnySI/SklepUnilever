@@ -7,50 +7,49 @@ function svg(inner, { size = 28, className = "", view = "0 0 24 24" } = {}) {
 }
 
 export const ICO = {
-  /** Żeton obszaru: 3 świerki (środkowy najwyższy) — wzór własny pod zdjęcie żetonu. */
+  /** Żeton las — styl „pergamin” (3 świerki). */
   forest: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.2"/>
-       <path d="M6.2 18.2 L8.8 12.2 L11.4 18.2 Z" fill="currentColor" stroke="none" opacity="0.75"/>
-       <path d="M12.6 18.2 L15.2 12.2 L17.8 18.2 Z" fill="currentColor" stroke="none" opacity="0.75"/>
-       <path d="M8.4 18.4 L12 7.2 L15.6 18.4 Z" fill="currentColor" stroke="none"/>
-       <path d="M12 18.4 V20.2" stroke="currentColor" stroke-width="1.4"/>`,
+      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
+       <path d="M5.1 18.1 L7.85 11.6 L10.6 18.1 Z" fill="#4a6b3d" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
+       <path d="M13.4 18.1 L16.15 11.6 L18.9 18.1 Z" fill="#4a6b3d" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
+       <path d="M8.15 18.35 L12 6.2 L15.85 18.35 Z" fill="#3f6234" stroke="#1a1814" stroke-width="0.85" stroke-linejoin="round"/>
+       <path d="M9.5 13.3 L12 8.55 L14.5 13.3 Z" fill="#557844" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>
+       <path d="M11.35 18.35 V20.05" stroke="#1a1814" stroke-width="1.35" stroke-linecap="round"/>`,
       { className: "ico-forest" }
     ),
-  /** Żeton obszaru: dwa ostre szczyty ze śniegiem. */
+  /** Żeton góry — dwa szczyty ze śniegiem. */
   mountain: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
-       <path d="M3.8 18.6 L9.2 7.4 L12.2 12.2 L14.6 8.2 L20.2 18.6 Z" fill="currentColor" stroke="none" opacity="0.85"/>
-       <path d="M9.2 7.4 L10.6 10.2 L8.4 10.6 Z" fill="#f7efd8" stroke="none"/>
-       <path d="M14.6 8.2 L15.8 10.4 L13.8 10.7 Z" fill="#f7efd8" stroke="none"/>`,
+      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
+       <path d="M3.4 18.55 L8.85 7.15 L12.05 12.35 L14.75 8.35 L20.6 18.55 Z" fill="#7a7a76" stroke="#1a1814" stroke-width="0.85" stroke-linejoin="round"/>
+       <path d="M12.05 12.35 L14.75 8.35 L16.9 12.9 Z" fill="#5e5e5a" stroke="none"/>
+       <path d="M8.85 7.15 L10.55 10.35 L7.75 10.55 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>
+       <path d="M14.75 8.35 L16.2 10.7 L13.7 10.9 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>`,
       { className: "ico-mountain" }
     ),
-  /** Żeton obszaru: trzy spienione fale. */
+  /** Żeton woda — zawinięte fale. */
   water: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
-       <path d="M4.2 15.2c1.6-2.2 3.4-2.4 5.2-.2 1.2 1.5 2.2 1.6 3.4.1 1.7-2.1 3.6-2.2 5.4.1" stroke="currentColor" stroke-width="1.8" fill="none"/>
-       <path d="M4.5 11.4c1.5-2 3.2-2.2 4.8-.15 1.1 1.4 2.1 1.45 3.2.05 1.6-1.95 3.4-2.05 5.1.05" stroke="currentColor" stroke-width="1.6" fill="none" opacity="0.85"/>
-       <path d="M5.2 8.2c1.2-1.55 2.6-1.7 3.9-.1.9 1.1 1.7 1.15 2.6 0 1.35-1.55 2.85-1.65 4.3 0" stroke="currentColor" stroke-width="1.45" fill="none" opacity="0.7"/>
-       <path d="M15.6 9.1c.55-.15 1.15.05 1.55.55.55.7.35 1.55-.25 1.85" stroke="#f7efd8" stroke-width="1.2" fill="none"/>`,
+      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
+       <path d="M4.2 16.4 C6.2 13.2, 9.1 12.4, 11.6 14.6 C10.4 12.1, 8.1 10.6, 5.5 10.5 C7.1 8.7, 9.6 8.2, 12.1 9.4 C13.6 10.2, 14.5 11.6, 14.7 13.2 C15.0 15.6, 13.5 17.6, 11.1 18.5 C8.4 19.5, 5.4 18.8, 4.2 16.4 Z" fill="#6fa0b8" stroke="#1a1814" stroke-width="0.8" stroke-linejoin="round"/>
+       <path d="M9.4 11.0 C10.6 10.2, 12.2 10.35, 13.1 11.5 C11.7 11.7, 10.4 11.55, 9.4 11.0 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.4"/>
+       <path d="M5.8 13.7 C7.4 12.0, 9.6 11.7, 11.5 13.4 C10.4 11.8, 8.5 10.9, 6.5 11.0 C7.5 10.0, 9.0 9.7, 10.5 10.3" fill="none" stroke="#3f6f86" stroke-width="0.7"/>
+       <path d="M14.2 10.8 C15.8 9.0, 18.0 8.7, 19.6 10.5 C18.2 8.4, 15.7 7.8, 13.5 8.9 C14.6 8.3, 15.9 8.3, 16.9 8.9" fill="none" stroke="#1a1814" stroke-width="0.75" stroke-linecap="round"/>
+       <path d="M15.05 9.55 C15.85 9.0, 16.9 9.15, 17.45 9.95 C16.5 10.05, 15.65 9.9, 15.05 9.55 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.35"/>`,
       { className: "ico-water" }
     ),
-  /**
-   * Symbol na karcie: woda | las | góry w jednym okręgu (jak na karcie akcji).
-   */
+  /** Na karcie: woda + las + góry w jednym okręgu (ten sam styl żetonu). */
   wild: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.7" fill="#a9c0ce" stroke="#5f8296" stroke-width="1.4"/>
-       <circle cx="12" cy="12" r="9.2" fill="#d6c7ae" stroke="#8f806a" stroke-width="0.5"/>
-       <path d="M3.2 15.2 C4.6 12.4, 6.4 11.2, 8.5 12.4 C7.9 10.6, 6.5 9.5, 4.9 9.2 C5.8 8.1, 7.2 7.7, 8.7 8.3 C9.6 8.7, 10.1 9.5, 10.2 10.5 C10.35 12.2, 9.5 13.7, 8.1 14.6 C6.6 15.55, 4.7 15.7, 3.2 15.2 Z" fill="#4f92b2" stroke="#2f6a86" stroke-width="0.45"/>
-       <path d="M5.1 10.05 C5.85 9.55, 6.85 9.65, 7.45 10.35 C6.55 10.55, 5.7 10.45, 5.1 10.05 Z" fill="#eaf6fb" stroke="none"/>
-       <path d="M9.0 17.7 L12 6.5 L15.0 17.7 Z" fill="#276532" stroke="#1a4222" stroke-width="0.45"/>
-       <path d="M10.15 13.6 L12 8.35 L13.85 13.6 Z" fill="#3a813f" stroke="none"/>
-       <path d="M10.75 11.15 L12 8.7 L13.25 11.15 Z" fill="#4b984f" stroke="none"/>
-       <path d="M11.35 17.7 V19.15" stroke="#16351b" stroke-width="1.4" stroke-linecap="round"/>
-       <path d="M14.75 17.75 L17.2 7.85 L19.15 11.7 L20.85 17.75 Z" fill="#f7f5ef" stroke="#5c5a54" stroke-width="0.5"/>
-       <path d="M17.2 7.85 L18.2 10.2 L16.35 10.4 Z" fill="#ffffff" stroke="none"/>`,
+      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
+       <path d="M2.85 15.35 C4.2 12.7, 6.15 11.7, 8.2 13.0 C7.55 11.15, 6.0 10.1, 4.35 9.95 C5.35 8.7, 7.0 8.35, 8.55 9.15 C9.5 9.7, 10.05 10.7, 10.15 11.85 C10.3 13.7, 9.25 15.3, 7.6 16.15 C5.85 17.05, 3.85 16.85, 2.85 15.35 Z" fill="#6fa0b8" stroke="#1a1814" stroke-width="0.65" stroke-linejoin="round"/>
+       <path d="M5.0 10.85 C5.75 10.3, 6.8 10.4, 7.4 11.2 C6.45 11.35, 5.55 11.2, 5.0 10.85 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.3"/>
+       <path d="M8.95 17.85 L12 6.35 L15.05 17.85 Z" fill="#3f6234" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
+       <path d="M10.15 13.55 L12 8.55 L13.85 13.55 Z" fill="#557844" stroke="#1a1814" stroke-width="0.4" stroke-linejoin="round"/>
+       <path d="M11.35 17.85 V19.2" stroke="#1a1814" stroke-width="1.2" stroke-linecap="round"/>
+       <path d="M14.7 17.9 L17.25 7.7 L19.2 11.7 L20.85 17.9 Z" fill="#8a8a86" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
+       <path d="M17.25 7.7 L18.3 10.15 L16.3 10.35 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.35" stroke-linejoin="round"/>`,
       { className: "ico-wild" }
     ),
   gold: () =>
