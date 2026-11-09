@@ -61,11 +61,11 @@ export function monsterEncounterHtml(loc, monster) {
   const lvl = monster.level ? ` poziom ${escapeHtml(String(monster.level))}` : "";
   const label = monster.label ? ` — ${escapeHtml(monster.label)}` : "";
   return `
-    <div class="guide-box guide-monster-hit" role="alert">
+    <div class="guide-box guide-monster-hit" role="status">
       <p class="step-kicker" style="margin:0">${ICO.monster()} Potwór na polu</p>
-      <h3 style="margin:0.25rem 0 0.4rem">Wszedłeś na <strong>${escapeHtml(loc.name)}</strong></h3>
-      <p class="lead" style="margin:0">Tu stoi potwór${lvl}${label} (×${monster.count}). Helper prowadzi Cię do <strong>walki</strong>.</p>
-      <p class="note" style="margin:0.45rem 0 0">Na stole: nie musisz walczyć w fazie I — ale jak już wszedłeś na żeton, zwykle idziesz w fazę II → walka. Tu skracamy drogę.</p>
+      <h3 style="margin:0.25rem 0 0.4rem">Na <strong>${escapeHtml(loc.name)}</strong> stoi potwór${lvl}${label} (×${monster.count})</h3>
+      <p class="lead" style="margin:0"><strong>Nie musisz walczyć.</strong> Instrukcja: w fazie II <em>możesz</em> walczyć z potworem na tym samym obszarze — albo wybrać medytację albo eksplorację.</p>
+      <p class="note" style="margin:0.45rem 0 0">Teraz jesteś w fazie I: akcje obszaru / zadanie / kolejny ruch. Walka dopiero gdy w fazie II wybierzesz „Walka”.</p>
     </div>
   `;
 }
@@ -75,7 +75,7 @@ export function monstersPanelHtml(board) {
   return `
     <div class="monsters-panel">
       <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Po wejściu gracza na to pole helper odpali walkę.</p>
+      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Wejście na potwora <strong>nie wymusza</strong> walki — w fazie II możesz wybrać walkę, medytację albo eksplorację.</p>
       <div class="actions" style="margin:0.55rem 0">
         <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "I" ? "btn-primary" : ""}" data-monster-level="I">Poz. I</button>
         <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "II" ? "btn-primary" : ""}" data-monster-level="II">Poz. II</button>

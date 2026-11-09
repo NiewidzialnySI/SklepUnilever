@@ -180,7 +180,7 @@ export function questArrivalHtml(player, locId) {
       <p class="step-kicker" style="margin:0">${ICO.quest()} Zadanie na tym polu</p>
       <h3 style="margin:0.25rem 0 0.4rem">Jesteś na <strong>${escapeHtml(loc?.name || "?")}</strong></h3>
       <p class="lead" style="margin:0"><strong>Faza I</strong> — możesz <em>opcjonalnie</em> rozwiązać zadanie teraz (Event z nr poniżej). To <strong>nie</strong> jest faza II.</p>
-      <p class="note" style="margin:0.35rem 0 0">Jeśli na polu jest też potwór: najpierw zadanie (faza I), potem w fazie II wybierasz <strong>tylko 1</strong> rzecz — walka <em>albo</em> medytacja <em>albo</em> eksploracja. Nie robisz walki i potem karty zadania w tej samej fazie II.</p>
+      <p class="note" style="margin:0.35rem 0 0">Jeśli na polu jest też potwór: zadanie rozwiązujesz w fazie I (opcjonalnie). W fazie II wybierasz <strong>tylko 1</strong> — walka jest <em>opcjonalna</em> (możesz zamiast niej medytować albo eksplorować).</p>
       <ul class="checklist">
         ${list
           .map(
