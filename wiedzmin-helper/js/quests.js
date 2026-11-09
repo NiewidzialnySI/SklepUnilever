@@ -23,25 +23,28 @@ export function newQuestId() {
 }
 
 /** Wybór talii eksploracji: miasto / dzikie ostępy — karty Gemini. */
-export function exploreDeckChooserHtml({ selected } = {}) {
+export function exploreDeckChooserHtml({ selected = null } = {}) {
   return `
-    <div class="guide-box guide-explore-choice">
-      <p class="step-kicker" style="margin:0">Faza II — eksploracja</p>
-      <h3 style="margin:0.25rem 0 0.4rem">Co eksplorujesz?</h3>
-      <p class="lead" style="margin:0">Wybierz talię: <strong>miasto</strong> albo <strong>dzikie ostępy</strong>.</p>
+    <div class="explore-chooser">
+      <h2 class="explore-chooser-title">Co eksplorujesz?</h2>
+      <p class="lead" style="margin:0">Kliknij kartę: <strong>dzikie ostępy</strong> albo <strong>miasto</strong>.</p>
       <div class="explore-card-grid" role="group" aria-label="Talia eksploracji">
-        <button type="button" class="explore-card ${selected === "wilds" ? "active" : ""}" data-explore-deck="wilds" aria-pressed="${
-          selected === "wilds" ? "true" : "false"
-        }">
-          <img src="./img/explore/wilds.png" alt="" width="180" height="360" decoding="async" />
-          <span class="explore-card-label"><strong>Dzikie ostępy</strong><span>Zielona talia</span></span>
-        </button>
-        <button type="button" class="explore-card ${selected === "city" ? "active" : ""}" data-explore-deck="city" aria-pressed="${
-          selected === "city" ? "true" : "false"
-        }">
-          <img src="./img/explore/city.png" alt="" width="180" height="360" decoding="async" />
-          <span class="explore-card-label"><strong>Miasto</strong><span>Szara talia</span></span>
-        </button>
+        <div class="explore-card-slot">
+          <button type="button" class="explore-card ${selected === "wilds" ? "active" : ""}" data-explore-deck="wilds" aria-label="Dzikie ostępy" aria-pressed="${
+            selected === "wilds" ? "true" : "false"
+          }">
+            <img src="./img/explore/wilds.png" alt="" width="180" height="272" decoding="async" draggable="false" />
+          </button>
+          <span class="explore-card-label"><strong>Dzikie ostępy</strong></span>
+        </div>
+        <div class="explore-card-slot">
+          <button type="button" class="explore-card ${selected === "city" ? "active" : ""}" data-explore-deck="city" aria-label="Miasto" aria-pressed="${
+            selected === "city" ? "true" : "false"
+          }">
+            <img src="./img/explore/city.png" alt="" width="180" height="272" decoding="async" draggable="false" />
+          </button>
+          <span class="explore-card-label"><strong>Miasto</strong></span>
+        </div>
       </div>
     </div>
   `;
