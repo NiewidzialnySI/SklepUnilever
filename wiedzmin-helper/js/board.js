@@ -60,11 +60,20 @@ export function monstersList(board) {
 
 export const MONSTER_TERRAINS = ["forest", "mountain", "water"];
 
-/** Lokacje danego terenu (numery z planszy) — do wyboru żetonu obszaru. */
+/**
+ * Lokacje danego terenu z żetonem obszaru (do wyboru numeru potwora).
+ * Behelt Nar (0, Szkoła Mantikory) nie ma żetonu obszaru — instrukcja str. 11.
+ * Pozostałe szkoły (Kaer Seren itd.) mają żetony i potwór może tam stanąć
+ * (nawet razem z wiedźminem; walka z potworem na szkole jest dozwolona).
+ */
 export function locationsForTerrain(terrain) {
-  return LOCATIONS.filter((l) => l.terrain === terrain).sort(
-    (a, b) => (a.number ?? 99) - (b.number ?? 99)
-  );
+  return LOCATIONS.filter(
+    (l) =>
+      l.terrain === terrain &&
+      typeof l.number === "number" &&
+      l.number !== 0 &&
+      l.id !== "behelt-nar"
+  ).sort((a, b) => a.number - b.number);
 }
 
 /** Inny potwór już zajmuje ten sam rodzaj terenu (las / góry / woda). */
@@ -100,6 +109,12 @@ export function setMonsterForTerrain(board, terrain, locId, { level } = {}) {
       reason: `Lokacja ${loc.name} to ${TERRAIN[loc.terrain]?.label || loc.terrain}, nie ${
         TERRAIN[terrain]?.label || terrain
       }.`,
+    };
+  }
+  if (loc.number === 0 || loc.id === "behelt-nar") {
+    return {
+      ok: false,
+      reason: "Behelt Nar (0) nie ma żetonu obszaru — tu nie stawia się potworów.",
     };
   }
   const lv = level || "I";
@@ -166,7 +181,12 @@ export function sanitizeMonstersUniqueTerrain(board) {
       continue;
     }
     const loc = locById(id);
-    if (!loc || !MONSTER_TERRAINS.includes(loc.terrain)) {
+    if (
+      !loc ||
+      !MONSTER_TERRAINS.includes(loc.terrain) ||
+      loc.number === 0 ||
+      loc.id === "behelt-nar"
+    ) {
       delete board.monsters[id];
       continue;
     }
@@ -389,7 +409,7 @@ export function monstersPanelHtml(board, { editable = true } = {}) {
   }).join("");
 
   const lead = editable
-    ? `Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy.`
+    ? `Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy. Szkoła (np. Kaer Seren) jest OK, jeśli tak wyszło na żetonie; <strong>Behelt Nar (0)</strong> nie ma żetonu.`
     : `Aktualne żetony na mapie (tylko podgląd). Zmiany w trakcie gry — przez wynik walki / spawn, nie ręczną edycję.`;
 
   return `
