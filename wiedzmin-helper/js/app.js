@@ -118,6 +118,7 @@ function defaultState() {
     roster: [],
     activeIndex: 0,
     setupIndex: 0,
+    turnNumber: 1,
     turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null, exploreDeck: null },
     board: defaultBoard(),
     orderDice: [],
@@ -192,6 +193,7 @@ function normalizeState(raw) {
     "sources",
   ]);
   roster.forEach((p) => ensureCombatTrack(ensurePlayerTrack(p)));
+  const turnNumber = Math.max(1, Math.min(999, Number(raw.turnNumber) || 1));
   return {
     ...base,
     view: views.has(raw.view) ? raw.view : "home",
@@ -199,6 +201,7 @@ function normalizeState(raw) {
     roster,
     activeIndex: Math.max(0, Number(raw.activeIndex) || 0),
     setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
+    turnNumber,
     turn,
     board,
     orderDice: Array.isArray(raw.orderDice) ? raw.orderDice.map(Number) : [],
@@ -837,6 +840,7 @@ function renderSetup() {
     toTurn.addEventListener("click", () => {
       applyStartResources(state.roster, state.players, { force: true });
       state.activeIndex = 0;
+      state.turnNumber = 1;
       go("turn", { turn: { phase: "hub", screen: "hub" } });
     });
   }
@@ -864,7 +868,9 @@ function turnShell(title, body) {
     <section class="panel">
       <div class="badge-row">
         <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
+        ${isSolo() ? `<span class="badge">Tura ${state.turnNumber || 1}</span>` : ""}
       </div>
+      ${soloTurnBadgeHtml()}
       <div class="phase-tabs">
         ${tabs
           .map(
@@ -880,6 +886,7 @@ function turnShell(title, body) {
     </section>
   `);
 
+  bindSoloTurnCounter();
   appEl.querySelectorAll("[data-phase]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-phase");
@@ -920,10 +927,39 @@ function setTurn(phase, screen, extra = {}) {
 function nextPlayer() {
   if (isSolo()) {
     state.activeIndex = 0;
+    state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
   } else {
-    state.activeIndex = (state.activeIndex + 1) % state.players;
+    // Pełna runda: gdy wracamy do pierwszego gracza, +1 tura
+    const next = (state.activeIndex + 1) % state.players;
+    if (next === 0) state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
+    state.activeIndex = next;
   }
   setTurn("hub", "hub");
+}
+
+function soloTurnBadgeHtml() {
+  if (!isSolo()) return "";
+  const n = state.turnNumber || 1;
+  return `
+    <div class="solo-turn-counter" role="status" aria-live="polite">
+      <span class="solo-turn-label">Tura</span>
+      <strong class="solo-turn-num">${n}</strong>
+      <span class="solo-turn-actions">
+        <button type="button" class="btn btn-secondary" data-turn-delta="-1" title="Cofnij turę" ${n <= 1 ? "disabled" : ""}>−</button>
+        <button type="button" class="btn btn-secondary" data-turn-delta="1" title="Dodaj turę">+</button>
+      </span>
+    </div>`;
+}
+
+function bindSoloTurnCounter() {
+  appEl.querySelectorAll("[data-turn-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const delta = Number(btn.getAttribute("data-turn-delta"));
+      state.turnNumber = Math.max(1, Math.min(999, (state.turnNumber || 1) + delta));
+      saveState();
+      render();
+    });
+  });
 }
 
 function bindChoices() {
@@ -1158,12 +1194,12 @@ function renderTurn() {
          </div>`;
 
     turnShell(
-      solo ? "Twoja tura" : `Tura: ${escapeHtml(p.name)}`,
+      solo ? `Twoja tura · nr ${state.turnNumber || 1}` : `Tura: ${escapeHtml(p.name)}`,
       `
         ${picker}
         <p class="lead">${
           solo
-            ? "Fazy I → II → III. Notuj numer tury. Start: 5 kart, 3 złota."
+            ? "Fazy I → II → III. Licznik tur liczy się automatycznie (po „Koniec tury”). Start: 5 kart, 3 złota."
             : "Aktywny rozgrywa I → II → III. Kolejność zgodnie z zegarem (pierwszy = index 0 w składzie)."
         }</p>
         ${solo ? "" : `<h3>Startowe zasoby (przypomnienie)</h3>${resourcesTable(state.players)}`}
@@ -1708,15 +1744,20 @@ function renderTurn() {
     const hint = phase3DrawHint(p.cards || 0);
     const next = state.roster[(state.activeIndex + 1) % state.players];
     turnShell(
-      "Podsumowanie tury",
-      turnSummaryHtml(p, { phase3Hint: hint, schoolName: schoolById(p.schoolId).short })
+      solo ? `Podsumowanie · tura ${state.turnNumber || 1}` : "Podsumowanie tury",
+      turnSummaryHtml(p, {
+        phase3Hint: hint,
+        schoolName: schoolById(p.schoolId).short,
+        turnNumber: state.turnNumber || 1,
+        isSolo: solo,
+      })
     );
     bindQuestForms(p);
     addTurnButtons([
       {
         id: "next",
         label: solo
-          ? "Koniec tury (+1) — znów Ty"
+          ? `Koniec tury ${state.turnNumber || 1} → start tury ${(state.turnNumber || 1) + 1}`
           : `Koniec tury → ${escapeHtml(next.name)}`,
         primary: true,
         onClick: () => nextPlayer(),

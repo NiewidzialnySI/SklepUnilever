@@ -203,7 +203,7 @@ export function questArrivalHtml(player, locId) {
 }
 
 /** Podsumowanie po fazie III. */
-export function turnSummaryHtml(player, { phase3Hint, schoolName } = {}) {
+export function turnSummaryHtml(player, { phase3Hint, schoolName, turnNumber, isSolo } = {}) {
   if (!player) return "";
   const loc = player.locationId ? locById(player.locationId) : null;
   const quests = ensureQuests(player);
@@ -211,11 +211,16 @@ export function turnSummaryHtml(player, { phase3Hint, schoolName } = {}) {
   const gold = player.gold ?? 0;
   const elixirs = player.elixirs ?? 0;
   const hint = phase3Hint || {};
+  const turnLine =
+    turnNumber != null
+      ? `<li><strong>Tura:</strong> ${Number(turnNumber)}${isSolo ? " <span class=\"note\">(helper liczy automatycznie)</span>" : ""}</li>`
+      : "";
   return `
     <div class="guide-box turn-summary">
       <p class="step-kicker" style="margin:0">Koniec tury — podsumowanie</p>
       <h3 style="margin:0.25rem 0 0.45rem">${escapeHtml(player.name)}${schoolName ? ` · ${escapeHtml(schoolName)}` : ""}</h3>
       <ul class="checklist">
+        ${turnLine}
         <li><strong>Lokalizacja:</strong> ${loc ? `${escapeHtml(loc.name)} (#${loc.number})` : "—"}</li>
         <li><strong>Karty na ręce:</strong> ${cards} <span class="note">(po fazie III zwykle 3 przed/po kupnie — limit 7)</span></li>
         <li><strong>Złoto:</strong> ${gold}</li>
