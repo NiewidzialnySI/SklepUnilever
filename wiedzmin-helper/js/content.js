@@ -469,6 +469,20 @@ export const FIGHT_BRANCH = `
 
 export function fightMonster(isSolo) {
   return `
+  <div class="tip">
+    <strong>Bardzo prosto (jak dla dziecka):</strong>
+    <ol class="checklist">
+      <li><strong>Tarcza</strong> = zbroja. Jak spadnie do 0, dalej żyjesz. Po prostu następnym razem boli bardziej.</li>
+      <li><strong>Talia wytrzymałości</strong> = Twoje życie (stos kart obok). Jak ktoś Cię bije i nie masz tarczy, zdejmujesz karty z tego stosu.</li>
+      <li><strong>Ręka</strong> = karty, którymi bijesz / bronisz w tej chwili.</li>
+      <li>Bijecie się na zmianę: Ty → potwór → Ty → potwór…</li>
+      <li>Potwór „umiera”, gdy skończą mu się karty w jego stosie walki.</li>
+      <li>Ty „padasz”, dopiero gdy <em> Twój stos życia jest pusty i nie masz już kart na ręce</em>. Samo „tarcza 0” to NIE padnięcie.</li>
+      <li>Jak padniesz, a potworowi zostało mało kart (&lt;2) = prawie wygrałeś → <strong>odpędzenie</strong> (dostajesz złoto).</li>
+      <li>Jak padniesz, a potworowi zostało dużo (≥2) = <strong>przegrana</strong> (dostajesz trop + słabszą fazę III).</li>
+    </ol>
+  </div>
+
   <p class="tip"><strong>Jesteś tuż po przygotowaniu?</strong> Talię + odrzucone złożyłeś w <em>talię wytrzymałości</em>, ręka została (nawet 1 karta) — <strong>OK, tak ma być</strong>. Dalej idzie naprzemienna walka.</p>
 
   <h3>0. Start walki (checklist)</h3>
