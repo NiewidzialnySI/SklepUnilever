@@ -637,31 +637,45 @@ function renderOrder() {
   const remaining = state.roster.length - diceDone;
 
   shell(`
-    <section class="panel">
+    <section class="panel order-panel">
       <p class="step-kicker">Kolejność przy stole</p>
       <h1>Kto pierwszy?</h1>
-      <ul class="order-list" id="order-list">
-        ${state.roster
-          .map((p, i) => {
-            const res = startResourcesFor(state.players, i);
-            return `
-            <li class="order-item" draggable="true" data-idx="${i}">
-              <span class="order-pos">${i + 1}.</span>
-              <span class="player-chip" style="background:${escapeAttr(
-                schoolById(p.schoolId).color || "#244833"
-              )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
-              <span class="tip" style="margin:0">→ ${res.cards} kart · ${res.gold} złota</span>
-              <button type="button" class="btn btn-secondary" data-order-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
-              <button type="button" class="btn btn-secondary" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""}>↓</button>
-            </li>`;
-          })
-          .join("")}
-      </ul>
-      <div class="actions">
-        <button type="button" class="btn btn-secondary" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
+      <div class="order-box">
+        <div class="order-box-head">
+          <span>Gracz</span>
+          <span class="order-box-head-meta">Start</span>
+          <span class="order-box-head-actions" aria-hidden="true"></span>
+        </div>
+        <ul class="order-list" id="order-list">
+          ${state.roster
+            .map((p, i) => {
+              const res = startResourcesFor(state.players, i);
+              const school = schoolById(p.schoolId);
+              const color = school.color || "#244833";
+              return `
+              <li class="order-item" draggable="true" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+                <span class="order-handle" aria-hidden="true" title="Przeciągnij">⋮⋮</span>
+                <span class="order-pos">${i + 1}</span>
+                <span class="order-avatar" style="background:${escapeAttr(color)}">${schoolIcon(p.schoolId)}</span>
+                <div class="order-identity">
+                  <strong class="order-name">${escapeHtml(p.name)}</strong>
+                  <span class="order-school">${escapeHtml(school.short)}</span>
+                </div>
+                <span class="order-meta">${res.cards} kart · ${res.gold} złota</span>
+                <div class="order-move">
+                  <button type="button" class="order-icon-btn" data-order-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Wyżej">↑</button>
+                  <button type="button" class="order-icon-btn" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""} aria-label="Niżej">↓</button>
+                </div>
+              </li>`;
+            })
+            .join("")}
+        </ul>
+      </div>
+      <div class="order-toolbar">
+        <button type="button" class="btn btn-secondary btn-compact" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
           ${ICO.dice()} Kość — wylosuj ${diceDone === 0 ? "1. gracza" : diceDone === 1 ? "2. gracza" : "kolejnego"}
         </button>
-        <button type="button" class="btn btn-secondary" id="order-reset">Reset kolejności / kości</button>
+        <button type="button" class="btn btn-secondary btn-compact" id="order-reset">Reset</button>
       </div>
       <div class="actions">
         <button class="btn btn-secondary" id="back-roster">Wstecz</button>
