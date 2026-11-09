@@ -333,17 +333,21 @@ export function monsterSpawnSlotHtml(board, { terrain, level }) {
     <div class="monster-terrain-slot is-filled monster-spawn-slot" data-terrain-slot="${terrain}">
       <div class="monster-terrain-head">
         <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
-        <strong>${escapeHtml(t.label)}</strong>
-        <span class="monster-terrain-meta">${escapeHtml(name)} · poz. ${escapeHtml(lv)}</span>
+        <div class="monster-terrain-titles">
+          <strong>${escapeHtml(t.label)}</strong>
+          <span class="monster-terrain-meta">${escapeHtml(name)} · poz. ${escapeHtml(lv)}</span>
+        </div>
       </div>
       <div class="monster-terrain-pick" role="group" aria-label="Numer nowego obszaru">
-        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni">◀</button>
-        <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
-          num != null ? escapeHtml(String(num)) : ""
-        }" placeholder="#" aria-label="Numer obszaru" />
-        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny">▶</button>
+        <div class="monster-stepper">
+          <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni" aria-label="Poprzedni obszar">◀</button>
+          <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+            num != null ? escapeHtml(String(num)) : ""
+          }" placeholder="#" aria-label="Numer obszaru" />
+          <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny" aria-label="Następny obszar">▶</button>
+        </div>
       </div>
-      <p class="note monster-terrain-hint">Poziom ustawiony na <strong>${escapeHtml(
+      <p class="monster-terrain-hint">Poziom ustawiony na <strong>${escapeHtml(
         lv
       )}</strong> · numery: ${opts.map((l) => l.number).join(", ")}</p>
     </div>
@@ -368,8 +372,10 @@ export function monstersPanelHtml(board, { editable = true } = {}) {
       <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"} is-locked" data-terrain-slot="${terrain}">
         <div class="monster-terrain-head">
           <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
-          <strong>${escapeHtml(t.label)}</strong>
-          <span class="monster-terrain-meta">${summary}</span>
+          <div class="monster-terrain-titles">
+            <strong>${escapeHtml(t.label)}</strong>
+            <span class="monster-terrain-meta">${summary}</span>
+          </div>
         </div>
       </div>`;
     }
@@ -377,16 +383,20 @@ export function monstersPanelHtml(board, { editable = true } = {}) {
       <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"}" data-terrain-slot="${terrain}">
         <div class="monster-terrain-head">
           <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
-          <strong>${escapeHtml(t.label)}</strong>
-          <span class="monster-terrain-meta">${filled ? escapeHtml(name) : "brak żetonu"}</span>
+          <div class="monster-terrain-titles">
+            <strong>${escapeHtml(t.label)}</strong>
+            <span class="monster-terrain-meta">${filled ? escapeHtml(name) : "brak żetonu"}</span>
+          </div>
         </div>
         <div class="monster-terrain-pick" role="group" aria-label="Numer obszaru: ${escapeHtml(t.label)}">
-          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni obszar">◀</button>
-          <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
-            num != null ? escapeHtml(String(num)) : ""
-          }" placeholder="#" aria-label="Numer obszaru ${escapeHtml(t.label)}" />
-          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny obszar">▶</button>
-          <button type="button" class="btn btn-secondary" data-monster-terrain-clear="${terrain}" ${
+          <div class="monster-stepper">
+            <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni obszar" aria-label="Poprzedni obszar ${escapeHtml(t.label)}">◀</button>
+            <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+              num != null ? escapeHtml(String(num)) : ""
+            }" placeholder="#" aria-label="Numer obszaru ${escapeHtml(t.label)}" />
+            <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny obszar" aria-label="Następny obszar ${escapeHtml(t.label)}">▶</button>
+          </div>
+          <button type="button" class="monster-clear-btn" data-monster-terrain-clear="${terrain}" ${
             filled ? "" : "disabled"
           }>Usuń</button>
         </div>
@@ -394,15 +404,15 @@ export function monstersPanelHtml(board, { editable = true } = {}) {
           ${levels
             .map(
               (lv) =>
-                `<button type="button" class="btn ${
-                  filled && level === lv ? "btn-primary" : "btn-secondary"
+                `<button type="button" class="monster-level-btn${
+                  filled && level === lv ? " is-active" : ""
                 }" data-monster-terrain-level="${terrain}" data-level="${lv}" ${
                   filled ? "" : "disabled"
                 }>Poz. ${lv}</button>`
             )
             .join("")}
         </div>
-        <p class="note monster-terrain-hint">Numery ${opts
+        <p class="monster-terrain-hint">Numery ${opts
           .map((l) => l.number)
           .join(", ")}</p>
       </div>`;
@@ -414,11 +424,13 @@ export function monstersPanelHtml(board, { editable = true } = {}) {
 
   return `
     <div class="monsters-panel${editable ? "" : " is-locked"}">
-      <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">${lead}</p>
+      <div class="monsters-panel-head">
+        <h3>${ICO.monster()} Potwory na mapie</h3>
+        <p class="monsters-panel-lead">${lead}</p>
+      </div>
       ${
         board.placeError && editable
-          ? `<p class="warn" style="margin:0.45rem 0 0" role="alert">${escapeHtml(board.placeError)}</p>`
+          ? `<p class="monsters-panel-error" role="alert">${escapeHtml(board.placeError)}</p>`
           : ""
       }
       <div class="monster-terrain-grid">${slots}</div>
