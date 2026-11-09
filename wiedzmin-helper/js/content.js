@@ -156,6 +156,7 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
+          <li><strong>W helperze (Stół):</strong> kliknij poziom I/II/III, potem <em>Potwór +</em> na tych samych lokacjach — jak gracz wejdzie, odpali się walka.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
         <p class="note">Reszta przygotowania potworów jak w multi.</p>
@@ -359,6 +360,7 @@ function buildMonsterSetupHtml(n) {
       <li><strong>2.</strong> Żetony: stosy I / II / III (zakryte, pomieszane).</li>
       ${special2}
       <li><strong>4–6.</strong> Odkryj → przenieś na obszary → dopasuj karty.</li>
+      <li><strong>W helperze (Stół):</strong> oznacz te same lokacje (przyciski I/II/III + Potwór +) — wejście gracza odpala walkę.</li>
       <li><strong>7.</strong> Potasuj karty walki potworów.</li>
     </ol>
   `;

@@ -32,12 +32,76 @@ export function defaultBoard() {
     tool: "select",
     selectedLoc: null,
     placePlayer: 0,
+    /** locId → { count, label?, level? } */
     monsters: {},
     /** { playerIdx, fromId, toId, costId? } — komunikat po przesunięciu pionka */
     movePrompt: null,
     /** Podświetl sąsiadów z tej lokacji (ruch) */
     highlightFrom: null,
+    /** Poziom ustawiany przyciskiem I/II/III przed Potwór + */
+    pendingMonsterLevel: null,
   };
+}
+
+export function monsterAt(board, locId) {
+  const m = board?.monsters?.[locId];
+  if (!m || !(m.count > 0)) return null;
+  return m;
+}
+
+export function monstersList(board) {
+  return Object.entries(board?.monsters || {})
+    .filter(([, m]) => m && m.count > 0)
+    .map(([id, m]) => ({ id, loc: locById(id), ...m }))
+    .filter((row) => row.loc);
+}
+
+export function monsterEncounterHtml(loc, monster) {
+  if (!loc || !monster) return "";
+  const lvl = monster.level ? ` poziom ${escapeHtml(String(monster.level))}` : "";
+  const label = monster.label ? ` — ${escapeHtml(monster.label)}` : "";
+  return `
+    <div class="guide-box guide-monster-hit" role="alert">
+      <p class="step-kicker" style="margin:0">${ICO.monster()} Potwór na polu</p>
+      <h3 style="margin:0.25rem 0 0.4rem">Wszedłeś na <strong>${escapeHtml(loc.name)}</strong></h3>
+      <p class="lead" style="margin:0">Tu stoi potwór${lvl}${label} (×${monster.count}). Helper prowadzi Cię do <strong>walki</strong>.</p>
+      <p class="note" style="margin:0.45rem 0 0">Na stole: nie musisz walczyć w fazie I — ale jak już wszedłeś na żeton, zwykle idziesz w fazę II → walka. Tu skracamy drogę.</p>
+    </div>
+  `;
+}
+
+export function monstersPanelHtml(board) {
+  const rows = monstersList(board);
+  return `
+    <div class="monsters-panel">
+      <h3>${ICO.monster()} Potwory na mapie</h3>
+      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Po wejściu gracza na to pole helper odpali walkę.</p>
+      <div class="actions" style="margin:0.55rem 0">
+        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "I" ? "btn-primary" : ""}" data-monster-level="I">Poz. I</button>
+        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "II" ? "btn-primary" : ""}" data-monster-level="II">Poz. II</button>
+        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "III" ? "btn-primary" : ""}" data-monster-level="III">Poz. III</button>
+      </div>
+      <p class="note">Aktywny poziom: <strong>${escapeHtml(board.pendingMonsterLevel || "—")}</strong> → narzędzie mapy przełącza się na <em>Potwór +</em>, potem kliknij lokację.</p>
+      ${
+        rows.length
+          ? `<ul class="checklist monsters-list">
+              ${rows
+                .map(
+                  (r) => `
+                <li>
+                  <strong>${escapeHtml(r.loc.name)}</strong> (#${r.loc.number})
+                  — ×${r.count}${r.level ? ` · poz. ${escapeHtml(String(r.level))}` : ""}${
+                    r.label ? ` · ${escapeHtml(r.label)}` : ""
+                  }
+                  <button type="button" class="btn btn-secondary" data-monster-clear="${r.id}" style="margin-left:0.35rem">Usuń</button>
+                </li>`
+                )
+                .join("")}
+            </ul>`
+          : `<p class="warn">Brak potworów na schemacie — dodaj je po setupie (3 żetony na start).</p>`
+      }
+    </div>
+  `;
 }
 
 export function ensurePlayerTrack(p, startCards = 5, startGold = 3) {
@@ -251,7 +315,11 @@ export function selectedLocPanel(board, roster) {
       }</p>
       <p class="tip" style="margin:0.5rem 0 0">Po ruchu: przycisk „Faza I” / „Eksploracja” w trackerze pokaże kroki za rękę wg tego znaku.</p>
       <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
-        m?.label ? ` (${escapeHtml(m.label)})` : ""
+        m?.level ? ` · poz. ${escapeHtml(String(m.level))}` : ""
+      }${m?.label ? ` (${escapeHtml(m.label)})` : ""}${
+        m?.count
+          ? ` — <em>wejście gracza = start walki w helperze</em>`
+          : ""
       }</p>
       <p>Wiedźmini:
         ${

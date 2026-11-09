@@ -10,6 +10,7 @@ import {
   LOCATION_ACTION_HINTS,
 } from "./map-data.js";
 
+
 export const MOVE_COSTS = [
   {
     id: "match",
@@ -131,7 +132,7 @@ function affordNote(player, cardsNeed, goldNeed) {
 }
 
 /** Lista sąsiadów z kosztem ruchu per cel (data-move-to). */
-export function neighborPickerHtml(fromId, { player } = {}) {
+export function neighborPickerHtml(fromId, { player, monsters } = {}) {
   const from = locById(fromId);
   if (!from) {
     return `<p class="warn">Brak pozycji startowej — wróć do <strong>Gracze</strong> i wybierz szkołę (pionek stawia się automatycznie na szkole).</p>`;
@@ -142,6 +143,10 @@ export function neighborPickerHtml(fromId, { player } = {}) {
   if (!neigh.length) {
     return `<p class="warn">Brak sąsiadów w schemacie — sprawdź mapę.</p>`;
   }
+  const hasMonster = (locId) => {
+    const m = monsters?.[locId];
+    return Boolean(m && m.count > 0);
+  };
   return `
     <div class="guide-box guide-destinations">
       <p class="step-kicker" style="margin:0">Dokąd możesz iść</p>
@@ -154,10 +159,16 @@ export function neighborPickerHtml(fromId, { player } = {}) {
             const matchOk = affordNote(player, 1, 0);
             const twoOk = affordNote(player, 2, 0);
             const mixOk = affordNote(player, 1, 1);
+            const mon = hasMonster(n.id);
             return `
-          <button type="button" class="choice" data-move-to="${n.id}">
-            <strong>${escapeHtml(n.name)} (#${n.number})</strong>
+          <button type="button" class="choice ${mon ? "choice-danger" : ""}" data-move-to="${n.id}">
+            <strong>${escapeHtml(n.name)} (#${n.number})${mon ? ` ${ICO.monster()} potwór!` : ""}</strong>
             <span>Teren celu: ${terrainChip(n.terrain)}</span>
+            ${
+              mon
+                ? `<span class="warn" style="margin:0.25rem 0 0">Wejście → helper odpala walkę</span>`
+                : ""
+            }
             <span class="move-cost-lines">
               <span><strong>Najtaniej:</strong> 1 karta ${escapeHtml(tLabel)} <em>(${escapeHtml(matchOk)})</em></span>
               <span><strong>Albo:</strong> 1× wild · 2 dowolne karty <em>(${escapeHtml(twoOk)})</em> · 1 karta + 1 złoto <em>(${escapeHtml(mixOk)})</em></span>

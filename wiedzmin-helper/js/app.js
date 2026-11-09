@@ -30,6 +30,9 @@ import {
   neighborsOf,
   placeAtSchool,
   schoolStartId,
+  monsterAt,
+  monsterEncounterHtml,
+  monstersPanelHtml,
 } from "./board.js";
 import {
   neighborPickerHtml,
@@ -651,10 +654,21 @@ function bindMoveCostTurn() {
       state.board.selectedLoc = toId;
       state.board.movePrompt = null;
       state.board.highlightFrom = null;
-      p.nowDoing = "faza1";
-      setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
+      finishMoveTo(p, toId, costId);
     });
   });
+}
+
+/** Po opłaceniu ruchu: potwór na polu → od razu walka. */
+function finishMoveTo(p, toId, costId) {
+  const mon = monsterAt(state.board, toId);
+  if (mon) {
+    p.nowDoing = "walka";
+    setTurn("II", "fight-monster", { moveTo: toId, moveCost: costId });
+    return;
+  }
+  p.nowDoing = "faza1";
+  setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
 }
 
 function addTurnButtons(buttons) {
@@ -764,8 +778,8 @@ function renderTurn() {
       "Faza I — dokąd możesz iść?",
       `
         <p class="lead"><strong>${escapeHtml(p.name)}</strong> stoi na szkole/polu startowym. Poniżej widać <em>wszystkich sąsiadów</em> i jaki koszt pasuje do każdego celu.</p>
-        ${neighborPickerHtml(fromId, { player: p })}
-        <p class="tip">Po kliknięciu celu wybierzesz dokładnie: 1 kartę terenu / wild / 2 karty / 1+złoto — tracker odejmie zasoby.</p>
+        ${neighborPickerHtml(fromId, { player: p, monsters: state.board.monsters })}
+        <p class="tip">Po kliknięciu celu wybierzesz dokładnie: 1 kartę terenu / wild / 2 karty / 1+złoto — tracker odejmie zasoby. Cel z potworem → od razu walka.</p>
         <div class="map-mini" style="margin-top:1rem">
           <h3>Mapa — podświetleni sąsiedzi</h3>
           ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
@@ -816,6 +830,22 @@ function renderTurn() {
 
   if (screen === "after-move") {
     const here = locById(p.locationId);
+    const mon = monsterAt(state.board, p.locationId);
+    if (mon && here) {
+      // Awaryjnie — jeśli ktoś wrócił na after-move z potworem
+      turnShell(
+        "Potwór na polu!",
+        `
+          ${monsterEncounterHtml(here, mon)}
+          <div class="choice-grid">
+            <button class="choice" data-goto="fight-monster"><strong>Zaczynam walkę</strong><span>Faza II — walka z potworem</span></button>
+            <button class="choice" data-goto="move"><strong>Uciekam dalej</strong><span>Kolejny ruch (koszt kart)</span></button>
+          </div>
+        `
+      );
+      bindChoices();
+      return;
+    }
     turnShell(
       "Faza I — po ruchu",
       `
@@ -849,7 +879,30 @@ function renderTurn() {
   }
 
   if (screen === "fight-monster") {
-    turnShell("Walka z potworem — co teraz?", fightMonster(solo));
+    const here = locById(p.locationId);
+    const mon = monsterAt(state.board, p.locationId);
+    turnShell(
+      "Walka z potworem — co teraz?",
+      `
+        ${mon && here ? monsterEncounterHtml(here, mon) : ""}
+        ${fightMonster(solo)}
+        ${
+          mon
+            ? `<div class="actions" style="margin-top:0.8rem">
+                <button type="button" class="btn btn-secondary" id="clear-monster-after-win">Usuń potwora z mapy (pokonany / odpędzony)</button>
+              </div>`
+            : ""
+        }
+      `
+    );
+    const clearBtn = appEl.querySelector("#clear-monster-after-win");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (p.locationId) delete state.board.monsters[p.locationId];
+        saveState();
+        render();
+      });
+    }
     addTurnButtons([
       {
         id: "to3",
@@ -937,6 +990,7 @@ function renderBoard() {
         (board.highlightFrom || activePlayer()?.nowDoing === "faza1") && activePlayer()?.locationId
           ? neighborPickerHtml(board.highlightFrom || activePlayer().locationId, {
               player: activePlayer(),
+              monsters: board.monsters,
             })
           : ""
       }
@@ -948,6 +1002,8 @@ function renderBoard() {
             </div>`
           : ""
       }
+
+      ${monstersPanelHtml(board)}
 
       <h2>Gracze — reputacja i karty</h2>
       <div class="tracker-list">
@@ -1018,7 +1074,12 @@ function renderBoard() {
 
       if (tool === "monster") {
         const cur = state.board.monsters[locId] || { count: 0 };
-        state.board.monsters[locId] = { count: (cur.count || 0) + 1 };
+        const level = state.board.pendingMonsterLevel || cur.level || null;
+        state.board.monsters[locId] = {
+          count: (cur.count || 0) + 1,
+          level: level || cur.level,
+          label: cur.label || (level ? `Poz. ${level}` : undefined),
+        };
       } else if (tool === "monster-") {
         const cur = state.board.monsters[locId];
         if (cur) {
@@ -1115,10 +1176,38 @@ function renderBoard() {
         return;
       }
       mp.costId = costId;
-      pl.nowDoing = "faza1";
       state.board.movePrompt = null;
       state.board.highlightFrom = null;
       state.board.selectedLoc = mp.toId;
+      // Na stole: też od razu do walki, jeśli potwór
+      const mon = monsterAt(state.board, mp.toId);
+      if (mon) {
+        pl.nowDoing = "walka";
+        state.activeIndex = mp.playerIdx;
+        saveState();
+        go("turn");
+        setTurn("II", "fight-monster", { moveTo: mp.toId, moveCost: costId });
+        return;
+      }
+      pl.nowDoing = "faza1";
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-monster-level]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.board.pendingMonsterLevel = btn.getAttribute("data-monster-level");
+      state.board.tool = "monster";
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-monster-clear]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-monster-clear");
+      delete state.board.monsters[id];
       saveState();
       render();
     });
