@@ -728,19 +728,9 @@ function renderSetup() {
     step.id === "monsters"
       ? `
       <div class="setup-map-embed">
-        <h3>Rozstaw potwory na mapie</h3>
-        <p class="lead">Wybierz poziom, potem kliknij lokację (Potwór +). Widać, gdzie stoi każdy żeton.</p>
-        ${mapToolbarHtml(state.board, state.roster)}
-        <div class="choice-grid" style="margin:0.5rem 0">
-          ${[1, 2, 3]
-            .map(
-              (lv) =>
-                `<button type="button" class="choice ${state.board.pendingMonsterLevel === lv ? "active" : ""}" data-mlevel="${lv}"><strong>Poziom ${lv}</strong><span>Następny potwór</span></button>`
-            )
-            .join("")}
-        </div>
-        ${mapSvgHtml(state.board, state.roster, { schoolById })}
         ${monstersPanelHtml(state.board)}
+        <p class="note">Na mapie helpera widać tylko lokacje i Twojego wiedźmina — żetony potworów zostają na fizycznej planszy.</p>
+        ${mapSvgHtml(state.board, state.roster, { schoolById })}
       </div>`
       : "";
 
@@ -770,45 +760,9 @@ function renderSetup() {
   `);
 
   if (step.id === "monsters") {
-    state.board.tool = state.board.tool || "monster";
-    appEl.querySelectorAll("[data-mlevel]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.board.pendingMonsterLevel = Number(btn.getAttribute("data-mlevel"));
-        state.board.tool = "monster";
-        saveState();
-        render();
-      });
-    });
-    appEl.querySelectorAll(".map-tool").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        state.board.tool = btn.getAttribute("data-tool");
-        saveState();
-        render();
-      });
-    });
     appEl.querySelectorAll(".map-node").forEach((g) => {
       g.addEventListener("click", () => {
-        const locId = g.getAttribute("data-loc");
-        const tool = state.board.tool || "monster";
-        state.board.selectedLoc = locId;
-        if (tool === "monster" || tool === "select") {
-          const cur = state.board.monsters[locId] || { count: 0 };
-          const level = state.board.pendingMonsterLevel || cur.level || 1;
-          state.board.monsters[locId] = {
-            count: (cur.count || 0) + 1,
-            level,
-            label: `Poz. ${level}`,
-          };
-          state.board.tool = "monster";
-        } else if (tool === "monster-") {
-          const cur = state.board.monsters[locId];
-          if (cur) {
-            cur.count = Math.max(0, (cur.count || 0) - 1);
-            if (cur.count === 0) delete state.board.monsters[locId];
-          }
-        } else if (tool === "clear-m") {
-          delete state.board.monsters[locId];
-        }
+        state.board.selectedLoc = g.getAttribute("data-loc");
         saveState();
         render();
       });
@@ -1483,9 +1437,7 @@ function renderTurn() {
 
   if (screen === "fight-monster") {
     const here = locById(p.locationId);
-    const mon = monsterAt(state.board, p.locationId);
-    if (!mon) {
-      // Wejście bez potwora (np. stary stan) — wróć do wyboru fazy II
+    if (!here) {
       setTurn("II", "phase2");
       return;
     }
@@ -1494,7 +1446,7 @@ function renderTurn() {
     turnShell(
       "Walka z potworem — co teraz?",
       `
-        ${mon && here ? monsterEncounterHtml(here, mon) : ""}
+        <p class="tip">${ICO.monster()} Walczysz z potworem na <strong>${escapeHtml(here.name)}</strong> (żeton na stole). Po pokonaniu / odpędzeniu zdejmij go z planszy.</p>
         ${questArrivalHtml(p, p.locationId)}
         <p class="${hasTrail ? "tip" : "warn"}"><strong>Żeton tropu:</strong> ${
           hasTrail
@@ -1505,27 +1457,12 @@ function renderTurn() {
         ${trailsHtml(p, { editable: true, board: state.board })}
         ${resourceAdjustHtml(p, { title: "Karty / złoto / eliksiry w walce" })}
         ${fightMonster(solo)}
-        ${
-          mon
-            ? `<div class="actions" style="margin-top:0.8rem">
-                <button type="button" class="btn btn-secondary" id="clear-monster-after-win">Usuń potwora z mapy (pokonany / odpędzony)</button>
-              </div>`
-            : ""
-        }
       `
     );
     bindQuestForms(p);
     bindResourceAdjust(p);
     bindAttrAdjust(p);
     bindTrailForms(p);
-    const clearBtn = appEl.querySelector("#clear-monster-after-win");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        if (p.locationId) delete state.board.monsters[p.locationId];
-        saveState();
-        render();
-      });
-    }
     addTurnButtons([
       {
         id: "to3",
@@ -1787,64 +1724,9 @@ function renderBoard() {
     </section>
   `);
 
-  appEl.querySelectorAll(".map-tool").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.board.tool = btn.getAttribute("data-tool");
-      saveState();
-      render();
-    });
-  });
-
-  const rotCcw = appEl.querySelector("#map-rotate-ccw");
-  const rotCw = appEl.querySelector("#map-rotate-cw");
-  const rotReset = appEl.querySelector("#map-rotate-reset");
-  if (rotCcw) {
-    rotCcw.addEventListener("click", () => {
-      state.board.rotation = ((state.board.rotation || 0) - 90 + 360) % 360;
-      saveState();
-      render();
-    });
-  }
-  if (rotCw) {
-    rotCw.addEventListener("click", () => {
-      state.board.rotation = ((state.board.rotation || 0) + 90) % 360;
-      saveState();
-      render();
-    });
-  }
-  if (rotReset) {
-    rotReset.addEventListener("click", () => {
-      state.board.rotation = 0;
-      saveState();
-      render();
-    });
-  }
-
   appEl.querySelectorAll(".map-node").forEach((g) => {
     g.addEventListener("click", () => {
-      const locId = g.getAttribute("data-loc");
-      let tool = state.board.tool || "select";
-      if (tool === "player") tool = "select"; // stare zapisy — pionek startuje na szkole
-      state.board.selectedLoc = locId;
-
-      if (tool === "monster") {
-        const cur = state.board.monsters[locId] || { count: 0 };
-        const level = state.board.pendingMonsterLevel || cur.level || null;
-        state.board.monsters[locId] = {
-          count: (cur.count || 0) + 1,
-          level: level || cur.level,
-          label: cur.label || (level ? `Poz. ${level}` : undefined),
-        };
-      } else if (tool === "monster-") {
-        const cur = state.board.monsters[locId];
-        if (cur) {
-          cur.count = Math.max(0, (cur.count || 0) - 1);
-          if (cur.count === 0) delete state.board.monsters[locId];
-        }
-      } else if (tool === "clear-m") {
-        delete state.board.monsters[locId];
-      }
-
+      state.board.selectedLoc = g.getAttribute("data-loc");
       saveState();
       render();
     });
@@ -1911,24 +1793,6 @@ function renderBoard() {
       saveState();
       go("turn");
       finishMoveTo(pl, mp.toId, costId);
-    });
-  });
-
-  appEl.querySelectorAll("[data-monster-level]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.board.pendingMonsterLevel = btn.getAttribute("data-monster-level");
-      state.board.tool = "monster";
-      saveState();
-      render();
-    });
-  });
-
-  appEl.querySelectorAll("[data-monster-clear]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-monster-clear");
-      delete state.board.monsters[id];
-      saveState();
-      render();
     });
   });
 

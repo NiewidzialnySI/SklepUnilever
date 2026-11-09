@@ -71,35 +71,11 @@ export function monsterEncounterHtml(loc, monster) {
 }
 
 export function monstersPanelHtml(board) {
-  const rows = monstersList(board);
   return `
     <div class="monsters-panel">
-      <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Wejście na potwora <strong>nie wymusza</strong> walki — w fazie II możesz wybrać walkę, medytację albo eksplorację.</p>
-      <div class="actions" style="margin:0.55rem 0">
-        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "I" ? "btn-primary" : ""}" data-monster-level="I">Poz. I</button>
-        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "II" ? "btn-primary" : ""}" data-monster-level="II">Poz. II</button>
-        <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "III" ? "btn-primary" : ""}" data-monster-level="III">Poz. III</button>
-      </div>
-      <p class="note">Aktywny poziom: <strong>${escapeHtml(board.pendingMonsterLevel || "—")}</strong> → narzędzie mapy przełącza się na <em>Potwór +</em>, potem kliknij lokację.</p>
-      ${
-        rows.length
-          ? `<ul class="checklist monsters-list">
-              ${rows
-                .map(
-                  (r) => `
-                <li>
-                  <strong>${escapeHtml(r.loc.name)}</strong> (#${r.loc.number})
-                  — ×${r.count}${r.level ? ` · poz. ${escapeHtml(String(r.level))}` : ""}${
-                    r.label ? ` · ${escapeHtml(r.label)}` : ""
-                  }
-                  <button type="button" class="btn btn-secondary" data-monster-clear="${r.id}" style="margin-left:0.35rem">Usuń</button>
-                </li>`
-                )
-                .join("")}
-            </ul>`
-          : `<p class="warn">Brak potworów na schemacie — dodaj je po setupie (3 żetony na start).</p>`
-      }
+      <h3>${ICO.monster()} Potwory</h3>
+      <p class="lead" style="margin:0">Liczba i poziomy potworów wynikają z <strong>zasad / przygotowania</strong> — trzymasz je na stole. Helper ich nie ustawia.</p>
+      <p class="note" style="margin:0.45rem 0 0">W fazie II walka z potworem jest <strong>opcjonalna</strong>: wybierasz ją tylko gdy na Twoim polu leży żeton. Wejście na potwora nie wymusza walki.</p>
     </div>
   `;
 }
@@ -295,28 +271,9 @@ export function bindMapLocPopup(root, { timeoutMs = 3000 } = {}) {
   return hide;
 }
 
-export function mapToolbarHtml(board, roster) {
-  // Pionek zawsze startuje na szkole — bez narzędzia „Ustaw wiedźmina”
-  const tool = board.tool === "player" ? "select" : board.tool || "select";
-  const tools = [
-    ["select", "Wybierz"],
-    ["monster", `${ICO.monster()} Potwór +`],
-    ["monster-", `${ICO.monster()} Potwór −`],
-    ["clear-m", "Wyczyść potwory tu"],
-  ];
-  return `
-    <div class="map-toolbar">
-      ${tools
-        .map(
-          ([id, label]) =>
-            `<button type="button" class="btn ${tool === id ? "btn-primary" : "btn-secondary"} map-tool" data-tool="${id}">${label}</button>`
-        )
-        .join("")}
-      <button type="button" class="btn btn-secondary" id="map-rotate-ccw">↺ Obróć</button>
-      <button type="button" class="btn btn-secondary" id="map-rotate-cw">Obróć ↻</button>
-      <button type="button" class="btn btn-secondary" id="map-rotate-reset">0°</button>
-    </div>
-  `;
+/** Pasek narzędzi mapy usunięty — potwory wg zasad na stole, pionek ze szkoły. */
+export function mapToolbarHtml() {
+  return "";
 }
 
 function escapeHtml(s) {
@@ -368,11 +325,7 @@ export function selectedLocPanel(board, roster) {
         neigh ? escapeHtml(neigh) : "—"
       }</p>
       <p class="tip" style="margin:0.5rem 0 0">Po ruchu helper pokaże kroki tej akcji (faza I, opcjonalna).</p>
-      <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
-        m?.level ? ` · poz. ${escapeHtml(String(m.level))}` : ""
-      }${m?.label ? ` (${escapeHtml(m.label)})` : ""}${
-        m?.count ? ` — <em>walka opcjonalna w fazie II</em>` : ""
-      }</p>
+      <p class="note">${ICO.monster()} Potwory: na fizycznej planszy (wg zasad). Walka w fazie II opcjonalna.</p>
       <p>Wiedźmini:
         ${
           here.length

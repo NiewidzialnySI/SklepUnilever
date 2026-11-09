@@ -156,7 +156,7 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
-          <li><strong>W helperze (Stół):</strong> kliknij poziom I/II/III, potem <em>Potwór +</em> na tych samych lokacjach — po wejściu możesz walczyć w fazie II (opcjonalnie).</li>
+          <li><strong>Na stole:</strong> połóż żetony potworów wg zasad. Helper nie ustawia ich na mapie — w fazie II walka jest opcjonalna.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
         <p class="note">Reszta przygotowania potworów jak w multi.</p>
@@ -361,7 +361,7 @@ function buildMonsterSetupHtml(n) {
       <li><strong>2.</strong> Żetony: stosy I / II / III (zakryte, pomieszane).</li>
       ${special2}
       <li><strong>4–6.</strong> Odkryj → przenieś na obszary → dopasuj karty.</li>
-      <li><strong>W helperze (Stół):</strong> oznacz te same lokacje (przyciski I/II/III + Potwór +) — wejście gracza odpala walkę.</li>
+      <li><strong>Na stole:</strong> żetony potworów wg zasad; w helperze walka w fazie II jest opcjonalna.</li>
       <li><strong>7.</strong> Potasuj karty walki potworów.</li>
     </ol>
   `;
@@ -457,8 +457,8 @@ export function phase2Choices(
     : meditateHint || "Zablokowane — żaden atrybut nie jest na V";
   const fightClass = fightEnabled ? "choice" : "choice choice-disabled";
   const fightSpan = fightEnabled
-    ? fightHint || (isSolo ? "Na Twoim obszarze" : "Z potworem lub wiedźminem")
-    : fightHint || "Brak celu walki na polu";
+    ? fightHint || (isSolo ? "Jeśli żeton na stole" : "Potwór (stół) lub wiedźmin")
+    : fightHint || "Brak lokacji";
   if (isSolo) {
     return `
       <p class="lead">Wybierz <strong>dokładnie 1</strong> opcję. Potem nie wracasz do ruchu.</p>
@@ -487,7 +487,7 @@ export function fightBranchHtml({ monsterEnabled = true, witcherEnabled = true, 
   return `
   <div class="choice-grid" data-choices="fight-type">
     <button class="${mClass}" data-goto="fight-monster" ${monsterEnabled ? "" : "disabled"}><strong>Walka z potworem</strong><span>${
-      monsterEnabled ? "Żeton na Twoim obszarze" : "Brak potwora na polu"
+      monsterEnabled ? "Jeśli żeton stoi na stole na Twoim polu" : "Brak lokacji"
     }</span></button>
     <button class="${wClass}" data-goto="fight-witcher" ${witcherEnabled ? "" : "disabled"}><strong>Walka z wiedźminem</strong><span>${
       witcherEnabled ? "Na tym samym obszarze" : "Brak innego wiedźmina tu"
