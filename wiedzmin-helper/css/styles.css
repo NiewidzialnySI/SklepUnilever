@@ -356,6 +356,92 @@ h3 {
   margin: 1rem 0 0.25rem;
 }
 
+.trail-token-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0.75rem 0 0.15rem;
+}
+
+.trail-token-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  text-align: center;
+  padding: 0.7rem 0.45rem 0.65rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  min-height: 6.2rem;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.trail-token-btn .trail-token-ico {
+  line-height: 0;
+  margin-bottom: 0.15rem;
+}
+
+.trail-token-btn .trail-token-ico .ico-img {
+  width: 2.35rem;
+  height: 2.35rem;
+}
+
+.trail-token-btn strong {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+
+.trail-token-meta {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.trail-token-status {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  opacity: 0.85;
+  margin-top: 0.15rem;
+}
+
+.trail-token-btn:hover:not(:disabled) {
+  border-color: var(--brass);
+  transform: translateY(-1px);
+}
+
+.trail-token-btn.active,
+.trail-token-btn.is-quest {
+  border-color: var(--brass);
+  background: rgba(184, 146, 62, 0.16);
+}
+
+.trail-token-btn.is-trail {
+  border-color: var(--ok, #2f6b45);
+  background: rgba(47, 107, 69, 0.14);
+}
+
+.trail-token-btn.is-empty,
+.trail-token-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 520px) {
+  .trail-token-grid {
+    gap: 0.4rem;
+  }
+  .trail-token-btn {
+    padding: 0.55rem 0.3rem;
+    min-height: 5.6rem;
+  }
+  .trail-token-btn strong {
+    font-size: 0.92rem;
+  }
+}
+
 .explore-chooser {
   margin: 0.5rem 0 0.25rem;
 }
