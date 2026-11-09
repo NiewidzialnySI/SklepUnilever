@@ -63,12 +63,15 @@ export const SOLO_SCORE_TABLE = `
   </table>
 `;
 
-export function buildSetupSteps(playerCount) {
-  if (playerCount === 1) return buildSoloSetupSteps();
-  return buildMultiSetupSteps(playerCount);
+export function buildSetupSteps(playerCount, roster = []) {
+  if (playerCount === 1) return buildSoloSetupSteps(roster[0]);
+  return buildMultiSetupSteps(playerCount, roster);
 }
 
-function buildSoloSetupSteps() {
+function buildSoloSetupSteps(player) {
+  const who = player
+    ? `<strong>${escapeLite(player.name)}</strong>`
+    : "Ty";
   return [
     {
       id: "intro",
@@ -80,7 +83,7 @@ function buildSoloSetupSteps() {
           <span class="badge">Tylko podstawka</span>
           <span class="badge">Cel: 3 potwory + trofeum atrybutu</span>
         </div>
-        <p class="tip"><strong>Notuj liczbę tur</strong> — po wygranej porównasz wynik z tabelą.</p>
+        <p class="tip">Gracz: ${who}. <strong>Notuj liczbę tur</strong>.</p>
       `,
     },
     {
@@ -167,10 +170,10 @@ function buildSoloSetupSteps() {
     },
     {
       id: "player-solo",
-      title: "Twój wiedźmin",
+      title: player ? `Twój wiedźmin (${escapeLite(player.name)})` : "Twój wiedźmin",
       body: `
         <ol class="checklist">
-          <li><strong>1.</strong> Wybierz planszetkę wiedźmina (albo wylosuj).</li>
+          <li><strong>1.</strong> Weź planszetkę szkoły, którą wybrałeś w helperze (albo inną — zaktualizuj potem w zakładce Gracze).</li>
           <li><strong>2.</strong> Żeton reputacji szkoły na 0 na torze reputacji.</li>
           <li><strong>3.</strong> Figurka na obszarze <strong>swojej szkoły</strong>.</li>
           <li><strong>4.</strong> 5 znaczników na najniższych polach atrybutów + poziomu wiedźmina.</li>
@@ -208,7 +211,14 @@ function buildSoloSetupSteps() {
   ];
 }
 
-function buildMultiSetupSteps(n) {
+function escapeLite(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function buildMultiSetupSteps(n, roster = []) {
   const steps = [
     {
       id: "intro",
@@ -298,7 +308,7 @@ function buildMultiSetupSteps(n) {
 
   for (let i = 0; i < n; i++) {
     const turnOrderIndex = n - 1 - i;
-    steps.push(buildPlayerSetupStep(n, turnOrderIndex, i + 1));
+    steps.push(buildPlayerSetupStep(n, turnOrderIndex, i + 1, roster[turnOrderIndex]));
   }
 
   if (n >= 4) {
@@ -353,23 +363,28 @@ function buildMonsterSetupHtml(n) {
   `;
 }
 
-function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber) {
+function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEntry) {
   const label = PLAYER_LABELS[turnOrderIndex];
   const res = START_RESOURCES[playerCount][turnOrderIndex];
   const schoolTrophies = playerCount - 1;
   const isFirst = turnOrderIndex === 0;
   const isLastPrep = prepNumber === playerCount;
+  const named = rosterEntry
+    ? ` <strong>${escapeLite(rosterEntry.name)}</strong>`
+    : "";
 
   return {
     id: `player-${turnOrderIndex}`,
-    title: `Gracz ${prepNumber}/${playerCount}: ${label}`,
+    title: `Gracz ${prepNumber}/${playerCount}: ${label}${rosterEntry ? ` — ${rosterEntry.name}` : ""}`,
     body: `
-      <p class="lead">Teraz: <strong>${label}</strong>${isFirst ? " (wybiera wiedźmina jako ostatni)" : ""}.</p>
+      <p class="lead">Teraz przygotowuje się:${named} (${label})${isFirst ? " — wybiera wiedźmina jako ostatni" : ""}.</p>
       <ol class="checklist">
         <li><strong>1. Planszetka:</strong> ${
-          isLastPrep && playerCount === 5
-            ? "Bierze ostatnią niewybraną."
-            : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
+          rosterEntry
+            ? `Weź szkołę przypisaną w helperze (albo zgodnie z wyborem przy stole).`
+            : isLastPrep && playerCount === 5
+              ? "Bierze ostatnią niewybraną."
+              : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
         }</li>
         <li><strong>2.</strong> Żeton reputacji na 0.</li>
         <li><strong>3.</strong> Figurka na obszarze swojej szkoły.</li>
@@ -540,20 +555,19 @@ export function phase3(isSolo) {
   return `
   <ol class="checklist">
     <li>Odrzuć z ręki, by mieć <strong>max 3</strong> karty.</li>
-    <li>Dobierz do <strong>3</strong> kart na ręce (pusta talia → tasuj odrzucone).</li>
-    <li><strong>Musisz kupić 1 kartę</strong> z puli (koszt ± modyfikator pola). Weź na rękę.</li>
-    <li>Przesuń pulę w prawo, odkryj nową na skrajne lewe.</li>
+    <li>Dobierz do <strong>3</strong> kart na ręce (pusta talia → tasuj odrzucone; poza walką zawsze możesz tak odnowić talię).</li>
+    <li>Kup <strong>1 kartę</strong> z puli (koszt nadrukowany ± pole −1/+1). Weź na rękę, przesuń pulę w prawo, odkryj nową na skrajne lewe.</li>
     ${
       isSolo
         ? `<li><strong>Solo:</strong> jeśli kupiłeś kartę <em>nie</em> ze skrajnie prawego pola — na koniec fazy <strong>odrzuć kartę ze skrajnie prawego pola</strong> na wspólny stos odrzuconych.</li>`
         : ""
     }
   </ol>
-  <p class="tip">Limit ręki: <strong>7</strong>. Kupno obowiązkowe.</p>
+  <p class="tip">Limit ręki: <strong>7</strong>. Kupno jest standardowo obowiązkowe — <em>FAQ Rebel:</em> jeśli obiektywnie nie możesz kupić, pomijasz.</p>
   ${
     isSolo
-      ? `<p class="lead">Koniec tury — zaznacz +1 turę na kartce, potem znów Faza I.</p>
-         <p class="tip">Wygrana? Sprawdź: 3 pokonane potwory + trofeum atrybutu → porównaj liczbę tur z tabelą wyniku (Ściąga).</p>`
+      ? `<p class="lead">Koniec tury — zaznacz +1 turę, potem znów Faza I.</p>
+         <p class="tip">Wygrana: 3 pokonane potwory + trofeum atrybutu → tabela wyniku (Źródła / Ściąga).</p>`
       : `<p class="lead">Koniec tury — następny gracz zgodnie z zegarem.</p>`
   }
 `;
@@ -562,7 +576,7 @@ export function phase3(isSolo) {
 export const LOCATION_ACTIONS = `
   <h3>Szybka ściąga akcji obszarów</h3>
   <ul class="checklist">
-    <li><strong>Szkoły:</strong> płać (poziom atrybutu + 1) złota → +1 atak/obrona/alchemia; na swojej szkole możesz rozwijać zdolność.</li>
+    <li><strong>Szkoły:</strong> koszt w złocie = poziom docelowy (aktualny + 1) → +1 atak/obrona/alchemia; zdolność specjalną tylko w swojej szkole.</li>
     <li><strong>Darmowy trening:</strong> +1 do atrybutu tylko jeśli poziom atrybutu ≤ poziomu wiedźmina.</li>
     <li><strong>Eliksir:</strong> dobierz 1 (limit 4).</li>
     <li><strong>Poker z miejscowymi:</strong> 1 złoto + 2 z banku (multi) / w solo: 1 złoto i tabela nagród.</li>

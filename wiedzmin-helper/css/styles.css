@@ -371,6 +371,55 @@ h3 {
   text-align: center;
 }
 
+.roster-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.4);
+  margin-bottom: 0.7rem;
+}
+
+.roster-card label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.roster-card input,
+.roster-card select {
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(26, 24, 20, 0.2);
+  background: #fffaf0;
+  color: var(--ink);
+}
+
+.player-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #244833;
+  color: #f7efd8;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.player-chip span {
+  opacity: 0.8;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+}
+
+.checklist a {
+  color: #6b4e16;
+}
+
 @media (max-width: 640px) {
   .app {
     width: min(100% - 1rem, 920px);

@@ -4,10 +4,11 @@ Przeglądarkowy przewodnik do planszówki **Wiedźmin: Stary Świat** (sama **po
 
 Prowadzi przez:
 
-1. **Przygotowanie rozgrywki** — krok po kroku (plansza, talie, potwory, każdy gracz)
-2. **Turę gracza** — faza I → II → III, z gałęziami (ruch, walka, medytacja, eksploracja)
-3. **Wariant solo** — osobny setup i różnice w pokerze, walce, fazie III oraz tabeli wyniku
-4. **Ściągę** — skrót zasad i akcji obszarów
+1. **Wybór liczby graczy** + **imiona i szkoły** wiedźmińskie
+2. **Przygotowanie rozgrywki** — krok po kroku (plansza, talie, potwory, każdy gracz)
+3. **Turę gracza** — faza I → II → III, z gałęziami (ruch, walka, medytacja, eksploracja)
+4. **Wariant solo** — osobny setup i różnice w pokerze, walce, fazie III oraz tabeli wyniku
+5. **Ściągę** + **Źródła** (instrukcja, FAQ Rebel, skróty filmów YT / forów — tylko podstawka)
 
 ## Uruchomienie
 
