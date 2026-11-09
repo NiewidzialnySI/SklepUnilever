@@ -501,29 +501,26 @@ export function fightMonster(isSolo) {
         : `Kontrolujący potwora wybiera: <strong>szarża</strong> albo <strong>ugryzienie</strong>.`
     }</li>
     <li>Odkryj <strong>1 kartę</strong> z wierzchu talii wytrzymałości potwora (jego talii walki) i rozpatrz efekt wybranego ataku + tekst karty.</li>
-    <li><strong>Obrażenia na Ciebie</strong> (typowo): najpierw obniż <strong>tarczę</strong>; jak zabraknie — zrzucaj karty z wierzchu <em>Twojej</em> talii wytrzymałości; czasem ręka (czytaj kartę). Jak nie masz już kart w talii wytrzymałości (i efekt wymaga) — padłeś.</li>
+    <li><strong>Obrażenia na Ciebie</strong> (typowo): najpierw obniż <strong>tarczę</strong>; jak zabraknie — zrzucaj karty z wierzchu <em>Twojej</em> talii wytrzymałości (czasem też ręka — czytaj kartę).</li>
   </ol>
+  <p class="warn"><strong>Tarcza spadła do 0?</strong> To jeszcze <em>nie</em> przegrana. Tarcza to tylko bufor. Walka trwa, dopóki masz karty w <strong>talii wytrzymałości</strong> albo na <strong>ręce</strong>. Jesteś <em>powalony</em> dopiero gdy talia wytrzymałości jest pusta <strong>i</strong> nie masz kart na ręce (po rozpatrzeniu zagranych kart).</p>
 
   <h3>3. Powtarzaj</h3>
-  <p class="lead">Ty → potwór → Ty → … aż ktoś „padnie” (talia walki potwora = 0 albo Ty bez wytrzymałości).</p>
+  <p class="lead">Ty → potwór → Ty → … aż talia potwora = 0 (pokonany) albo Ty jesteś powalony.</p>
 
-  <h3>4. Wynik</h3>
+  <h3>4. Wynik — gdy jesteś powalony / potwór pada</h3>
   <ul class="checklist">
-    <li><strong>Pokonanie</strong> (0 kart u potwora): <strong>2 złota</strong>, odwróć kartę potwora, +reputacja, zmęczenie, trofeum.
+    <li><strong>Pokonanie</strong> (Ty stoisz, talia potwora = 0): <strong>2 złota</strong>, odwróć kartę potwora, +reputacja, zmęczenie, trofeum.
       ${
         isSolo
           ? ` <strong>Solo: NIE dobieraj nowego potwora</strong>.`
           : ` Potem zwykle nowy potwór (poziom +1; III→III).`
       }
     </li>
-    <li><strong>Odpędzenie</strong> (została 0–1 karta PW wg karty pomocy): nagrody wg pomocy; ${
-      isSolo
-        ? `nowy żeton <strong>tego samego poziomu</strong>.`
-        : `nowy potwór tego samego poziomu.`
-    }</li>
-    <li><strong>Klęska</strong> (≥2 karty PW u potwora): kary/nagrody wg instrukcji; w fazie III często dobór tylko do 2.</li>
+    <li><strong>Odpędzenie</strong> (Ty powalony, a u potwora zostało <strong>&lt; 2</strong> kart): +2 złota; odrzuć kartę potwora / żeton na stos odpędzonych; weź 1 kartę kosztu 0 z puli na swoje odrzucone; nowy potwór <strong>tego samego poziomu</strong>.</li>
+    <li><strong>Klęska</strong> (Ty powalony, a u potwora zostało <strong>≥ 2</strong> kart): weź żeton tropu terenu potwora (jeśli go nie masz); weź 1 kartę kosztu 0 z puli na odrzucone; w tej turze w fazie III dobierasz o 1 mniej. Potwór zostaje (przy następnej walce z nim będzie mocniejszy wg instrukcji).</li>
   </ul>
-  <p class="tip">Po walce: tarcza = obrona; zbuduj z powrotem normalną talię akcji z talii wytrzymałości + odrzuconych (wg instrukcji). Potem → <strong>Faza III</strong>.</p>
+  <p class="tip">Po każdej walce: tarcza z powrotem = obrona; złóż talię akcji na nowo (talia wytrzymałości + odrzucone — wg instrukcji). Potem → <strong>Faza III</strong>.</p>
 `;
 }
 
