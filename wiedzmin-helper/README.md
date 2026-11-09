@@ -8,7 +8,8 @@ Prowadzi przez:
 2. **Przygotowanie rozgrywki** — krok po kroku (plansza, talie, potwory, każdy gracz)
 3. **Turę gracza** — faza I → II → III, z gałęziami (ruch, walka, medytacja, eksploracja)
 4. **Wariant solo** — osobny setup i różnice w pokerze, walce, fazie III oraz tabeli wyniku
-5. **Ściągę** + **Źródła** (instrukcja, FAQ Rebel, skróty filmów YT / forów — tylko podstawka)
+5. **Ściągę** + **Leksykon** (atrybuty, zdolności szkół, kroki walki) + **Źródła** (instrukcja, FAQ, skróty YT/forów)
+6. **Nie zastępuje kart** — pełne teksty potworów/eliksirów/eksploracji zostają na stole (prawa CDPR)
 
 ## Uruchomienie
 

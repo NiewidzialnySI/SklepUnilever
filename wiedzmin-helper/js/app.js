@@ -15,6 +15,7 @@ import {
   MOVE_HELP,
 } from "./content.js";
 import { SCHOOLS, sourcesHtml } from "./sources.js";
+import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v3";
 
@@ -101,6 +102,7 @@ function render() {
   else if (state.view === "setup") renderSetup();
   else if (state.view === "turn") renderTurn();
   else if (state.view === "ref") renderRef();
+  else if (state.view === "lexicon") renderLexicon();
   else if (state.view === "sources") renderSources();
   else renderHome();
 }
@@ -123,6 +125,7 @@ function shell(inner) {
         <button class="btn btn-ghost" data-nav="setup">Przygotowanie</button>
         <button class="btn btn-ghost" data-nav="turn">Tura</button>
         <button class="btn btn-ghost" data-nav="ref">Ściąga</button>
+        <button class="btn btn-ghost" data-nav="lexicon">Leksykon</button>
         <button class="btn btn-ghost" data-nav="sources">Źródła</button>
       </div>
     </header>
@@ -619,6 +622,31 @@ function renderRef() {
     Object.assign(state, defaultState());
     render();
   });
+}
+
+function renderLexicon() {
+  const schoolId = activePlayer()?.schoolId;
+  const mine = SCHOOL_SPECIALTIES.find((s) => s.id === schoolId);
+  shell(`
+    <section class="panel">
+      <p class="step-kicker">Podstawka · przy stole</p>
+      <h1>Leksykon</h1>
+      ${
+        mine
+          ? `<p class="tip"><strong>Aktywny (${escapeHtml(activePlayer().name)}):</strong> ${mine.name}<br>${mine.body}</p>`
+          : ""
+      }
+      ${lexiconHtml()}
+      <div class="actions">
+        <button class="btn btn-primary" id="to-turn">Do tury</button>
+        <button class="btn btn-secondary" id="to-sources">Źródła / FAQ</button>
+      </div>
+    </section>
+  `);
+  appEl.querySelector("#to-turn").addEventListener("click", () =>
+    go("turn", { turn: { phase: "hub", screen: "hub" } })
+  );
+  appEl.querySelector("#to-sources").addEventListener("click", () => go("sources"));
 }
 
 function renderSources() {

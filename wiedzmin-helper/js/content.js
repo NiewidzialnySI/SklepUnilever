@@ -375,7 +375,7 @@ function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEnt
 
   return {
     id: `player-${turnOrderIndex}`,
-    title: `Gracz ${prepNumber}/${playerCount}: ${label}${rosterEntry ? ` — ${rosterEntry.name}` : ""}`,
+    title: `Gracz ${prepNumber}/${playerCount}: ${label}${rosterEntry ? ` — ${escapeLite(rosterEntry.name)}` : ""}`,
     body: `
       <p class="lead">Teraz przygotowuje się:${named} (${label})${isFirst ? " — wybiera wiedźmina jako ostatni" : ""}.</p>
       <ol class="checklist">
