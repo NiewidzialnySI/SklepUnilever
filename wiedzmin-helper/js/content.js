@@ -424,7 +424,8 @@ export function phase1AfterMove(isSolo) {
         : "z wiedźminem na tym samym obszarze (raz z każdym; oboje ≥1 złoto)"
     }.</li>
     <li><strong>Zadanie tropienia:</strong> jeśli weszłeś na obszar z nazwy na żetonie → zbierz złoto i odwróć żeton (masz trop). Zapisz dojście jako <em>zadanie u góry</em>.</li>
-    <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze. Jeśli na polu jest też potwór, walka to dopiero <strong>faza II</strong> (wybór 1 z: walka / medytacja / eksploracja).</li>
+    <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze.</li>
+    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka (opcjonalna) / medytacja / eksploracja.</li>
   </ul>
   ${
     isSolo
@@ -466,7 +467,7 @@ export function phase2Choices(
         <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
-      <p class="note">W solo nie ma walki z innymi wiedźminami. Bez potwora i bez medytacji helper idzie od razu do eksploracji.</p>
+      <p class="note">Walka jest <strong>opcjonalna</strong> (instrukcja: „możesz walczyć”). W solo nie ma walki z innymi wiedźminami. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
     `;
   }
   return `
@@ -476,7 +477,7 @@ export function phase2Choices(
       <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
-    <p class="note">Bez celu walki i bez medytacji helper od razu przechodzi do eksploracji.</p>
+    <p class="note">Walka jest <strong>opcjonalna</strong> — nawet z potworem na polu możesz wybrać medytację albo eksplorację. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
   `;
 }
 
