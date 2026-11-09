@@ -995,15 +995,9 @@ function finishMoveTo(p, toId, costId) {
 }
 
 function proceedAfterFieldConfirm(p) {
-  const toId = p.locationId;
-  const mon = monsterAt(state.board, toId);
-  if (mon) {
-    p.nowDoing = "walka";
-    setTurn("II", "fight-monster", { moveTo: toId, moveCost: state.turn?.moveCost || null });
-    return;
-  }
+  // Instrukcja: wejście na potwora NIE wymusza walki. Walka = opcjonalny wybór w fazie II.
   p.nowDoing = "faza1";
-  setTurn("I", "after-move", { moveTo: toId, moveCost: state.turn?.moveCost || null });
+  setTurn("I", "after-move", { moveTo: p.locationId, moveCost: state.turn?.moveCost || null });
 }
 
 function bindResourceAdjust(player) {
@@ -1392,34 +1386,17 @@ function renderTurn() {
   if (screen === "after-move") {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
-    if (mon && here) {
-      turnShell(
-        "Potwór na polu!",
-        `
-          ${questArrivalHtml(p, p.locationId)}
-          ${monsterEncounterHtml(here, mon)}
-          <p class="note">Najpierw faza I (zadanie / akcje obszaru). Walka to już <strong>faza II</strong> — wtedy nie czytasz już karty zadania z nr Event.</p>
-          <div class="choice-grid">
-            <button class="choice" data-goto="fight-monster"><strong>Zaczynam walkę</strong><span>Faza II — walka z potworem</span></button>
-            <button class="choice" data-goto="move"><strong>Uciekam dalej</strong><span>Kolejny ruch (koszt kart)</span></button>
-            <button class="choice" data-goto="phase2"><strong>Dalej do fazy II</strong><span>Bez walki teraz</span></button>
-          </div>
-        `
-      );
-      bindChoices();
-      bindQuestForms(p);
-      return;
-    }
     turnShell(
       "Faza I — po ruchu",
       `
         ${questArrivalHtml(p, p.locationId)}
-        <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Możesz jeszcze raz spojrzeć na znak pola albo iść dalej:</p>
+        ${mon && here ? monsterEncounterHtml(here, mon) : ""}
+        <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Możesz zrobić akcje obszaru, rozwiązać zadanie, ruszyć się znowu albo przejść do fazy II.</p>
         ${locationActionGuideHtml(here)}
         ${phase1AfterMove(solo)}
         <div class="choice-grid">
           <button class="choice" data-goto="move"><strong>Ruszam się znowu</strong><span>Znowu wybór celu + koszt kart</span></button>
-          <button class="choice" data-goto="phase2"><strong>Przechodzę do fazy II</strong><span>Zostawiam rękę</span></button>
+          <button class="choice" data-goto="phase2"><strong>Przechodzę do fazy II</strong><span>Walka / medytacja / eksploracja — wybór 1</span></button>
         </div>
         <details style="margin-top:1rem"><summary><strong>Ściąga wszystkich akcji obszarów</strong></summary>${LOCATION_ACTIONS}</details>
       `
