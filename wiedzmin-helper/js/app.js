@@ -33,6 +33,11 @@ import {
   monsterAt,
   monsterEncounterHtml,
   monstersPanelHtml,
+  cycleMonsterTerrain,
+  setMonsterTerrainByNumber,
+  setMonsterTerrainLevel,
+  setMonsterForTerrain,
+  sanitizeMonstersUniqueTerrain,
   LOCATIONS,
 } from "./board.js";
 import {
@@ -164,6 +169,8 @@ function normalizeState(raw) {
   }
   if (board.selectedLoc === "oxenfurt") board.selectedLoc = "loc-ichaer";
   if (board.selectedLoc === "mantikora") board.selectedLoc = "behelt-nar";
+  sanitizeMonstersUniqueTerrain(board);
+  if (!board.pendingMonsterLevel) board.pendingMonsterLevel = "I";
   const roster = Array.isArray(raw.roster)
     ? raw.roster.map((p) => {
         const copy = { ...(p || {}) };
@@ -728,8 +735,9 @@ function renderSetup() {
     step.id === "monsters"
       ? `
       <div class="setup-map-embed">
+        <h3>Oznacz potwory (numery z żetonów)</h3>
+        <p class="lead">Dla lasu, gór i wody podaj numer obszaru z odkrytego żetonu — strzałkami albo wpisz. Potem ustaw poziom.</p>
         ${monstersPanelHtml(state.board)}
-        <p class="note">Na mapie helpera widać tylko lokacje i Twojego wiedźmina — żetony potworów zostają na fizycznej planszy.</p>
         ${mapSvgHtml(state.board, state.roster, { schoolById })}
       </div>`
       : "";
@@ -760,9 +768,11 @@ function renderSetup() {
   `);
 
   if (step.id === "monsters") {
+    bindMonsterPanelControls();
     appEl.querySelectorAll(".map-node").forEach((g) => {
       g.addEventListener("click", () => {
         state.board.selectedLoc = g.getAttribute("data-loc");
+        state.board.placeError = null;
         saveState();
         render();
       });
@@ -879,6 +889,61 @@ function nextPlayer() {
     state.activeIndex = (state.activeIndex + 1) % state.players;
   }
   setTurn("hub", "hub");
+}
+
+function bindMonsterPanelControls() {
+  appEl.querySelectorAll("[data-monster-cycle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-monster-cycle");
+      const delta = Number(btn.getAttribute("data-delta") || 1);
+      const result = cycleMonsterTerrain(state.board, terrain, delta);
+      if (!result.ok) state.board.placeError = result.reason;
+      saveState();
+      render();
+    });
+  });
+  appEl.querySelectorAll("[data-monster-num]").forEach((input) => {
+    const apply = () => {
+      const terrain = input.getAttribute("data-monster-num");
+      const raw = String(input.value || "").trim();
+      if (raw === "") {
+        const result = setMonsterForTerrain(state.board, terrain, null);
+        if (!result.ok) state.board.placeError = result.reason;
+        saveState();
+        render();
+        return;
+      }
+      const result = setMonsterTerrainByNumber(state.board, terrain, raw);
+      if (!result.ok) state.board.placeError = result.reason;
+      saveState();
+      render();
+    };
+    input.addEventListener("change", apply);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        apply();
+      }
+    });
+  });
+  appEl.querySelectorAll("[data-monster-terrain-level]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-monster-terrain-level");
+      const level = btn.getAttribute("data-level") || "I";
+      const result = setMonsterTerrainLevel(state.board, terrain, level);
+      if (!result.ok) state.board.placeError = result.reason;
+      saveState();
+      render();
+    });
+  });
+  appEl.querySelectorAll("[data-monster-terrain-clear]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-monster-terrain-clear");
+      setMonsterForTerrain(state.board, terrain, null);
+      saveState();
+      render();
+    });
+  });
 }
 
 function bindChoices() {
@@ -1437,7 +1502,8 @@ function renderTurn() {
 
   if (screen === "fight-monster") {
     const here = locById(p.locationId);
-    if (!here) {
+    const mon = monsterAt(state.board, p.locationId);
+    if (!here || !mon) {
       setTurn("II", "phase2");
       return;
     }
@@ -1446,7 +1512,7 @@ function renderTurn() {
     turnShell(
       "Walka z potworem — co teraz?",
       `
-        <p class="tip">${ICO.monster()} Walczysz z potworem na <strong>${escapeHtml(here.name)}</strong> (żeton na stole). Po pokonaniu / odpędzeniu zdejmij go z planszy.</p>
+        ${monsterEncounterHtml(here, mon)}
         ${questArrivalHtml(p, p.locationId)}
         <p class="${hasTrail ? "tip" : "warn"}"><strong>Żeton tropu:</strong> ${
           hasTrail
@@ -1457,12 +1523,24 @@ function renderTurn() {
         ${trailsHtml(p, { editable: true, board: state.board })}
         ${resourceAdjustHtml(p, { title: "Karty / złoto / eliksiry w walce" })}
         ${fightMonster(solo)}
+        <div class="actions" style="margin-top:0.8rem">
+          <button type="button" class="btn btn-secondary" id="clear-monster-after-win">Usuń potwora z mapy (pokonany / odpędzony)</button>
+        </div>
       `
     );
     bindQuestForms(p);
     bindResourceAdjust(p);
     bindAttrAdjust(p);
     bindTrailForms(p);
+    const clearBtn = appEl.querySelector("#clear-monster-after-win");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (p.locationId) delete state.board.monsters[p.locationId];
+        state.board.placeError = null;
+        saveState();
+        render();
+      });
+    }
     addTurnButtons([
       {
         id: "to3",
@@ -1724,9 +1802,12 @@ function renderBoard() {
     </section>
   `);
 
+  bindMonsterPanelControls();
+
   appEl.querySelectorAll(".map-node").forEach((g) => {
     g.addEventListener("click", () => {
       state.board.selectedLoc = g.getAttribute("data-loc");
+      state.board.placeError = null;
       saveState();
       render();
     });

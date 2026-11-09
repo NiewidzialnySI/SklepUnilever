@@ -97,14 +97,13 @@ export function meditationStatus(player, { isSolo = false } = {}) {
 
 /**
  * Faza II — walka opcjonalna.
- * Potwory trzymasz na stole wg zasad (helper ich nie edytuje).
- * Walka z potworem: zawsze do wyboru gdy masz lokację — Ty wiesz, czy na polu stoi potwór.
+ * Walka z potworem: tylko gdy na mapie helpera stoi żeton na Twoim polu.
  * Walka z wiedźminem: tylko gdy ktoś inny stoi na tym samym polu.
  */
 export function phase2FightOptions(player, { board, roster = [], isSolo = false } = {}) {
   const locId = player?.locationId || null;
   const m = locId ? board?.monsters?.[locId] : null;
-  const canMonster = Boolean(locId);
+  const canMonster = Boolean(locId && m && m.count > 0);
   const others = (roster || []).filter(
     (r) => r && r !== player && r.locationId && locId && r.locationId === locId
   );
@@ -113,17 +112,21 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   let reason;
   if (!locId) {
     reason = "Walka zablokowana: brak lokacji (wybierz szkołę w Graczach).";
+  } else if (canMonster && canWitcher) {
+    reason = `Możesz walczyć z potworem albo z: ${others.map((o) => o.name).join(", ")}.`;
+  } else if (canMonster) {
+    reason = "Na Twoim polu stoi potwór — walka opcjonalna (możesz też medytować / eksplorować).";
   } else if (canWitcher) {
-    reason = `Możesz walczyć z potworem (jeśli stoi na stole) albo z: ${others.map((o) => o.name).join(", ")}.`;
+    reason = `Brak potwora na polu. Możesz walczyć z: ${others.map((o) => o.name).join(", ")}.`;
   } else {
-    reason = "Walka z potworem: opcjonalna — tylko jeśli na Twoim polu leży żeton potwora (stół).";
+    reason = "Walka zablokowana: na tym polu nie ma potwora (oznacz go na mapie, jeśli stoi na stole).";
   }
   return {
     can,
     canMonster,
     canWitcher,
     others,
-    monster: m && m.count > 0 ? m : null,
+    monster: canMonster ? m : null,
     reason,
   };
 }
@@ -157,26 +160,15 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
     const label = TERRAIN[t]?.label || t;
     const opts = monsters[t] || [];
     const slot = player.trails[t];
-    const slotLoc = slot?.locId ? locById(slot.locId) : null;
-    const fallbackLoc = LOCATIONS.find((l) => l.terrain === t) || null;
-    const fromSlot = slotLoc
-      ? opts.find((o) => o.locId === slot.locId) || {
-          locId: slot.locId,
-          loc: slotLoc,
-          level: null,
-          count: 1,
-        }
-      : null;
-    const primary =
-      fromSlot ||
-      opts[0] ||
-      (fallbackLoc ? { locId: fallbackLoc.id, loc: fallbackLoc, level: null, count: 0 } : null);
+    const primary = opts[0] || null;
 
     if (!primary?.loc) {
       return `
-        <button type="button" class="trail-token-btn is-empty" disabled data-trail-terrain="${t}">
+        <button type="button" class="trail-token-btn is-empty" disabled data-trail-terrain="${t}" title="Brak potwora na tym terenie">
           <span class="trail-token-ico">${TRAIL_ICON[t]?.() || ""}</span>
           <strong>${escapeHtmlLite(label)}</strong>
+          <span class="trail-token-meta">niedostępne</span>
+          <span class="trail-token-status">ustaw potwora w panelu</span>
         </button>`;
     }
 
@@ -194,7 +186,7 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
         loc.id
       )}" data-kind="${nextKind}" title="${escapeHtmlLite(label)}">
         <span class="trail-token-ico">${TRAIL_ICON[t]?.() || ""}</span>
-        <strong>${escapeHtmlLite(label)}</strong>
+        <strong>${escapeHtmlLite(loc.name || label)}</strong>
         <span class="trail-token-meta">${meta}</span>
         <span class="trail-token-status">${statusTxt}</span>
       </button>`;

@@ -38,8 +38,10 @@ export function defaultBoard() {
     movePrompt: null,
     /** Podświetl sąsiadów z tej lokacji (ruch) */
     highlightFrom: null,
-    /** Poziom ustawiany przyciskiem I/II/III przed Potwór + */
-    pendingMonsterLevel: null,
+    /** Poziom ustawiany przyciskiem I/II/III przed oznaczeniem */
+    pendingMonsterLevel: "I",
+    /** Komunikat gdy kliknięcie nie może postawić potwora (ten sam teren itd.) */
+    placeError: null,
   };
 }
 
@@ -56,6 +58,128 @@ export function monstersList(board) {
     .filter((row) => row.loc);
 }
 
+export const MONSTER_TERRAINS = ["forest", "mountain", "water"];
+
+/** Lokacje danego terenu (numery z planszy) — do wyboru żetonu obszaru. */
+export function locationsForTerrain(terrain) {
+  return LOCATIONS.filter((l) => l.terrain === terrain).sort(
+    (a, b) => (a.number ?? 99) - (b.number ?? 99)
+  );
+}
+
+/** Inny potwór już zajmuje ten sam rodzaj terenu (las / góry / woda). */
+export function monsterOccupyingTerrain(board, terrain, exceptLocId = null) {
+  if (!terrain || !MONSTER_TERRAINS.includes(terrain)) return null;
+  for (const row of monstersList(board)) {
+    if (exceptLocId && row.id === exceptLocId) continue;
+    if (row.loc.terrain === terrain) return row;
+  }
+  return null;
+}
+
+/**
+ * Ustaw potwora dla slotu terenu (max 1 na las/góry/wodę).
+ * locId = null → wyczyść slot. Zawsze jeden żeton na teren.
+ */
+export function setMonsterForTerrain(board, terrain, locId, { level } = {}) {
+  if (!MONSTER_TERRAINS.includes(terrain)) {
+    return { ok: false, reason: "Nieznany teren." };
+  }
+  for (const row of monstersList(board)) {
+    if (row.loc.terrain === terrain) delete board.monsters[row.id];
+  }
+  if (!locId) {
+    board.placeError = null;
+    return { ok: true, cleared: true };
+  }
+  const loc = locById(locId);
+  if (!loc) return { ok: false, reason: "Nieznana lokacja." };
+  if (loc.terrain !== terrain) {
+    return {
+      ok: false,
+      reason: `Lokacja ${loc.name} to ${TERRAIN[loc.terrain]?.label || loc.terrain}, nie ${
+        TERRAIN[terrain]?.label || terrain
+      }.`,
+    };
+  }
+  const lv = level || "I";
+  board.monsters[locId] = { count: 1, level: lv, label: `Poz. ${lv}` };
+  board.placeError = null;
+  board.selectedLoc = locId;
+  return { ok: true, placed: true, level: lv, loc };
+}
+
+/** Przewiń numer obszaru w slocie terenu (mysz: ◀ ▶). */
+export function cycleMonsterTerrain(board, terrain, delta) {
+  const opts = locationsForTerrain(terrain);
+  if (!opts.length) return { ok: false, reason: "Brak lokacji." };
+  const cur = monsterOccupyingTerrain(board, terrain);
+  let idx = cur ? opts.findIndex((l) => l.id === cur.id) : -1;
+  if (idx < 0) idx = delta > 0 ? -1 : 0;
+  const next = opts[(idx + delta + opts.length) % opts.length];
+  const level = cur?.level || "I";
+  return setMonsterForTerrain(board, terrain, next.id, { level });
+}
+
+/** Ustaw slot terenu po numerze z planszy (0–18). */
+export function setMonsterTerrainByNumber(board, terrain, number, { level } = {}) {
+  const n = Number(number);
+  if (!Number.isFinite(n)) return { ok: false, reason: "Podaj numer obszaru." };
+  const loc = locationsForTerrain(terrain).find((l) => l.number === n);
+  if (!loc) {
+    const nums = locationsForTerrain(terrain)
+      .map((l) => l.number)
+      .join(", ");
+    return {
+      ok: false,
+      reason: `Numer ${n} nie należy do terenu „${TERRAIN[terrain]?.label || terrain}”. Dostępne: ${nums}.`,
+    };
+  }
+  const cur = monsterOccupyingTerrain(board, terrain);
+  return setMonsterForTerrain(board, terrain, loc.id, {
+    level: level || cur?.level || "I",
+  });
+}
+
+export function setMonsterTerrainLevel(board, terrain, level) {
+  const cur = monsterOccupyingTerrain(board, terrain);
+  if (!cur) {
+    return { ok: false, reason: "Najpierw wybierz numer obszaru dla tego terenu." };
+  }
+  board.monsters[cur.id] = {
+    count: 1,
+    level,
+    label: `Poz. ${level}`,
+  };
+  board.placeError = null;
+  return { ok: true };
+}
+
+/** Stare zapisy: max 1 potwór na teren, count zawsze 1. */
+export function sanitizeMonstersUniqueTerrain(board) {
+  if (!board?.monsters) return board;
+  const seen = Object.create(null);
+  for (const id of Object.keys(board.monsters)) {
+    const m = board.monsters[id];
+    if (!m || !(m.count > 0)) {
+      delete board.monsters[id];
+      continue;
+    }
+    const loc = locById(id);
+    if (!loc || !MONSTER_TERRAINS.includes(loc.terrain)) {
+      delete board.monsters[id];
+      continue;
+    }
+    m.count = 1;
+    if (seen[loc.terrain]) {
+      delete board.monsters[id];
+      continue;
+    }
+    seen[loc.terrain] = id;
+  }
+  return board;
+}
+
 export function monsterEncounterHtml(loc, monster) {
   if (!loc || !monster) return "";
   const lvl = monster.level ? ` poziom ${escapeHtml(String(monster.level))}` : "";
@@ -63,7 +187,7 @@ export function monsterEncounterHtml(loc, monster) {
   return `
     <div class="guide-box guide-monster-hit" role="status">
       <p class="step-kicker" style="margin:0">${ICO.monster()} Potwór na polu</p>
-      <h3 style="margin:0.25rem 0 0.4rem">Na <strong>${escapeHtml(loc.name)}</strong> stoi potwór${lvl}${label} (×${monster.count})</h3>
+      <h3 style="margin:0.25rem 0 0.4rem">Na <strong>${escapeHtml(loc.name)}</strong> stoi potwór${lvl}${label}</h3>
       <p class="lead" style="margin:0"><strong>Nie musisz walczyć.</strong> Instrukcja: w fazie II <em>możesz</em> walczyć z potworem na tym samym obszarze — albo wybrać medytację albo eksplorację.</p>
       <p class="note" style="margin:0.45rem 0 0">Teraz jesteś w fazie I: akcje obszaru / zadanie / kolejny ruch. Walka dopiero gdy w fazie II wybierzesz „Walka”.</p>
     </div>
@@ -71,11 +195,61 @@ export function monsterEncounterHtml(loc, monster) {
 }
 
 export function monstersPanelHtml(board) {
+  const levels = ["I", "II", "III"];
+  const slots = MONSTER_TERRAINS.map((terrain) => {
+    const t = TERRAIN[terrain];
+    const opts = locationsForTerrain(terrain);
+    const cur = monsterOccupyingTerrain(board, terrain);
+    const num = cur?.loc?.number;
+    const name = cur?.loc?.name || "— wybierz numer —";
+    const level = cur?.level || "I";
+    const filled = Boolean(cur);
+    return `
+      <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"}" data-terrain-slot="${terrain}">
+        <div class="monster-terrain-head">
+          <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
+          <strong>${escapeHtml(t.label)}</strong>
+          <span class="monster-terrain-meta">${filled ? escapeHtml(name) : "brak żetonu"}</span>
+        </div>
+        <div class="monster-terrain-pick" role="group" aria-label="Numer obszaru: ${escapeHtml(t.label)}">
+          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni obszar">◀</button>
+          <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+            num != null ? escapeHtml(String(num)) : ""
+          }" placeholder="#" aria-label="Numer obszaru ${escapeHtml(t.label)}" />
+          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny obszar">▶</button>
+          <button type="button" class="btn btn-secondary" data-monster-terrain-clear="${terrain}" ${
+            filled ? "" : "disabled"
+          }>Usuń</button>
+        </div>
+        <div class="monster-terrain-levels" role="group" aria-label="Poziom potwora ${escapeHtml(t.label)}">
+          ${levels
+            .map(
+              (lv) =>
+                `<button type="button" class="btn ${
+                  filled && level === lv ? "btn-primary" : "btn-secondary"
+                }" data-monster-terrain-level="${terrain}" data-level="${lv}" ${
+                  filled ? "" : "disabled"
+                }>Poz. ${lv}</button>`
+            )
+            .join("")}
+        </div>
+        <p class="note monster-terrain-hint">Numery ${opts
+          .map((l) => l.number)
+          .join(", ")}</p>
+      </div>`;
+  }).join("");
+
   return `
     <div class="monsters-panel">
-      <h3>${ICO.monster()} Potwory</h3>
-      <p class="lead" style="margin:0">Liczba i poziomy potworów wynikają z <strong>zasad / przygotowania</strong> — trzymasz je na stole. Helper ich nie ustawia.</p>
-      <p class="note" style="margin:0.45rem 0 0">W fazie II walka z potworem jest <strong>opcjonalna</strong>: wybierasz ją tylko gdy na Twoim polu leży żeton. Wejście na potwora nie wymusza walki.</p>
+      <h3>${ICO.monster()} Potwory na mapie</h3>
+      <p class="lead" style="margin:0">Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy.</p>
+      ${
+        board.placeError
+          ? `<p class="warn" style="margin:0.45rem 0 0" role="alert">${escapeHtml(board.placeError)}</p>`
+          : ""
+      }
+      <div class="monster-terrain-grid">${slots}</div>
+      <p class="note" style="margin:0.45rem 0 0">Walka w fazie II jest <strong>opcjonalna</strong> — tylko gdy żeton stoi na Twoim polu.</p>
     </div>
   `;
 }
@@ -271,7 +445,7 @@ export function bindMapLocPopup(root, { timeoutMs = 3000 } = {}) {
   return hide;
 }
 
-/** Pasek narzędzi mapy usunięty — potwory wg zasad na stole, pionek ze szkoły. */
+/** Pasek narzędzi mapy usunięty — oznaczanie potworów jest w panelu Potwory. */
 export function mapToolbarHtml() {
   return "";
 }
@@ -293,10 +467,10 @@ function terrainIcon(id) {
 export function selectedLocPanel(board, roster) {
   const loc = locById(board.selectedLoc);
   if (!loc) {
-    return `<p class="lead">Kliknij lokację na mapie, potem użyj narzędzi: potwór / wiedźmin.</p>`;
+    return `<p class="lead">Kliknij lokację na mapie. Potwory ustawiasz numerami w panelu (1 na teren).</p>`;
   }
   const t = TERRAIN[loc.terrain];
-  const m = board.monsters[loc.id];
+  const m = monsterAt(board, loc.id);
   const here = roster
     .map((p, i) => ({ p, i }))
     .filter(({ p }) => p.locationId === loc.id);
@@ -306,6 +480,10 @@ export function selectedLocPanel(board, roster) {
     .filter(Boolean)
     .map((n) => `${n.name}${typeof n.number === "number" ? ` (${n.number})` : ""}`)
     .join(", ");
+  const otherSame =
+    !m && MONSTER_TERRAINS.includes(loc.terrain)
+      ? monsterOccupyingTerrain(board, loc.terrain)
+      : null;
 
   return `
     <div class="loc-panel">
@@ -325,7 +503,19 @@ export function selectedLocPanel(board, roster) {
         neigh ? escapeHtml(neigh) : "—"
       }</p>
       <p class="tip" style="margin:0.5rem 0 0">Po ruchu helper pokaże kroki tej akcji (faza I, opcjonalna).</p>
-      <p class="note">${ICO.monster()} Potwory: na fizycznej planszy (wg zasad). Walka w fazie II opcjonalna.</p>
+      ${
+        m
+          ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.monster()} Potwór tu: poz. <strong>${escapeHtml(
+              String(m.level || "?")
+            )}</strong></p>`
+          : otherSame
+            ? `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Slot „${escapeHtml(
+                t.label
+              )}” zajęty przez <strong>${escapeHtml(otherSame.loc.name)}</strong> (#${
+                otherSame.loc.number
+              }).</p>`
+            : `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — ustaw numer w panelu poniżej.</p>`
+      }
       <p>Wiedźmini:
         ${
           here.length

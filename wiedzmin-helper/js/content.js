@@ -143,7 +143,7 @@ function buildSoloSetupSteps(player) {
       body: `
         <ol class="checklist">
           <li>3 stosy: las / góry / woda — pomieszaj, zakryte.</li>
-          <li>Po 1 żetonie z każdego — odkryte na 3 polach sekcji potworów.</li>
+          <li>Po 1 żetonie z każdego — odkryte na 3 polach sekcji potworów (<strong>różne tereny</strong>: las + góry + woda).</li>
         </ol>
       `,
     },
@@ -156,10 +156,10 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
-          <li><strong>Na stole:</strong> połóż żetony potworów wg zasad. Helper nie ustawia ich na mapie — w fazie II walka jest opcjonalna.</li>
+          <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom — potem w fazie II walka opcjonalna po wejściu.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
-        <p class="note">Reszta przygotowania potworów jak w multi.</p>
+        <p class="note">Reszta przygotowania potworów jak w multi. Jeden potwór na teren (las / góry / woda).</p>
       `,
     },
     {
@@ -289,7 +289,7 @@ function buildMultiSetupSteps(n, roster = []) {
       body: `
         <ol class="checklist">
           <li>3 stosy: las / góry / woda.</li>
-          <li>Po 1 odkrytym żetonie na 3 polach sekcji potworów.</li>
+          <li>Po 1 odkrytym żetonie na 3 polach sekcji potworów (<strong>różne tereny</strong>: las + góry + woda).</li>
         </ol>
       `,
     },
@@ -361,7 +361,7 @@ function buildMonsterSetupHtml(n) {
       <li><strong>2.</strong> Żetony: stosy I / II / III (zakryte, pomieszane).</li>
       ${special2}
       <li><strong>4–6.</strong> Odkryj → przenieś na obszary → dopasuj karty.</li>
-      <li><strong>Na stole:</strong> żetony potworów wg zasad; w helperze walka w fazie II jest opcjonalna.</li>
+      <li><strong>W helperze:</strong> 3 ikony terenu → numer obszaru z żetonu + poziom (<strong>max 1 na teren</strong>).</li>
       <li><strong>7.</strong> Potasuj karty walki potworów.</li>
     </ol>
   `;
