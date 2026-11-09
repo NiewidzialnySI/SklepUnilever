@@ -13,7 +13,7 @@ import {
   schoolStartId,
   placeAtSchool,
 } from "./map-data.js";
-import { ICO, SCHOOL_ICON } from "./icons.js";
+import { ICO, SCHOOL_ICON, actionIconHtml } from "./icons.js";
 import { nowDoingGuideHtml, moveCostChooserHtml } from "./guide.js";
 
 export const NOW_ACTIONS = [
@@ -372,17 +372,20 @@ export function selectedLocPanel(board, roster) {
       <p class="lead" style="margin:0">${terrainIcon(loc.terrain)} Teren ruchu: <strong>${
         t.label
       }</strong>${loc.school ? ` · szkoła wiedźmińska` : ""}</p>
+      ${
+        loc.actionKey
+          ? `<div class="loc-action-icon">${actionIconHtml(loc.actionKey, { width: 130, height: 40 })}</div>`
+          : ""
+      }
       ${hint ? `<p class="loc-action"><strong>Znak na planszy:</strong> ${escapeHtml(hint)}</p>` : ""}
       <p class="note" style="margin:0.4rem 0 0">Sąsiedzi (ścieżki): ${
         neigh ? escapeHtml(neigh) : "—"
       }</p>
-      <p class="tip" style="margin:0.5rem 0 0">Po ruchu: przycisk „Faza I” / „Eksploracja” w trackerze pokaże kroki za rękę wg tego znaku.</p>
+      <p class="tip" style="margin:0.5rem 0 0">Po ruchu helper pokaże kroki tej akcji (faza I, opcjonalna).</p>
       <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
         m?.level ? ` · poz. ${escapeHtml(String(m.level))}` : ""
       }${m?.label ? ` (${escapeHtml(m.label)})` : ""}${
-        m?.count
-          ? ` — <em>wejście gracza = start walki w helperze</em>`
-          : ""
+        m?.count ? ` — <em>walka opcjonalna w fazie II</em>` : ""
       }</p>
       <p>Wiedźmini:
         ${

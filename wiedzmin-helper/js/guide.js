@@ -1,7 +1,7 @@
 /**
  * Prowadzenie za rękę: koszt ruchu (klikany wybór) + kroki wg znaków na polu.
  */
-import { ICO } from "./icons.js";
+import { ICO, actionIconHtml } from "./icons.js";
 import {
   TERRAIN,
   locById,
@@ -181,9 +181,13 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
       to.school ? " · szkoła" : ""
     }</p>
     ${
-      hint
-        ? `<p class="map-loc-popup-hint"><strong>Znak:</strong> ${escapeHtml(hint)}</p>`
-        : ""
+      to.actionKey
+        ? `<div class="map-loc-popup-action">${actionIconHtml(to.actionKey, { width: 100, height: 34 })}${
+            hint ? `<p class="map-loc-popup-hint">${escapeHtml(hint)}</p>` : ""
+          }</div>`
+        : hint
+          ? `<p class="map-loc-popup-hint"><strong>Znak:</strong> ${escapeHtml(hint)}</p>`
+          : ""
     }
     ${
       mon
@@ -324,10 +328,10 @@ export function locationActionSteps(loc) {
       return {
         ...base,
         steps: [
-          "Znak: karta z ogniem : +1 karta.",
-          "Usuń 1 kartę z ręki (zwykle na stos odrzuconych / wg tekstu — tu: wymiana).",
-          "Dobierz 1 kartę (z talii).",
-          "Raz na turę ta akcja obszaru.",
+          "Znak Vengerberg: usuń 1 kartę z ręki z gry.",
+          "Kup 1 kartę z odkrytej puli na planszy.",
+          "Koszt nowej karty może być niższy, równy albo o 1 wyższy od kosztu usuniętej.",
+          "Weź kupioną kartę na rękę. Raz na turę.",
         ],
       };
     case "defenseLevel":
@@ -344,9 +348,9 @@ export function locationActionSteps(loc) {
       return {
         ...base,
         steps: [
-          "Znak: ALCHEMIA ≤ POZIOM.",
-          "Jeśli alchemia ≤ poziom wiedźmina → wykonaj efekt: +1 eliksir (dobierz kartę eliksiru).",
-          "Pamiętaj limit 4 eliksiry przy sobie.",
+          "Znak: + alchemia (tylko gdy alchemia ≤ poziom wiedźmina).",
+          "Podnieś alchemię o +1.",
+          "Przy każdym podniesieniu alchemii dobierasz 1 kartę eliksiru (limit 4).",
         ],
       };
     case "specialtyLevel":
@@ -394,15 +398,17 @@ export function locationActionGuideHtml(loc, { heading = "Akcja tego pola (znaki
   if (!loc) {
     return `<div class="guide-box"><p class="warn">${escapeHtml(g.steps[0])}</p></div>`;
   }
+  const icon = actionIconHtml(loc.actionKey, { width: 120, height: 40 });
   return `
     <div class="guide-box guide-loc" role="region" aria-label="Akcja obszaru">
       <p class="step-kicker" style="margin:0">${escapeHtml(heading)}</p>
       <h3 style="margin:0.25rem 0 0.35rem">${escapeHtml(g.title)}</h3>
-      ${g.tip ? `<p class="lead" style="margin:0">${escapeHtml(g.tip)}</p>` : ""}
+      ${icon ? `<div class="loc-action-icon" title="Znak pod nazwą miejscowości">${icon}</div>` : ""}
+      ${g.tip ? `<p class="lead" style="margin:0.35rem 0 0">${escapeHtml(g.tip)}</p>` : ""}
       <ol class="checklist guide-steps">
         ${g.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}
       </ol>
-      <p class="note">To akcja <strong>fazy I</strong> (po ruchu). Faza II „Eksploracja” to osobne karty miasto / dzikie ostępy.</p>
+      <p class="note">Akcja <strong>fazy I</strong> — opcjonalna, raz na turę. Nie myl z fazą II (walka / medytacja / eksploracja).</p>
     </div>
   `;
 }

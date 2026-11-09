@@ -701,6 +701,37 @@ h3 {
   display: block;
 }
 
+.ico-action {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.ico-action-img,
+.ico-action .ico-img {
+  width: auto !important;
+  height: 2rem !important;
+  max-width: min(100%, 12rem);
+  object-fit: contain;
+}
+
+.loc-action-icon {
+  margin: 0.45rem 0 0.15rem;
+}
+
+.map-loc-popup-action {
+  margin: 0.45rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.ico-legend-item .ico-action .ico-img {
+  height: 2.4rem !important;
+  max-width: 9rem;
+}
+
 .ico-terrain .ico-img,
 .ico-school-img .ico-img {
   width: 1.75rem;
