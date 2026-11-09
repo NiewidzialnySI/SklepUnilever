@@ -37,21 +37,22 @@ export const ICO = {
       { className: "ico-water" }
     ),
   /**
-   * Symbol na karcie (nie żeton): w okręgu woda + las + góry obok siebie
-   * = pasuje do dowolnego terenu przy ruchu.
+   * Symbol na karcie: woda | las | góry w jednym okręgu (jak na karcie akcji).
    */
   wild: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.4" fill="#d8dde0" stroke="#8aa4b5" stroke-width="1.6"/>
-       <circle cx="12" cy="12" r="8.6" fill="#c5b8a4" stroke="none"/>
-       <path d="M3.8 14.8c1.1-2.4 2.6-2.6 4.1-.15.55.9.95.95 1.45.1" fill="none" stroke="#5b8fb0" stroke-width="1.55"/>
-       <path d="M4.1 11.6c.95-1.9 2.2-2.05 3.5-.1.45.7.8.75 1.2.05" fill="none" stroke="#7aa7c2" stroke-width="1.35"/>
-       <path d="M5.6 9.4c.35-.15.75.05 1 .45.35.55.2 1.15-.25 1.35" fill="none" stroke="#eef6fb" stroke-width="1.1"/>
-       <path d="M9.35 17.4 L12 7.6 L14.65 17.4 Z" fill="#3f6b3a" stroke="none"/>
-       <path d="M10.55 13.2 L12 9.4 L13.45 13.2 Z" fill="#4f8348" stroke="none"/>
-       <path d="M11.25 17.4 V18.55" stroke="#2f4f2c" stroke-width="1.15"/>
-       <path d="M14.55 17.5 L17.1 9.3 L19.2 12.6 L20.55 17.5 Z" fill="#e8e6e1" stroke="none"/>
-       <path d="M17.1 9.3 L17.85 11.15 L16.35 11.35 Z" fill="#f7f7f5" stroke="none"/>`,
+      `<circle cx="12" cy="12" r="10.6" fill="#b7c9d4" stroke="#6f8fa3" stroke-width="1.35"/>
+       <circle cx="12" cy="12" r="9.15" fill="#d2c4ad" stroke="#9a8b74" stroke-width="0.55"/>
+       <path d="M3.55 13.9c1.35-0.15 2.05 0.55 2.55 1.45 0.55-1.35 1.55-2.05 2.85-1.85 0.15 0.85-0.15 1.55-0.85 1.95-0.85 0.5-1.85 0.35-2.45-0.25-0.55 0.95-1.45 1.25-2.45 0.95-0.2-0.7 0-1.45 0.35-2.25z" fill="#5a9abb" stroke="#3f7a96" stroke-width="0.45"/>
+       <path d="M4.15 11.35c1.05-0.1 1.65 0.45 2.05 1.2 0.45-1.1 1.25-1.65 2.25-1.45 0.1 0.65-0.15 1.2-0.7 1.5-0.7 0.4-1.45 0.25-1.9-0.25-0.4 0.7-1.1 0.95-1.9 0.7-0.1-0.55 0-1.15 0.2-1.7z" fill="#7eb6d0" stroke="none"/>
+       <path d="M5.35 9.55c0.55 0.05 0.9 0.4 1.05 0.9 0.35-0.7 0.9-1.05 1.55-0.9-0.05 0.55-0.35 0.9-0.85 1.05-0.55 0.2-1.05 0-1.3-0.4-0.2 0.45-0.6 0.65-1.1 0.45 0.05-0.45 0.25-0.9 0.65-1.1z" fill="#d8eef7" stroke="none"/>
+       <path d="M9.05 17.55 L12 6.85 L14.95 17.55 Z" fill="#2f6b35" stroke="#214a26" stroke-width="0.4"/>
+       <path d="M10.15 13.85 L12 8.55 L13.85 13.85 Z" fill="#3f8644" stroke="none"/>
+       <path d="M10.7 11.35 L12 8.9 L13.3 11.35 Z" fill="#4f9a52" stroke="none"/>
+       <path d="M11.35 17.55 V19.05" stroke="#1d3a20" stroke-width="1.35" stroke-linecap="round"/>
+       <path d="M14.85 17.6 L17.35 8.15 L19.05 11.55 L20.7 17.6 Z" fill="#f4f2ec" stroke="#6a6862" stroke-width="0.45"/>
+       <path d="M17.35 8.15 L18.25 10.35 L16.55 10.55 Z" fill="#ffffff" stroke="none"/>
+       <path d="M18.55 12.85 L19.55 15.55 L17.85 15.7 Z" fill="#cfcbc3" stroke="none" opacity="0.7"/>`,
       { className: "ico-wild" }
     ),
   gold: () =>
