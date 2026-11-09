@@ -409,7 +409,7 @@ export const MOVE_HELP = `
     <li>${ICO.forest()}${ICO.mountain()}${ICO.water()} Odrzuć kartę z <strong>pasującym terenem</strong> (las / góry / woda) na sąsiedni obszar.</li>
     <li>Albo <strong>2 dowolne</strong> karty → dowolny sąsiad.</li>
     <li>Albo <strong>1 karta + ${chip(ICO.gold, "1 złoto")}</strong> → dowolny sąsiad.</li>
-    <li>${chip(ICO.wild, "Uniwersalny")} teren = 1 karta na dowolny sąsiad.</li>
+    <li>${chip(ICO.wild, "Uniwersalny (*)")} na <em>karcie</em> = 1 karta na dowolny sąsiad (to nie żeton las/góry/woda).</li>
   </ul>
 `;
 

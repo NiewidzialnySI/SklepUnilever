@@ -22,11 +22,11 @@ export const MOVE_COSTS = [
   },
   {
     id: "wild",
-    title: "1 karta uniwersalna",
-    short: "Dziki / wild na karcie",
+    title: "1 karta uniwersalna (*)",
+    short: "Symbol * na karcie — nie żeton",
     cards: 1,
     gold: 0,
-    tip: "Jedna karta z symbolem uniwersalnym wystarczy na dowolnego sąsiada.",
+    tip: "Na karcie akcji bywa symbol „uniwersalny” — liczy się jak las/góry/woda. To nie jest żeton z planszy.",
   },
   {
     id: "two",
@@ -204,7 +204,7 @@ export function neighborPickerHtml(fromId, { player, monsters } = {}) {
             }
             <span class="move-cost-lines">
               <span><strong>Najtaniej:</strong> 1 karta ${escapeHtml(tLabel)} <em>(${escapeHtml(matchOk)})</em></span>
-              <span><strong>Albo:</strong> 1× wild · 2 dowolne karty <em>(${escapeHtml(twoOk)})</em> · 1 karta + 1 złoto <em>(${escapeHtml(mixOk)})</em></span>
+              <span><strong>Albo:</strong> 1× uniwersalna (*) · 2 dowolne karty <em>(${escapeHtml(twoOk)})</em> · 1 karta + 1 złoto <em>(${escapeHtml(mixOk)})</em></span>
             </span>
           </button>`;
           })

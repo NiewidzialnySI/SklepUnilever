@@ -540,10 +540,10 @@ h3 {
   vertical-align: middle;
 }
 
-.ico-forest { color: #2f6b45; }
-.ico-mountain { color: #6b5b45; }
-.ico-water { color: #2f5f8b; }
-.ico-wild { color: #7a5a9a; }
+.ico-forest { color: #3d6b3a; }
+.ico-mountain { color: #5a5a58; }
+.ico-water { color: #4a7a9a; }
+.ico-wild { color: #6b5a3a; }
 .ico-gold { color: #b8923e; }
 .ico-shield { color: #4a6a8b; }
 .ico-attack { color: #8b3a2f; }
@@ -959,10 +959,10 @@ h3 {
   color: inherit;
 }
 
-.ico-legend-item .ico-forest { color: #2f6b45; }
-.ico-legend-item .ico-mountain { color: #6b5b45; }
-.ico-legend-item .ico-water { color: #2f5f8b; }
-.ico-legend-item .ico-wild { color: #7a5a9a; }
+.ico-legend-item .ico-forest { color: #3d6b3a; }
+.ico-legend-item .ico-mountain { color: #5a5a58; }
+.ico-legend-item .ico-water { color: #4a7a9a; }
+.ico-legend-item .ico-wild { color: #6b5a3a; }
 .ico-legend-item .ico-gold { color: #b8923e; }
 .ico-legend-item .ico-card-blue { color: #2f5f9a; }
 .ico-legend-item .ico-card-red { color: #a33a2f; }

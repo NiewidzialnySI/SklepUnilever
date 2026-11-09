@@ -7,24 +7,47 @@ function svg(inner, { size = 28, className = "", view = "0 0 24 24" } = {}) {
 }
 
 export const ICO = {
+  /** Żeton obszaru: 3 świerki (środkowy najwyższy) — wzór własny pod zdjęcie żetonu. */
   forest: () =>
     svg(
-      `<path d="M12 21V11"/><path d="M12 11L7 16H17L12 11Z"/><path d="M12 8L8.5 12.5H15.5L12 8Z"/><path d="M12 5L9.5 8.5H14.5L12 5Z"/>`,
+      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.12" stroke="currentColor" stroke-width="1.2"/>
+       <path d="M6.2 18.2 L8.8 12.2 L11.4 18.2 Z" fill="currentColor" stroke="none" opacity="0.75"/>
+       <path d="M12.6 18.2 L15.2 12.2 L17.8 18.2 Z" fill="currentColor" stroke="none" opacity="0.75"/>
+       <path d="M8.4 18.4 L12 7.2 L15.6 18.4 Z" fill="currentColor" stroke="none"/>
+       <path d="M12 18.4 V20.2" stroke="currentColor" stroke-width="1.4"/>`,
       { className: "ico-forest" }
     ),
+  /** Żeton obszaru: dwa ostre szczyty ze śniegiem. */
   mountain: () =>
     svg(
-      `<path d="M3 19L9 8L12 13L15 7L21 19H3Z"/><path d="M10.5 13.5L12 11L14 14"/>`,
+      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
+       <path d="M3.8 18.6 L9.2 7.4 L12.2 12.2 L14.6 8.2 L20.2 18.6 Z" fill="currentColor" stroke="none" opacity="0.85"/>
+       <path d="M9.2 7.4 L10.6 10.2 L8.4 10.6 Z" fill="#f7efd8" stroke="none"/>
+       <path d="M14.6 8.2 L15.8 10.4 L13.8 10.7 Z" fill="#f7efd8" stroke="none"/>`,
       { className: "ico-mountain" }
     ),
+  /** Żeton obszaru: trzy spienione fale. */
   water: () =>
     svg(
-      `<path d="M4 14c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M4 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M12 4c-2 3-4 5.5-4 8a4 4 0 008 0c0-2.5-2-5-4-8Z"/>`,
+      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
+       <path d="M4.2 15.2c1.6-2.2 3.4-2.4 5.2-.2 1.2 1.5 2.2 1.6 3.4.1 1.7-2.1 3.6-2.2 5.4.1" stroke="currentColor" stroke-width="1.8" fill="none"/>
+       <path d="M4.5 11.4c1.5-2 3.2-2.2 4.8-.15 1.1 1.4 2.1 1.45 3.2.05 1.6-1.95 3.4-2.05 5.1.05" stroke="currentColor" stroke-width="1.6" fill="none" opacity="0.85"/>
+       <path d="M5.2 8.2c1.2-1.55 2.6-1.7 3.9-.1.9 1.1 1.7 1.15 2.6 0 1.35-1.55 2.85-1.65 4.3 0" stroke="currentColor" stroke-width="1.45" fill="none" opacity="0.7"/>
+       <path d="M15.6 9.1c.55-.15 1.15.05 1.55.55.55.7.35 1.55-.25 1.85" stroke="#f7efd8" stroke-width="1.2" fill="none"/>`,
       { className: "ico-water" }
     ),
+  /**
+   * NIE jest żetonem z planszy. Na kartach akcji: symbol „pasuje do każdego terenu”
+   * (las/góry/woda) przy ruchu. W helperze nazywamy to „uniwersalny”.
+   */
   wild: () =>
     svg(
-      `<circle cx="12" cy="12" r="8"/><path d="M12 6v12M6 12h12M8.5 8.5l7 7M15.5 8.5l-7 7"/>`,
+      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
+       <path d="M7.2 16.8 L9.5 12.2 L11.8 16.8 Z" fill="currentColor" stroke="none" opacity="0.55"/>
+       <path d="M8.8 16.9 L12 9.2 L15.2 16.9 Z" fill="currentColor" stroke="none" opacity="0.45"/>
+       <path d="M4.5 17 L8.2 10.5 L10.2 13.5 L12.8 9.2 L19.5 17 Z" fill="none" stroke="currentColor" stroke-width="1.35" opacity="0.9"/>
+       <path d="M5.2 13.8c1.4-1.6 2.9-1.7 4.3 0" stroke="currentColor" stroke-width="1.35" fill="none"/>
+       <path d="M12 4.6l.7 1.9h2l-1.6 1.2.6 2-1.7-1.2-1.7 1.2.6-2-1.6-1.2h2z" fill="currentColor" stroke="none"/>`,
       { className: "ico-wild" }
     ),
   gold: () =>
@@ -198,12 +221,16 @@ export function iconsLegendHtml() {
     <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> z planszówki (uproszczone, własne SVG — nie grafiki z pudełka). Widzisz na karcie butelkę, kości albo „ogień”? Tu jest co to znaczy.</p>
     <p class="note">To nadal pomocnik, nie cyfrowa kopia gry. Tekstów i ilustracji kart nie kopiujemy — czytasz je z fizycznych kart.</p>
 
-    <h3>Teren (ruch)</h3>
+    <h3>Żetony terenu (3 sztuki — jak w pudełku)</h3>
+    <p class="note">Na planszy / w stosach żetonów obszarów są tylko: <strong>las</strong>, <strong>góry</strong>, <strong>woda</strong>. Nie ma osobnego żetonu „wild”.</p>
     ${row([
-      [ICO.forest, "Las", "Pasuje do symbolu lasu na karcie / obszarze"],
-      [ICO.mountain, "Góry", "Symbol górskiego terenu"],
-      [ICO.water, "Woda", "Symbol wodnego / morskiego"],
-      [ICO.wild, "Uniwersalny", "Dziki symbol — dowolny sąsiadujący teren"],
+      [ICO.forest, "Las", "Żeton: 3 świerki. Ruch: odrzuć kartę z lasem na sąsiada-las."],
+      [ICO.mountain, "Góry", "Żeton: szczyty. Ruch: karta z górami."],
+      [ICO.water, "Woda", "Żeton: fale. Ruch: karta z wodą (też ścieżki morskie)."],
+    ])}
+    <h3>Symbol na karcie (nie żeton)</h3>
+    ${row([
+      [ICO.wild, "Uniwersalny (*)", "Tylko na kartach akcji: zastępuje las/góry/wodę przy ruchu. To NIE jest 4. żeton z pudełka."],
     ])}
 
     <h3>Kolory kart akcji (walka / talia)</h3>
