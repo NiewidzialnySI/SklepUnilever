@@ -84,7 +84,7 @@ function buildSoloSetupSteps(player) {
           <span class="badge">Tylko podstawka</span>
           <span class="badge">Cel: 3 potwory + trofeum atrybutu</span>
         </div>
-        <p class="tip">Gracz: ${who}. <strong>Notuj liczbę tur</strong>.</p>
+        <p class="tip">Gracz: ${who}. Helper <strong>sam liczy tury</strong> (widać je w zakładce Tura).</p>
       `,
     },
     {
@@ -197,7 +197,7 @@ function buildSoloSetupSteps(player) {
           <li>Zdobyć <strong>3 trofea za pokonane potwory</strong> (nie odpędzone).</li>
           <li>Zdobyć <strong>odkryte trofeum atrybutu</strong> z przygotowania (medytacja przy V).</li>
         </ol>
-        <p class="warn">Trofeum atrybutu <strong>nie może być ostatnim</strong> — najpierw medytacja, potem 3. potwór. Notuj liczbę tur!</p>
+        <p class="warn">Trofeum atrybutu <strong>nie może być ostatnim</strong> — najpierw medytacja, potem 3. potwór. Po wygranej wynik liczysz wg tabeli (zależnie od liczby tur z helpera).</p>
         <h3>Tabela wyniku po wygranej</h3>
         ${SOLO_SCORE_TABLE}
       `,
@@ -714,7 +714,7 @@ export function quickRef(isSolo) {
            <li>Atak potwora: kość 1–3 szarża / 4–6 ugryzienie.</li>
            <li>Po zabiciu: bez nowego potwora; po odpędzeniu: nowy tego poziomu.</li>
            <li>Faza III: kupno nie z prawego skraju → odrzuć prawą kartę puli.</li>
-           <li>Wygrana: 3 pokonane + trofeum atrybutu; notuj tury.</li>
+           <li>Wygrana: 3 pokonane + trofeum atrybutu; helper liczy tury.</li>
          </ul>
          <h3>Wynik solo</h3>
          ${SOLO_SCORE_TABLE}
