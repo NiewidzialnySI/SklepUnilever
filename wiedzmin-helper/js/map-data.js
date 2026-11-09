@@ -14,18 +14,26 @@ export const TERRAIN = {
  * Akcje obszarów — skróty ze znaków na planszy (pomoc przy stole).
  * Szkoły: trening atrybutu za złoto (−2/−3/−4/−5 = koszt poziomu docelowego).
  */
+/**
+ * Znaki pod nazwami lokacji — skróty z instrukcji (Akcje obszarów).
+ * Akcja jest opcjonalna, w fazie I, każdy konkretny znak najwyżej raz na turę.
+ */
 export const LOCATION_ACTION_HINTS = {
-  schoolTrain: "Szkoła: +1 atak / obrona / alchemia / specjalność (koszt złota = poziom docelowy: 2–5).",
-  trailGold: "+1 złoto. Opcja: zadanie tropienia (1 złoto → żeton terenu potwora).",
-  dicePoker: "Poker kośćmi z miejscowymi.",
-  cleanPool: "0 złota → +1 złoto. Możesz spalić karty z puli na polach z płomieniem.",
-  trashDraw: "Usuń 1 kartę z ręki → dobierz +1 kartę.",
-  defenseLevel: "Obrona ≤ poziom wiedźmina → +1 obrona.",
-  alchemyLevel: "Alchemia ≤ poziom wiedźmina → +1 eliksir.",
-  specialtyLevel: "Zdolność specjalna ≤ poziom → +1 specjalność.",
-  attackLevel: "Atak ≤ poziom wiedźmina → +1 atak.",
-  gainElixir: "+1 karta eliksiru (limit 4).",
-  cintraElixir: "+1 karta eliksiru.",
+  schoolTrain:
+    "Szkoła: zapłać złoto = poziom docelowy (aktualny+1, zwykle 2–5) → +1 atak / obrona / alchemia. Specjalność tylko we własnej szkole.",
+  trailGold:
+    "+1 złoto z banku. Opcja: zapłać 1 złoto → zadanie tropienia (żeton terenu wybranego potwora + 1 złoto na żetonie).",
+  dicePoker: "Kościany poker z miejscowymi: 1 złoto do puli (+2 z banku); gracz po prawej rzuca za miejscowych.",
+  cleanPool: "Jeśli masz 0 złota → weź +1 złoto. Możesz też spalić (usunąć z gry) 1–2 karty z puli na polach z płomieniem.",
+  trashDraw:
+    "Usuń 1 kartę z ręki z gry → kup 1 kartę z odkrytej puli (koszt nowej: ≤, = albo o 1 wyższy od usuniętej).",
+  defenseLevel: "Darmowy trening: obrona ≤ poziom wiedźmina → +1 obrona (i +1 tarcza).",
+  alchemyLevel:
+    "Darmowy trening: alchemia ≤ poziom wiedźmina → +1 alchemia (przy podniesieniu alchemii zawsze dobierasz 1 eliksir).",
+  specialtyLevel: "Darmowy trening: zdolność specjalna ≤ poziom wiedźmina → +1 specjalność.",
+  attackLevel: "Darmowy trening: atak ≤ poziom wiedźmina → +1 atak.",
+  gainElixir: "Dobierz 1 kartę eliksiru (limit 4 przy sobie).",
+  cintraElixir: "Dobierz 1 kartę eliksiru (limit 4 przy sobie).",
 };
 
 /** id → lokacja. `number` = numer na planszy; `terrain` = ikona terenu do ruchu. */

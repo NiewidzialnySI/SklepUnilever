@@ -13,7 +13,7 @@ import {
   schoolStartId,
   placeAtSchool,
 } from "./map-data.js";
-import { ICO, SCHOOL_ICON } from "./icons.js";
+import { ICO, SCHOOL_ICON, actionIconHtml } from "./icons.js";
 import { nowDoingGuideHtml, moveCostChooserHtml } from "./guide.js";
 
 export const NOW_ACTIONS = [
@@ -61,11 +61,11 @@ export function monsterEncounterHtml(loc, monster) {
   const lvl = monster.level ? ` poziom ${escapeHtml(String(monster.level))}` : "";
   const label = monster.label ? ` — ${escapeHtml(monster.label)}` : "";
   return `
-    <div class="guide-box guide-monster-hit" role="alert">
+    <div class="guide-box guide-monster-hit" role="status">
       <p class="step-kicker" style="margin:0">${ICO.monster()} Potwór na polu</p>
-      <h3 style="margin:0.25rem 0 0.4rem">Wszedłeś na <strong>${escapeHtml(loc.name)}</strong></h3>
-      <p class="lead" style="margin:0">Tu stoi potwór${lvl}${label} (×${monster.count}). Helper prowadzi Cię do <strong>walki</strong>.</p>
-      <p class="note" style="margin:0.45rem 0 0">Na stole: nie musisz walczyć w fazie I — ale jak już wszedłeś na żeton, zwykle idziesz w fazę II → walka. Tu skracamy drogę.</p>
+      <h3 style="margin:0.25rem 0 0.4rem">Na <strong>${escapeHtml(loc.name)}</strong> stoi potwór${lvl}${label} (×${monster.count})</h3>
+      <p class="lead" style="margin:0"><strong>Nie musisz walczyć.</strong> Instrukcja: w fazie II <em>możesz</em> walczyć z potworem na tym samym obszarze — albo wybrać medytację albo eksplorację.</p>
+      <p class="note" style="margin:0.45rem 0 0">Teraz jesteś w fazie I: akcje obszaru / zadanie / kolejny ruch. Walka dopiero gdy w fazie II wybierzesz „Walka”.</p>
     </div>
   `;
 }
@@ -75,7 +75,7 @@ export function monstersPanelHtml(board) {
   return `
     <div class="monsters-panel">
       <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Po wejściu gracza na to pole helper odpali walkę.</p>
+      <p class="lead" style="margin:0">Ustaw jak na stole: narzędzie <strong>Potwór +</strong>, kliknij lokację z żetonu obszaru. Wejście na potwora <strong>nie wymusza</strong> walki — w fazie II możesz wybrać walkę, medytację albo eksplorację.</p>
       <div class="actions" style="margin:0.55rem 0">
         <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "I" ? "btn-primary" : ""}" data-monster-level="I">Poz. I</button>
         <button type="button" class="btn btn-secondary ${board.pendingMonsterLevel === "II" ? "btn-primary" : ""}" data-monster-level="II">Poz. II</button>
@@ -372,17 +372,20 @@ export function selectedLocPanel(board, roster) {
       <p class="lead" style="margin:0">${terrainIcon(loc.terrain)} Teren ruchu: <strong>${
         t.label
       }</strong>${loc.school ? ` · szkoła wiedźmińska` : ""}</p>
+      ${
+        loc.actionKey
+          ? `<div class="loc-action-icon">${actionIconHtml(loc.actionKey, { width: 130, height: 40 })}</div>`
+          : ""
+      }
       ${hint ? `<p class="loc-action"><strong>Znak na planszy:</strong> ${escapeHtml(hint)}</p>` : ""}
       <p class="note" style="margin:0.4rem 0 0">Sąsiedzi (ścieżki): ${
         neigh ? escapeHtml(neigh) : "—"
       }</p>
-      <p class="tip" style="margin:0.5rem 0 0">Po ruchu: przycisk „Faza I” / „Eksploracja” w trackerze pokaże kroki za rękę wg tego znaku.</p>
+      <p class="tip" style="margin:0.5rem 0 0">Po ruchu helper pokaże kroki tej akcji (faza I, opcjonalna).</p>
       <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
         m?.level ? ` · poz. ${escapeHtml(String(m.level))}` : ""
       }${m?.label ? ` (${escapeHtml(m.label)})` : ""}${
-        m?.count
-          ? ` — <em>wejście gracza = start walki w helperze</em>`
-          : ""
+        m?.count ? ` — <em>walka opcjonalna w fazie II</em>` : ""
       }</p>
       <p>Wiedźmini:
         ${

@@ -16,6 +16,36 @@ function schoolPng(file, className, size = 28) {
   return `<span class="ico ico-school-img ${className}" aria-hidden="true"><img class="ico-img" src="./img/schools/${file}.png" alt="" width="${size}" height="${size}" decoding="async" /></span>`;
 }
 
+/** Znaki pod nazwami miejscowości — PNG z Gemini (bez tła). */
+function actionPng(file, className = "", { width = 72, height = 28 } = {}) {
+  return `<span class="ico ico-action ${className}" aria-hidden="true"><img class="ico-img ico-action-img" src="./img/actions/${file}.png" alt="" width="${width}" height="${height}" decoding="async" /></span>`;
+}
+
+/** actionKey z map-data → plik PNG znaku lokacji. */
+export const ACTION_ICON_FILE = {
+  schoolTrain: "action-school-train-b",
+  trailGold: "action-trail-gold",
+  dicePoker: "action-dice-poker",
+  cleanPool: "action-clean-pool",
+  trashDraw: "action-trash-draw",
+  defenseLevel: "action-defense-level",
+  alchemyLevel: "action-alchemy-level",
+  specialtyLevel: "action-specialty-level",
+  attackLevel: "action-attack-level",
+  gainElixir: "action-gain-elixir",
+  cintraElixir: "action-gain-elixir",
+};
+
+export function actionIconHtml(actionKey, opts = {}) {
+  const file = ACTION_ICON_FILE[actionKey];
+  if (!file) return "";
+  const wide = ["schoolTrain", "trailGold", "cleanPool", "trashDraw"].includes(actionKey);
+  return actionPng(file, `ico-action-${actionKey}`, {
+    width: opts.width ?? (wide ? 110 : 72),
+    height: opts.height ?? 32,
+  });
+}
+
 export const ICO = {
   /** Żeton las — asset Gemini (3 świerki). */
   forest: () => terrainPng("forest", "ico-forest"),
@@ -123,6 +153,22 @@ export const ICO = {
   schoolKot: () => schoolPng("kot", "ico-school"),
   schoolZmija: () => schoolPng("zmija", "ico-school"),
   schoolMantikora: () => schoolPng("mantikora", "ico-school"),
+  /** Znaki akcji obszarów (Gemini). */
+  actionAttack: () => actionPng("action-attack-level", "ico-loc-action", { width: 72, height: 32 }),
+  actionDefense: () => actionPng("action-defense-level", "ico-loc-action", { width: 72, height: 32 }),
+  actionAlchemy: () => actionPng("action-alchemy-level", "ico-loc-action", { width: 72, height: 32 }),
+  actionSpecialty: () => actionPng("action-specialty-level", "ico-loc-action", { width: 72, height: 32 }),
+  actionSchool: () => actionPng("action-school-train-b", "ico-loc-action", { width: 110, height: 32 }),
+  actionElixir: () => actionPng("action-gain-elixir", "ico-loc-action", { width: 72, height: 32 }),
+  actionDice: () => actionPng("action-dice-poker", "ico-loc-action", { width: 56, height: 32 }),
+  actionTrail: () => actionPng("action-trail-gold", "ico-loc-action", { width: 110, height: 32 }),
+  actionTrash: () => actionPng("action-trash-draw", "ico-loc-action", { width: 110, height: 32 }),
+  actionClean: () => actionPng("action-clean-pool", "ico-loc-action", { width: 110, height: 32 }),
+  actionQuest: () => actionPng("action-quest-mark", "ico-loc-action", { width: 56, height: 32 }),
+  attrAttackPng: () => actionPng("attr-attack", "", { width: 28, height: 28 }),
+  attrDefensePng: () => actionPng("attr-defense", "", { width: 28, height: 28 }),
+  attrAlchemyPng: () => actionPng("attr-alchemy", "", { width: 28, height: 28 }),
+  attrSpecialtyPng: () => actionPng("attr-specialty", "", { width: 28, height: 28 }),
   elixir: () =>
     svg(
       `<path d="M10 3h4"/><path d="M11 3v3.5L7.5 14a4.2 4.2 0 003.8 6h1.4a4.2 4.2 0 003.8-6L13 6.5V3"/><path d="M9 15c1.5 1 4.5 1 6 0"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>`,
@@ -169,9 +215,12 @@ export function chip(iconFn, label) {
 }
 
 export function iconsLegendHtml() {
-  const row = (items) =>
-    `<div class="ico-legend-row">${items
-      .map(([fn, label, hint]) => `<div class="ico-legend-item">${fn()}<div><strong>${label}</strong><span>${hint}</span></div></div>`)
+  const row = (items, rowClass = "") =>
+    `<div class="ico-legend-row${rowClass ? ` ${rowClass}` : ""}">${items
+      .map(
+        ([fn, label, hint]) =>
+          `<div class="ico-legend-item"><div class="ico-legend-ico">${fn()}</div><div class="ico-legend-text"><strong>${label}</strong><span>${hint}</span></div></div>`
+      )
       .join("")}</div>`;
 
   return `
@@ -235,11 +284,27 @@ export function iconsLegendHtml() {
       [ICO.reputation, "Reputacja", "Tor 0→4. 4. z walki wygrywa; medytacja jako „ostatnie” nie kończy gry."],
     ])}
 
+    <h3>Znaki pod nazwami miejscowości (Gemini)</h3>
+    <p class="note">To akcje <strong>fazy I</strong> — opcjonalne, raz na turę każdy konkretny znak. Wejście na pole z potworem <em>nie</em> wymusza walki.</p>
+    ${row([
+      [ICO.actionSchool, "Szkoła", "Zapłać złoto = poziom docelowy (2–5) → +1 atak/obrona/alchemia; specjalność tylko we własnej szkole."],
+      [ICO.actionAttack, "+ Atak", "Darmowy trening: atak ≤ poziom wiedźmina → +1 atak (Ard Modron)."],
+      [ICO.actionDefense, "+ Obrona", "Obrona ≤ poziom → +1 obrona (+1 tarcza) (Cidaris)."],
+      [ICO.actionAlchemy, "+ Alchemia", "Alchemia ≤ poziom → +1 alchemia i dobierz 1 eliksir (Ban Ard)."],
+      [ICO.actionSpecialty, "+ Specjalność", "Specjalność ≤ poziom → +1 specjalność (Glenmore)."],
+      [ICO.actionElixir, "+ Eliksir", "Dobierz 1 kartę eliksiru (max 4) — Beauclair, Dhuwod, Cintra."],
+      [ICO.actionDice, "Poker", "Kościany poker z miejscowymi (Novigrad, Loc Ichaer)."],
+      [ICO.actionTrail, "Tropienie", "+1 złoto; opcja: 1 złoto → zadanie tropienia (Hengfors, Doldeth)."],
+      [ICO.actionClean, "Wyzima", "0 złota → +1 złoto; możesz spalić karty z puli na polach z płomieniem."],
+      [ICO.actionTrash, "Vengerberg", "Usuń 1 kartę z ręki → kup 1 z puli (koszt ≤+1 względem usuniętej)."],
+    ])}
+
     <h3>Atrybuty i zasoby</h3>
     ${row([
-      [ICO.attack, "Atak", "Dobór kart w walce"],
-      [ICO.defense, "Obrona", "Limit tarczy; +1 obrona → +1 tarcza"],
-      [ICO.specialty, "Zdolność szkoły", "Użycie w walce: raz na walkę (gdziekolwiek). Trening zdolności: tylko w swojej szkole."],
+      [ICO.attrAttackPng, "Atak", "Dobór kart w walce"],
+      [ICO.attrDefensePng, "Obrona", "Limit tarczy; +1 obrona → +1 tarcza"],
+      [ICO.attrAlchemyPng, "Alchemia", "Limit eliksirów w walce; +1 alchemia → +1 eliksir"],
+      [ICO.attrSpecialtyPng, "Zdolność szkoły", "Użycie w walce: raz na walkę. Trening zdolności: tylko w swojej szkole."],
       [ICO.gold, "Złoto", "Bank / koszty / nagrody"],
       [ICO.shield, "Tarcza", "Blokuje obrażenia; po walce reset do obrony"],
       [ICO.trophy, "Trofeum", "Potwór / wiedźmin / medytacja → reputacja"],
@@ -256,13 +321,16 @@ export function iconsLegendHtml() {
     </div>
 
     <h3>Szkoły (medale Gemini)</h3>
-    ${row([
-      [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
-      [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
-      [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
-      [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
-      [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
-      [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0) — na mapie podstawki"],
-    ])}
+    ${row(
+      [
+        [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
+        [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
+        [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
+        [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
+        [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
+        [ICO.schoolMantikora, "Mantikora", "Start Behelt Nar (#0)"],
+      ],
+      "ico-legend-row--schools"
+    )}
   `;
 }

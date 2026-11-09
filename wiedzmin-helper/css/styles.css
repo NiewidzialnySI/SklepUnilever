@@ -701,11 +701,47 @@ h3 {
   display: block;
 }
 
+.ico-action {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.ico-action-img,
+.ico-action .ico-img {
+  width: auto !important;
+  height: 2rem !important;
+  max-width: min(100%, 12rem);
+  object-fit: contain;
+}
+
+.loc-action-icon {
+  margin: 0.45rem 0 0.15rem;
+}
+
+.map-loc-popup-action {
+  margin: 0.45rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.ico-legend-item .ico-action .ico-img {
+  height: 2.4rem !important;
+  max-width: 9rem;
+}
+
 .ico-terrain .ico-img,
 .ico-school-img .ico-img {
   width: 1.75rem;
   height: 1.75rem;
   object-fit: contain;
+}
+
+.ico-legend-row--schools .ico-school-img .ico-img {
+  width: 3.25rem !important;
+  height: 3.25rem !important;
 }
 
 .ico-legend-item .ico-terrain .ico-img,
@@ -1235,9 +1271,13 @@ h3 {
 
 .ico-legend-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
   margin: 0.6rem 0 1.1rem;
+}
+
+.ico-legend-row--schools {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
 .ico-legend-item {
@@ -1245,14 +1285,34 @@ h3 {
   grid-template-columns: auto 1fr;
   gap: 0.65rem;
   align-items: start;
-  padding: 0.7rem 0.75rem;
+  padding: 0.75rem 0.85rem;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ico-legend-row--schools .ico-legend-item {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+  gap: 0.45rem;
+  padding: 0.85rem 0.7rem 0.95rem;
+}
+
+.ico-legend-ico {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ico-legend-text {
+  min-width: 0;
 }
 
 .ico-legend-item .ico {
-  margin-top: 0.15rem;
+  margin-top: 0;
   color: inherit;
 }
 
@@ -1271,13 +1331,36 @@ h3 {
   display: block;
   font-family: var(--font-display);
   font-size: 0.95rem;
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.15rem;
+  line-height: 1.2;
 }
 
 .ico-legend-item span {
   display: block;
   color: var(--ink-soft);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.ico-legend-row--schools .ico-legend-item strong {
+  font-size: 1.05rem;
+}
+
+.ico-legend-row--schools .ico-legend-item span {
+  font-size: 0.84rem;
+  max-width: 11rem;
+  margin-inline: auto;
+}
+
+@media (max-width: 520px) {
+  .ico-legend-row {
+    grid-template-columns: 1fr;
+  }
+  .ico-legend-row--schools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .player-chip .ico {

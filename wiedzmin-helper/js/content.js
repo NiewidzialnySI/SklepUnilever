@@ -1,5 +1,5 @@
 /** Treść przewodnika — Wiedźmin: Stary Świat, sama podstawka (PL). */
-import { ICO, chip } from "./icons.js";
+import { ICO, chip, actionIconHtml } from "./icons.js";
 
 export const START_RESOURCES = {
   1: [{ cards: 5, gold: 3 }],
@@ -156,7 +156,7 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
-          <li><strong>W helperze (Stół):</strong> kliknij poziom I/II/III, potem <em>Potwór +</em> na tych samych lokacjach — jak gracz wejdzie, odpali się walka.</li>
+          <li><strong>W helperze (Stół):</strong> kliknij poziom I/II/III, potem <em>Potwór +</em> na tych samych lokacjach — po wejściu możesz walczyć w fazie II (opcjonalnie).</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
         <p class="note">Reszta przygotowania potworów jak w multi.</p>
@@ -424,7 +424,8 @@ export function phase1AfterMove(isSolo) {
         : "z wiedźminem na tym samym obszarze (raz z każdym; oboje ≥1 złoto)"
     }.</li>
     <li><strong>Zadanie tropienia:</strong> jeśli weszłeś na obszar z nazwy na żetonie → zbierz złoto i odwróć żeton (masz trop). Zapisz dojście jako <em>zadanie u góry</em>.</li>
-    <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze. Jeśli na polu jest też potwór, walka to dopiero <strong>faza II</strong> (wybór 1 z: walka / medytacja / eksploracja).</li>
+    <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze.</li>
+    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka (opcjonalna) / medytacja / eksploracja.</li>
   </ul>
   ${
     isSolo
@@ -466,7 +467,7 @@ export function phase2Choices(
         <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
-      <p class="note">W solo nie ma walki z innymi wiedźminami. Bez potwora i bez medytacji helper idzie od razu do eksploracji.</p>
+      <p class="note">Walka jest <strong>opcjonalna</strong> (instrukcja: „możesz walczyć”). W solo nie ma walki z innymi wiedźminami. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
     `;
   }
   return `
@@ -476,7 +477,7 @@ export function phase2Choices(
       <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
-    <p class="note">Bez celu walki i bez medytacji helper od razu przechodzi do eksploracji.</p>
+    <p class="note">Walka jest <strong>opcjonalna</strong> — nawet z potworem na polu możesz wybrać medytację albo eksplorację. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
   `;
 }
 
@@ -679,14 +680,15 @@ export const TRAIL_HELP = `
 
 export const LOCATION_ACTIONS = `
   <h3>Szybka ściąga akcji obszarów</h3>
+  <p class="note">Znaki Gemini pod nazwą miejscowości. Akcja fazy I — opcjonalna, raz na turę.</p>
   <ul class="checklist">
-    <li>${ICO.specialty()} <strong>Szkoły (1, 3, 10, 15, 17, 0):</strong> koszt ${ICO.gold()} = poziom docelowy → +1 ${chip(ICO.attack, "atak")} / ${chip(ICO.defense, "obrona")} / ${chip(ICO.alchemy, "alchemia")} / specjalność; zdolność tylko w swojej szkole.</li>
-    <li><strong>Darmowy trening (atrybut ≤ poziom wiedźmina):</strong> Cidaris = obrona · Ban Ard = alchemia (+eliksir) · Glenmore = specjalność · Ard Modron = atak.</li>
-    <li>${ICO.alchemy()} <strong>Eliksir (+karta):</strong> Beauclair, Dhuwod, Cintra (limit 4 eliksiry).</li>
-    <li>${ICO.dice()} <strong>Poker:</strong> Novigrad (6), Loc Ichaer (14).</li>
-    <li><strong>Wyzima (7):</strong> 0 ${ICO.gold()} → +1 ${ICO.gold()}; możesz spalić karty z puli na polach z płomieniem.</li>
-    <li><strong>Vengerberg (8):</strong> usuń 1 kartę z ręki → dobierz +1.</li>
-    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie +1 złoto:</strong> Hengfors (2), Doldeth (13) — szczegóły poniżej.</li>
+    <li>${actionIconHtml("schoolTrain")} <strong>Szkoły (0, 1, 3, 10, 15, 17):</strong> koszt ${ICO.gold()} = poziom docelowy → +1 atak/obrona/alchemia; specjalność tylko we własnej szkole.</li>
+    <li>${actionIconHtml("defenseLevel")} Cidaris · ${actionIconHtml("alchemyLevel")} Ban Ard · ${actionIconHtml("specialtyLevel")} Glenmore · ${actionIconHtml("attackLevel")} Ard Modron — darmowy trening gdy atrybut ≤ poziom wiedźmina (alchemia przy awansie daje też eliksir).</li>
+    <li>${actionIconHtml("gainElixir")} <strong>Eliksir:</strong> Beauclair, Dhuwod, Cintra (limit 4).</li>
+    <li>${actionIconHtml("dicePoker")} <strong>Poker:</strong> Novigrad (6), Loc Ichaer (14).</li>
+    <li>${actionIconHtml("cleanPool")} <strong>Wyzima (7):</strong> 0 złota → +1 złoto; możesz spalić karty z puli na polach z płomieniem.</li>
+    <li>${actionIconHtml("trashDraw")} <strong>Vengerberg (8):</strong> usuń 1 kartę z ręki → kup 1 z puli (koszt ≤+1).</li>
+    <li>${actionIconHtml("trailGold")} <strong>Tropienie:</strong> Hengfors (2), Doldeth (13) — +1 złoto, opcja zadania tropienia.</li>
   </ul>
   <h3>Tereny na planszy (ruch)</h3>
   <ul class="checklist">
