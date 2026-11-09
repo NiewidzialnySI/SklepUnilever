@@ -2,7 +2,7 @@
  * Atrybuty, tropy, medytacja, startowe zasoby.
  */
 import { ICO } from "./icons.js";
-import { locById, TERRAIN, actionHintFor } from "./map-data.js";
+import { locById, LOCATIONS, TERRAIN, actionHintFor } from "./map-data.js";
 import { START_RESOURCES } from "./content.js";
 
 export const ATTR_KEYS = [
@@ -95,7 +95,11 @@ export function meditationStatus(player, { isSolo = false } = {}) {
   };
 }
 
-/** Czy w Fazie II jest z kim walczyć (potwór / inny wiedźmin na tym samym polu). */
+/**
+ * Faza II — walka opcjonalna.
+ * Walka z potworem: tylko gdy na mapie helpera stoi żeton na Twoim polu.
+ * Walka z wiedźminem: tylko gdy ktoś inny stoi na tym samym polu.
+ */
 export function phase2FightOptions(player, { board, roster = [], isSolo = false } = {}) {
   const locId = player?.locationId || null;
   const m = locId ? board?.monsters?.[locId] : null;
@@ -106,17 +110,16 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   const canWitcher = !isSolo && others.length > 0;
   const can = canMonster || canWitcher;
   let reason;
-  if (can) {
-    const bits = [];
-    if (canMonster) bits.push("potwór na Twoim polu");
-    if (canWitcher) bits.push(`wiedźmin: ${others.map((o) => o.name).join(", ")}`);
-    reason = `Możesz walczyć (${bits.join("; ")}).`;
-  } else if (!locId) {
-    reason = "Walka zablokowana: nie masz ustawionej lokacji na mapie.";
-  } else if (isSolo) {
-    reason = "Walka zablokowana: na Twoim polu nie ma potwora.";
+  if (!locId) {
+    reason = "Walka zablokowana: brak lokacji (wybierz szkołę w Graczach).";
+  } else if (canMonster && canWitcher) {
+    reason = `Możesz walczyć z potworem albo z: ${others.map((o) => o.name).join(", ")}.`;
+  } else if (canMonster) {
+    reason = "Na Twoim polu stoi potwór — walka opcjonalna (możesz też medytować / eksplorować).";
+  } else if (canWitcher) {
+    reason = `Brak potwora na polu. Możesz walczyć z: ${others.map((o) => o.name).join(", ")}.`;
   } else {
-    reason = "Walka zablokowana: brak potwora i innego wiedźmina na tym polu.";
+    reason = "Walka zablokowana: na tym polu nie ma potwora (oznacz go na mapie, jeśli stoi na stole).";
   }
   return {
     can,
@@ -157,53 +160,42 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
     const label = TERRAIN[t]?.label || t;
     const opts = monsters[t] || [];
     const slot = player.trails[t];
-    const slotLoc = slot?.locId ? locById(slot.locId) : null;
-    const fromSlot = slotLoc
-      ? opts.find((o) => o.locId === slot.locId) || {
-          locId: slot.locId,
-          loc: slotLoc,
-          level: null,
-          count: 1,
-        }
-      : null;
-    const primary = fromSlot || opts[0] || null;
+    const primary = opts[0] || null;
 
     if (!primary?.loc) {
       return `
-        <button type="button" class="trail-token-btn is-empty" disabled data-trail-terrain="${t}" title="Brak potwora ${escapeHtmlLite(label)} na mapie">
+        <button type="button" class="trail-token-btn is-empty" disabled data-trail-terrain="${t}" title="Brak potwora na tym terenie">
           <span class="trail-token-ico">${TRAIL_ICON[t]?.() || ""}</span>
           <strong>${escapeHtmlLite(label)}</strong>
-          <span class="trail-token-meta">brak potwora</span>
+          <span class="trail-token-meta">niedostępne</span>
+          <span class="trail-token-status">ustaw potwora w panelu</span>
         </button>`;
     }
 
     const loc = primary.loc;
-    const levelTxt =
-      primary.level != null && primary.level !== ""
-        ? `poz. ${escapeHtmlLite(String(primary.level))}`
-        : "poz. ?";
     const hasTrop = slot?.kind === "trail";
-    // klik: brak → trop (i tylko ten jeden); trop → wyczyść. Bez „zadania” tu.
     const nextKind = hasTrop ? "clear" : "trail";
     const statusTxt = hasTrop ? "trop · klik → wyczyść" : "klik → weź trop";
+    const meta =
+      primary.level != null && primary.level !== ""
+        ? `poz. ${escapeHtmlLite(String(primary.level))}`
+        : escapeHtmlLite(label);
 
     return `
       <button type="button" class="trail-token-btn ${hasTrop ? "active is-trail" : ""}" data-trail-monster="${t}" data-loc="${escapeHtmlLite(
         loc.id
-      )}" data-kind="${nextKind}" title="${escapeHtmlLite(label)}: ${escapeHtmlLite(loc.name)}">
+      )}" data-kind="${nextKind}" title="${escapeHtmlLite(label)}">
         <span class="trail-token-ico">${TRAIL_ICON[t]?.() || ""}</span>
-        <strong>${escapeHtmlLite(loc.name)}</strong>
-        <span class="trail-token-meta">${levelTxt}</span>
+        <strong>${escapeHtmlLite(loc.name || label)}</strong>
+        <span class="trail-token-meta">${meta}</span>
         <span class="trail-token-status">${statusTxt}</span>
       </button>`;
   }).join("");
 
-  const anyMon = TRAIL_TERRAINS.some((t) => (monsters[t] || []).length);
   return `
     <div class="guide-box trail-tokens-box">
       <p class="step-kicker" style="margin:0">${ICO.monster()} Żetony tropu</p>
-      <p class="lead" style="margin:0.3rem 0 0">Przy <strong>akcji tropienia</strong> wybierasz <strong>tylko 1</strong> potwora (1 z 3). Klik = masz trop tego terenu (zaczynasz walkę). Zadanie dojścia (nazwa z żetonu) zapisuj <strong>u góry</strong> jako zadanie.</p>
-      ${anyMon ? "" : `<p class="warn" style="margin:0.45rem 0 0">Brak potworów na mapie — dodaj je na Stole.</p>`}
+      <p class="lead" style="margin:0.3rem 0 0">Przy <strong>akcji tropienia</strong> wybierasz <strong>1</strong> teren potwora ze stołu. Klik = masz trop (zaczynasz walkę). Dojście z żetonu zapisuj jako zadanie u góry.</p>
       <div class="trail-token-grid" role="group" aria-label="Żetony tropu">${buttons}</div>
     </div>`;
 }
