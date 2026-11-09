@@ -356,6 +356,69 @@ h3 {
   margin: 1rem 0 0.25rem;
 }
 
+.explore-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0.85rem 0 0.25rem;
+  align-items: end;
+}
+
+.explore-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.45rem 0.7rem;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.explore-card img {
+  display: block;
+  width: min(100%, 11.5rem);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+}
+
+.explore-card-label {
+  text-align: center;
+}
+
+.explore-card-label strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+}
+
+.explore-card-label span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  margin-top: 0.15rem;
+}
+
+.explore-card:hover,
+.explore-card.active {
+  border-color: var(--brass);
+  background: rgba(184, 146, 62, 0.12);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 520px) {
+  .explore-card-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+  }
+  .explore-card img {
+    width: min(100%, 9.5rem);
+  }
+}
+
 .choice {
   text-align: left;
   padding: 1.15rem 1.2rem;
