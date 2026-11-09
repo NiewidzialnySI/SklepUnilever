@@ -2,7 +2,15 @@
  * Uproszczona mapa-schemat + helpery trackera przy stole.
  * Nie jest kopią oficjalnej grafiki — tylko nazwy lokacji i przybliżone pozycje.
  */
-import { LOCATIONS, ROADS, TERRAIN, locById, fatigueForReputation } from "./map-data.js";
+import {
+  LOCATIONS,
+  ROADS,
+  TERRAIN,
+  locById,
+  neighborsOf,
+  actionHintFor,
+  fatigueForReputation,
+} from "./map-data.js";
 import { ICO, SCHOOL_ICON } from "./icons.js";
 
 export const NOW_ACTIONS = [
@@ -84,11 +92,14 @@ export function mapSvgHtml(board, roster, { schoolById }) {
 
   const nodes = LOCATIONS.map((loc) => {
     const t = TERRAIN[loc.terrain] || TERRAIN.forest;
+    const fill = loc.school ? TERRAIN.school.color : t.color;
     const selected = board.selectedLoc === loc.id ? " map-node-selected" : "";
     const monsters = board.monsters[loc.id];
     const witches = roster
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => p.locationId === loc.id);
+    const numLabel =
+      typeof loc.number === "number" ? String(loc.number) : "";
 
     const monsterBadge = monsters
       ? `<g class="map-monster-badge" transform="translate(${loc.x + 3.2},${loc.y - 3.8}) rotate(${labelUpright})">
@@ -109,7 +120,9 @@ export function mapSvgHtml(board, roster, { schoolById }) {
 
     return `
       <g class="map-node${selected}" data-loc="${loc.id}" style="cursor:pointer">
-        <circle cx="${loc.x}" cy="${loc.y}" r="3.4" fill="${t.color}" stroke="#f0e6d2" stroke-width="0.45"/>
+        <circle cx="${loc.x}" cy="${loc.y}" r="3.4" fill="${fill}" stroke="#f0e6d2" stroke-width="0.45"/>
+        <circle cx="${loc.x}" cy="${loc.y}" r="2.35" fill="none" stroke="${t.color}" stroke-width="0.55"/>
+        <text x="${loc.x}" y="${loc.y + 1.05}" text-anchor="middle" class="map-badge-text">${escapeXml(numLabel)}</text>
         <text x="${loc.x}" y="${loc.y - 4.8}" text-anchor="middle" class="map-label" transform="rotate(${labelUpright} ${loc.x} ${loc.y - 4.8})">${escapeXml(loc.name)}</text>
         ${monsterBadge}
         ${witchBadges}
@@ -132,7 +145,7 @@ export function mapSvgHtml(board, roster, { schoolById }) {
         </svg>
       </div>
     </div>
-    <p class="note">Schemat pomocniczy (nazwy z podstawki, pozycje przybliżone). <strong>Nie</strong> jest to kopia oficjalnej mapy z pudełka — służy tylko do oznaczania, gdzie kto stoi i gdzie są potwory.</p>
+    <p class="note">Schemat wg zdjęć planszy: numery 0–18, tereny (pierścień = las/góry/woda) i drogi. Szkoły = złoty punkt. <strong>Nie</strong> jest to kopia grafiki z pudełka.</p>
   `;
 }
 
@@ -181,6 +194,13 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;");
 }
 
+function terrainIcon(id) {
+  if (id === "forest") return ICO.forest();
+  if (id === "mountain") return ICO.mountain();
+  if (id === "water") return ICO.water();
+  return "";
+}
+
 export function selectedLocPanel(board, roster) {
   const loc = locById(board.selectedLoc);
   if (!loc) {
@@ -191,12 +211,24 @@ export function selectedLocPanel(board, roster) {
   const here = roster
     .map((p, i) => ({ p, i }))
     .filter(({ p }) => p.locationId === loc.id);
+  const hint = actionHintFor(loc);
+  const neigh = neighborsOf(loc.id)
+    .map((id) => locById(id))
+    .filter(Boolean)
+    .map((n) => `${n.name}${typeof n.number === "number" ? ` (${n.number})` : ""}`)
+    .join(", ");
 
   return `
     <div class="loc-panel">
-      <h3>${escapeHtml(loc.name)}</h3>
-      <p class="lead" style="margin:0">Teren: <strong>${t.label}</strong>${
-        loc.school ? ` · szkoła` : ""
+      <h3>${escapeHtml(loc.name)}${
+        typeof loc.number === "number" ? ` <span class="loc-num">#${loc.number}</span>` : ""
+      }</h3>
+      <p class="lead" style="margin:0">${terrainIcon(loc.terrain)} Teren ruchu: <strong>${
+        t.label
+      }</strong>${loc.school ? ` · szkoła wiedźmińska` : ""}</p>
+      ${hint ? `<p class="loc-action"><strong>Znak na planszy:</strong> ${escapeHtml(hint)}</p>` : ""}
+      <p class="note" style="margin:0.4rem 0 0">Sąsiedzi (ścieżki): ${
+        neigh ? escapeHtml(neigh) : "—"
       }</p>
       <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
         m?.label ? ` (${escapeHtml(m.label)})` : ""
@@ -317,4 +349,4 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
     .join("");
 }
 
-export { fatigueForReputation, locById, LOCATIONS, TERRAIN };
+export { fatigueForReputation, locById, LOCATIONS, TERRAIN, neighborsOf, actionHintFor };

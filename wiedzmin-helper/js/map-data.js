@@ -1,7 +1,6 @@
 /**
- * Uproszczona mapa-schemat (NIE kopia grafiki z pudełka).
- * Nazwy lokacji z gry podstawowej — pozycje przybliżone, by dało się
- * oznaczać potwory i wiedźminów przy stole.
+ * Schemat mapy wg zdjęć planszy (podstawka) — nie kopia grafiki z pudełka.
+ * Numery, tereny i drogi zbliżone do fizycznej planszy; pozycje % pod SVG.
  */
 
 export const TERRAIN = {
@@ -11,59 +10,265 @@ export const TERRAIN = {
   school: { id: "school", label: "Szkoła", color: "#b8923e" },
 };
 
-/** id → { name, terrain, x, y, school? } — współrzędne 0–100 w viewBox */
+/**
+ * Akcje obszarów — skróty ze znaków na planszy (pomoc przy stole).
+ * Szkoły: trening atrybutu za złoto (−2/−3/−4/−5 = koszt poziomu docelowego).
+ */
+export const LOCATION_ACTION_HINTS = {
+  schoolTrain: "Szkoła: +1 atak / obrona / alchemia / specjalność (koszt złota = poziom docelowy: 2–5).",
+  trailGold: "+1 złoto. Opcja: zadanie tropienia (1 złoto → żeton terenu potwora).",
+  dicePoker: "Poker kośćmi z miejscowymi.",
+  cleanPool: "0 złota → +1 złoto. Możesz spalić karty z puli na polach z płomieniem.",
+  trashDraw: "Usuń 1 kartę z ręki → dobierz +1 kartę.",
+  defenseLevel: "Obrona ≤ poziom wiedźmina → +1 obrona.",
+  alchemyLevel: "Alchemia ≤ poziom wiedźmina → +1 eliksir.",
+  specialtyLevel: "Zdolność specjalna ≤ poziom → +1 specjalność.",
+  attackLevel: "Atak ≤ poziom wiedźmina → +1 atak.",
+  gainElixir: "+1 karta eliksiru (limit 4).",
+  cintraElixir: "+1 karta eliksiru.",
+};
+
+/** id → lokacja. `number` = numer na planszy; `terrain` = ikona terenu do ruchu. */
 export const LOCATIONS = [
-  { id: "kaer-morhen", name: "Kaer Morhen", terrain: "school", school: "wilk", x: 62, y: 18 },
-  { id: "kaer-seren", name: "Kaer Seren", terrain: "school", school: "gryf", x: 48, y: 10 },
-  { id: "haern-caduch", name: "Haern Caduch", terrain: "school", school: "niedzwiedz", x: 28, y: 22 },
-  { id: "stygga", name: "Stygga", terrain: "school", school: "kot", x: 78, y: 28 },
-  { id: "gorthur-gvaed", name: "Gorthur Gvaed", terrain: "school", school: "zmija", x: 72, y: 48 },
-  { id: "hengfors", name: "Hengfors", terrain: "mountain", x: 55, y: 28 },
-  { id: "ban-ard", name: "Ban Ard", terrain: "forest", x: 58, y: 40 },
-  { id: "vengerberg", name: "Vengerberg", terrain: "water", x: 52, y: 52 },
-  { id: "novigrad", name: "Novigrad", terrain: "water", x: 40, y: 42 },
-  { id: "loc-ichaer", name: "Loc Ichaer", terrain: "water", x: 44, y: 50 },
-  { id: "wyzima", name: "Wyzima", terrain: "forest", x: 38, y: 58 },
-  { id: "cidaris", name: "Cidaris", terrain: "water", x: 28, y: 48 },
-  { id: "cintra", name: "Cintra", terrain: "forest", x: 32, y: 72 },
-  { id: "beauclair", name: "Beauclair", terrain: "mountain", x: 22, y: 68 },
-  { id: "glenmore", name: "Glenmore", terrain: "forest", x: 48, y: 68 },
-  { id: "doldeth", name: "Doldeth", terrain: "mountain", x: 68, y: 62 },
-  { id: "ard-modron", name: "Ard Modron", terrain: "mountain", x: 75, y: 72 },
-  { id: "dhuwod", name: "Dhuwod", terrain: "forest", x: 58, y: 58 },
-  { id: "mantikora", name: "Szkoła Mantikory (0)", terrain: "school", x: 88, y: 55 },
+  {
+    id: "kaer-seren",
+    name: "Kaer Seren",
+    number: 1,
+    terrain: "water",
+    school: "gryf",
+    x: 22,
+    y: 10,
+    actionKey: "schoolTrain",
+  },
+  {
+    id: "hengfors",
+    name: "Hengfors",
+    number: 2,
+    terrain: "mountain",
+    x: 48,
+    y: 16,
+    actionKey: "trailGold",
+  },
+  {
+    id: "kaer-morhen",
+    name: "Kaer Morhen",
+    number: 3,
+    terrain: "mountain",
+    school: "wilk",
+    x: 72,
+    y: 12,
+    actionKey: "schoolTrain",
+  },
+  {
+    id: "ban-ard",
+    name: "Ban Ard",
+    number: 4,
+    terrain: "water",
+    x: 78,
+    y: 28,
+    actionKey: "alchemyLevel",
+  },
+  {
+    id: "cidaris",
+    name: "Cidaris",
+    number: 5,
+    terrain: "water",
+    x: 14,
+    y: 28,
+    actionKey: "defenseLevel",
+  },
+  {
+    id: "novigrad",
+    name: "Novigrad",
+    number: 6,
+    terrain: "forest",
+    x: 32,
+    y: 30,
+    actionKey: "dicePoker",
+  },
+  {
+    id: "wyzima",
+    name: "Wyzima",
+    number: 7,
+    terrain: "forest",
+    x: 48,
+    y: 34,
+    actionKey: "cleanPool",
+  },
+  {
+    id: "vengerberg",
+    name: "Vengerberg",
+    number: 8,
+    terrain: "forest",
+    x: 68,
+    y: 38,
+    actionKey: "trashDraw",
+  },
+  {
+    id: "cintra",
+    name: "Cintra",
+    number: 9,
+    terrain: "water",
+    x: 20,
+    y: 46,
+    actionKey: "cintraElixir",
+  },
+  {
+    id: "haern-caduch",
+    name: "Haern Caduch",
+    number: 10,
+    terrain: "mountain",
+    school: "niedzwiedz",
+    x: 42,
+    y: 48,
+    actionKey: "schoolTrain",
+  },
+  {
+    id: "beauclair",
+    name: "Beauclair",
+    number: 11,
+    terrain: "mountain",
+    x: 62,
+    y: 50,
+    actionKey: "gainElixir",
+  },
+  {
+    id: "glenmore",
+    name: "Glenmore",
+    number: 12,
+    terrain: "water",
+    x: 28,
+    y: 62,
+    actionKey: "specialtyLevel",
+  },
+  {
+    id: "doldeth",
+    name: "Doldeth",
+    number: 13,
+    terrain: "mountain",
+    x: 44,
+    y: 68,
+    actionKey: "trailGold",
+  },
+  {
+    id: "loc-ichaer",
+    name: "Loc Ichaer",
+    number: 14,
+    terrain: "forest",
+    x: 56,
+    y: 62,
+    actionKey: "dicePoker",
+  },
+  {
+    id: "gorthur-gvaed",
+    name: "Gorthur Gvaed",
+    number: 15,
+    terrain: "water",
+    school: "zmija",
+    x: 82,
+    y: 58,
+    actionKey: "schoolTrain",
+  },
+  {
+    id: "dhuwod",
+    name: "Dhuwod",
+    number: 16,
+    terrain: "forest",
+    x: 48,
+    y: 78,
+    actionKey: "gainElixir",
+  },
+  {
+    id: "stygga",
+    name: "Stygga",
+    number: 17,
+    terrain: "forest",
+    school: "kot",
+    x: 66,
+    y: 74,
+    actionKey: "schoolTrain",
+  },
+  {
+    id: "ard-modron",
+    name: "Ard Modron",
+    number: 18,
+    terrain: "mountain",
+    x: 86,
+    y: 74,
+    actionKey: "attackLevel",
+  },
+  {
+    id: "mantikora",
+    name: "Szkoła Mantikory",
+    number: 0,
+    terrain: "forest",
+    school: "mantikora",
+    x: 88,
+    y: 44,
+    actionKey: "schoolTrain",
+  },
 ];
 
-/** Luźne połączenia (schemat — nie oficjalna mapa dróg). */
+/**
+ * Połączenia (drogi + trasy morskie) — ruch tylko do sąsiada po ścieżce.
+ * Ułożone na podstawie zdjęć planszy użytkownika.
+ */
 export const ROADS = [
-  ["kaer-seren", "kaer-morhen"],
-  ["kaer-morhen", "hengfors"],
+  // północ
+  ["kaer-seren", "hengfors"],
+  ["kaer-seren", "novigrad"],
+  ["kaer-seren", "cidaris"], // trasa morska
+  ["hengfors", "kaer-morhen"],
+  ["hengfors", "wyzima"],
+  ["hengfors", "novigrad"],
   ["hengfors", "ban-ard"],
+  ["kaer-morhen", "ban-ard"],
   ["ban-ard", "vengerberg"],
-  ["vengerberg", "novigrad"],
-  ["novigrad", "loc-ichaer"],
-  ["loc-ichaer", "wyzima"],
-  ["novigrad", "cidaris"],
-  ["cidaris", "beauclair"],
-  ["beauclair", "cintra"],
+  // zachód / centrum
+  ["cidaris", "novigrad"],
+  ["cidaris", "cintra"], // trasa morska / brzeg
+  ["novigrad", "wyzima"],
+  ["novigrad", "cintra"],
+  ["wyzima", "vengerberg"],
+  ["wyzima", "haern-caduch"],
+  ["vengerberg", "beauclair"],
+  ["vengerberg", "mantikora"],
+  // południe / szkoły
+  ["cintra", "haern-caduch"],
   ["cintra", "glenmore"],
-  ["glenmore", "vengerberg"],
+  ["haern-caduch", "beauclair"],
+  ["haern-caduch", "glenmore"],
+  ["haern-caduch", "loc-ichaer"],
+  ["beauclair", "mantikora"],
+  ["beauclair", "gorthur-gvaed"],
+  ["beauclair", "loc-ichaer"],
   ["glenmore", "doldeth"],
-  ["doldeth", "ard-modron"],
-  ["doldeth", "gorthur-gvaed"],
+  ["doldeth", "loc-ichaer"],
+  ["doldeth", "dhuwod"],
+  ["loc-ichaer", "stygga"],
+  ["mantikora", "gorthur-gvaed"],
+  ["gorthur-gvaed", "ard-modron"],
   ["gorthur-gvaed", "stygga"],
-  ["stygga", "kaer-morhen"],
-  ["haern-caduch", "cidaris"],
-  ["haern-caduch", "hengfors"],
-  ["ard-modron", "mantikora"],
-  ["ban-ard", "loc-ichaer"],
-  ["ban-ard", "dhuwod"],
-  ["dhuwod", "vengerberg"],
-  ["dhuwod", "doldeth"],
+  ["dhuwod", "stygga"],
+  ["stygga", "ard-modron"],
 ];
 
 export function locById(id) {
   return LOCATIONS.find((l) => l.id === id);
+}
+
+export function neighborsOf(id) {
+  const out = [];
+  for (const [a, b] of ROADS) {
+    if (a === id) out.push(b);
+    else if (b === id) out.push(a);
+  }
+  return out;
+}
+
+export function actionHintFor(loc) {
+  if (!loc?.actionKey) return "";
+  return LOCATION_ACTION_HINTS[loc.actionKey] || "";
 }
 
 /**

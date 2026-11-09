@@ -647,13 +647,19 @@ export const TRAIL_HELP = `
 export const LOCATION_ACTIONS = `
   <h3>Szybka ściąga akcji obszarów</h3>
   <ul class="checklist">
-    <li>${ICO.specialty()} <strong>Szkoły:</strong> koszt ${ICO.gold()} = poziom docelowy (aktualny + 1) → +1 ${chip(ICO.attack, "atak")} / ${chip(ICO.defense, "obrona")} / ${chip(ICO.alchemy, "alchemia")}; zdolność tylko w swojej szkole.</li>
-    <li><strong>Darmowy trening:</strong> +1 do atrybutu tylko jeśli poziom atrybutu ≤ poziomu wiedźmina.</li>
-    <li>${ICO.alchemy()} <strong>Eliksir:</strong> dobierz 1 (limit 4).</li>
-    <li>${ICO.dice()} <strong>Poker z miejscowymi:</strong> 1 złoto + 2 z banku (multi) / solo: 1 złoto + tabela.</li>
-    <li><strong>Wymiana:</strong> usuń 1 kartę z ręki, kup z puli o koszcie ≤ usuniętej + 1.</li>
-    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie:</strong> +1 złoto do kieszeni, potem zadanie tropienia (żeton obszaru + 1 złoto na żetonie) — szczegóły poniżej.</li>
-    <li><strong>Czyszczenie puli:</strong> bez złota → 1 złoto; możesz usunąć 1–2 karty z puli.</li>
+    <li>${ICO.specialty()} <strong>Szkoły (1, 3, 10, 15, 17, 0):</strong> koszt ${ICO.gold()} = poziom docelowy → +1 ${chip(ICO.attack, "atak")} / ${chip(ICO.defense, "obrona")} / ${chip(ICO.alchemy, "alchemia")} / specjalność; zdolność tylko w swojej szkole.</li>
+    <li><strong>Darmowy trening (atrybut ≤ poziom wiedźmina):</strong> Cidaris = obrona · Ban Ard = alchemia (+eliksir) · Glenmore = specjalność · Ard Modron = atak.</li>
+    <li>${ICO.alchemy()} <strong>Eliksir (+karta):</strong> Beauclair, Dhuwod, Cintra (limit 4 eliksiry).</li>
+    <li>${ICO.dice()} <strong>Poker:</strong> Novigrad (6), Loc Ichaer (14).</li>
+    <li><strong>Wyzima (7):</strong> 0 ${ICO.gold()} → +1 ${ICO.gold()}; możesz spalić karty z puli na polach z płomieniem.</li>
+    <li><strong>Vengerberg (8):</strong> usuń 1 kartę z ręki → dobierz +1.</li>
+    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie +1 złoto:</strong> Hengfors (2), Doldeth (13) — szczegóły poniżej.</li>
+  </ul>
+  <h3>Tereny na planszy (ruch)</h3>
+  <ul class="checklist">
+    <li>${ICO.water()} <strong>Woda:</strong> Kaer Seren, Ban Ard, Cidaris, Cintra, Glenmore, Gorthur Gvaed</li>
+    <li>${ICO.forest()} <strong>Las:</strong> Novigrad, Wyzima, Vengerberg, Loc Ichaer, Dhuwod, Stygga (+ Mantikora 0)</li>
+    <li>${ICO.mountain()} <strong>Góry:</strong> Hengfors, Kaer Morhen, Haern Caduch, Beauclair, Doldeth, Ard Modron</li>
   </ul>
   ${TRAIL_HELP}
 `;
