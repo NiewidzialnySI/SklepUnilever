@@ -150,6 +150,7 @@ function normalizeState(raw) {
           monsters: raw.board.monsters || {},
           movePrompt: raw.board.movePrompt || null,
           highlightFrom: raw.board.highlightFrom || null,
+          tool: raw.board.tool === "player" ? "select" : raw.board.tool || "select",
         }
       : defaultBoard();
   // migracja Oxenfurt → Loc Ichaer; Mantikora → Behelt Nar
@@ -1819,19 +1820,11 @@ function renderBoard() {
     });
   }
 
-  appEl.querySelectorAll("[data-place-player]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.board.placePlayer = Number(btn.dataset.placePlayer);
-      state.board.tool = "player";
-      saveState();
-      render();
-    });
-  });
-
   appEl.querySelectorAll(".map-node").forEach((g) => {
     g.addEventListener("click", () => {
       const locId = g.getAttribute("data-loc");
-      const tool = state.board.tool || "select";
+      let tool = state.board.tool || "select";
+      if (tool === "player") tool = "select"; // stare zapisy — pionek startuje na szkole
       state.board.selectedLoc = locId;
 
       if (tool === "monster") {
@@ -1850,35 +1843,6 @@ function renderBoard() {
         }
       } else if (tool === "clear-m") {
         delete state.board.monsters[locId];
-      } else if (tool === "player") {
-        const idx = state.board.placePlayer || 0;
-        const pl = state.roster[idx];
-        if (pl) {
-          const fromId = pl.locationId;
-          // Pierwsze ustawienie albo to samo pole = bez kosztu ruchu
-          if (!fromId || fromId === locId) {
-            pl.locationId = locId;
-            state.board.movePrompt = null;
-          } else {
-            const adj = neighborsOf(fromId);
-            if (!adj.includes(locId)) {
-              window.alert(
-                "To nie jest sąsiad po ścieżce. Albo kliknij sąsiada, albo najpierw ustaw pionek (pierwszy raz) bez kosztu."
-              );
-            } else {
-              // Przesuń od razu, ale wymagaj wyboru kosztu (anuluj = cofnij)
-              pl.locationId = locId;
-              pl.nowDoing = "faza1";
-              state.activeIndex = idx;
-              state.board.movePrompt = {
-                playerIdx: idx,
-                fromId,
-                toId: locId,
-                costId: null,
-              };
-            }
-          }
-        }
       }
 
       saveState();

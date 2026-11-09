@@ -296,40 +296,26 @@ export function bindMapLocPopup(root, { timeoutMs = 3000 } = {}) {
 }
 
 export function mapToolbarHtml(board, roster) {
+  // Pionek zawsze startuje na szkole — bez narzędzia „Ustaw wiedźmina”
+  const tool = board.tool === "player" ? "select" : board.tool || "select";
   const tools = [
     ["select", "Wybierz"],
     ["monster", `${ICO.monster()} Potwór +`],
     ["monster-", `${ICO.monster()} Potwór −`],
     ["clear-m", "Wyczyść potwory tu"],
-    ["player", "Ustaw wiedźmina"],
   ];
   return `
     <div class="map-toolbar">
       ${tools
         .map(
           ([id, label]) =>
-            `<button type="button" class="btn ${board.tool === id ? "btn-primary" : "btn-secondary"} map-tool" data-tool="${id}">${label}</button>`
+            `<button type="button" class="btn ${tool === id ? "btn-primary" : "btn-secondary"} map-tool" data-tool="${id}">${label}</button>`
         )
         .join("")}
       <button type="button" class="btn btn-secondary" id="map-rotate-ccw">↺ Obróć</button>
       <button type="button" class="btn btn-secondary" id="map-rotate-cw">Obróć ↻</button>
       <button type="button" class="btn btn-secondary" id="map-rotate-reset">0°</button>
     </div>
-    ${
-      board.tool === "player"
-        ? `<div class="choice-grid" style="margin-top:0.6rem">
-            ${roster
-              .map(
-                (p, i) => `
-              <button type="button" class="choice ${board.placePlayer === i ? "active" : ""}" data-place-player="${i}">
-                <strong>${i + 1}. ${escapeHtml(p.name)}</strong>
-                <span>Kliknij lokację na mapie</span>
-              </button>`
-              )
-              .join("")}
-          </div>`
-        : ""
-    }
   `;
 }
 
@@ -474,7 +460,7 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
           </div>
 
           <p class="tip"><strong>Lokalizacja:</strong> ${
-            loc ? escapeHtml(loc.name) : "nie ustawiona — kliknij na mapie (narzędzie „Ustaw wiedźmina”)"
+            loc ? escapeHtml(loc.name) : "szkoła startowa (ustawi się po wyborze szkoły)"
           }</p>
 
           ${
