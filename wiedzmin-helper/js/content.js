@@ -227,7 +227,6 @@ function buildMultiSetupSteps(n, roster = []) {
       id: "intro",
       title: "Zaczynamy przygotowanie",
       body: `
-        <p class="lead">Przygotowanie <strong>podstawki</strong> (bez dodatków).</p>
         <div class="badge-row">
           <span class="badge">${n} graczy</span>
           <span class="badge">Tylko podstawka</span>
