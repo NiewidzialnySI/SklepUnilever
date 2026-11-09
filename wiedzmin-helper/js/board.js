@@ -255,35 +255,43 @@ export function mapSvgHtml(
   `;
 }
 
+let _mapPopupCleanup = null;
+
 /** Dymek nad mapą: znika po 3 s albo kliku poza oknem (wybór celu zostaje). */
 export function bindMapLocPopup(root, { timeoutMs = 3000 } = {}) {
+  if (typeof _mapPopupCleanup === "function") {
+    _mapPopupCleanup();
+    _mapPopupCleanup = null;
+  }
   const popup = root?.querySelector?.("#map-loc-popup");
   if (!popup) return () => {};
 
   let gone = false;
+  let outsideTimer = null;
   const hide = () => {
     if (gone) return;
     gone = true;
     popup.classList.add("map-loc-popup--gone");
     window.clearTimeout(timer);
+    if (outsideTimer) window.clearTimeout(outsideTimer);
     document.removeEventListener("pointerdown", onOutside, true);
+    if (_mapPopupCleanup === hide) _mapPopupCleanup = null;
   };
 
   const onOutside = (e) => {
     const t = e.target;
     if (!(t instanceof Element)) return;
     if (popup.contains(t)) return;
-    // nowy klik w cel ruchu otworzy dymek od nowa (re-render)
     if (t.closest(".map-node-reach")) return;
     hide();
   };
 
   const timer = window.setTimeout(hide, timeoutMs);
-  // nie zamykaj od razu tym samym kliknięciem, które otworzyło dymek
-  window.setTimeout(() => {
+  outsideTimer = window.setTimeout(() => {
     if (!gone) document.addEventListener("pointerdown", onOutside, true);
   }, 0);
 
+  _mapPopupCleanup = hide;
   return hide;
 }
 
