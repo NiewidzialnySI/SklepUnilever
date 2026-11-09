@@ -127,6 +127,7 @@ function defaultState() {
     activeIndex: 0,
     setupIndex: 0,
     turnNumber: 1,
+    gameStarted: false,
     turn: {
       phase: "hub",
       screen: "hub",
@@ -138,6 +139,16 @@ function defaultState() {
     board: defaultBoard(),
     orderDice: [],
   };
+}
+
+/** Gra rozpoczęta = widok tury albo flaga po starcie pierwszej tury. */
+function isGameStarted() {
+  return state.view === "turn" || state.gameStarted === true;
+}
+
+function markGameStarted() {
+  if (state.gameStarted) return;
+  state.gameStarted = true;
 }
 
 function isSolo() {
@@ -215,14 +226,17 @@ function normalizeState(raw) {
   ]);
   roster.forEach((p) => ensureCombatTrack(ensurePlayerTrack(p)));
   const turnNumber = Math.max(1, Math.min(999, Number(raw.turnNumber) || 1));
+  const view = views.has(raw.view) ? raw.view : "home";
+  const gameStarted = raw.gameStarted === true || view === "turn";
   return {
     ...base,
-    view: views.has(raw.view) ? raw.view : "home",
+    view,
     players,
     roster,
     activeIndex: Math.max(0, Number(raw.activeIndex) || 0),
     setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
     turnNumber,
+    gameStarted,
     turn,
     board,
     orderDice: Array.isArray(raw.orderDice) ? raw.orderDice.map(Number) : [],
@@ -346,6 +360,7 @@ function setPlayers(n) {
   state.players = n;
   state.setupIndex = 0;
   state.activeIndex = 0;
+  state.gameStarted = false;
   ensureRoster();
   saveState();
   render();
@@ -354,6 +369,7 @@ function setPlayers(n) {
 function go(view, extras = {}) {
   state.view = view;
   Object.assign(state, extras);
+  if (view === "turn") markGameStarted();
   saveState();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -820,7 +836,7 @@ function renderSetup() {
       <div class="setup-map-embed">
         <h3>Oznacz potwory (numery z żetonów)</h3>
         <p class="lead">Dla lasu, gór i wody podaj numer obszaru z odkrytego żetonu — strzałkami albo wpisz. Potem ustaw poziom.</p>
-        ${monstersPanelHtml(state.board)}
+        ${monstersPanelHtml(state.board, { editable: true })}
         ${mapSvgHtml(state.board, state.roster, { schoolById })}
       </div>`
       : "";
@@ -2032,7 +2048,7 @@ function renderBoard() {
           : ""
       }
 
-      ${monstersPanelHtml(board)}
+      ${monstersPanelHtml(board, { editable: !isGameStarted() })}
 
       <h2>Gracze — reputacja i karty</h2>
       <div class="tracker-list">
@@ -2053,7 +2069,7 @@ function renderBoard() {
     </section>
   `);
 
-  bindMonsterPanelControls();
+  if (!isGameStarted()) bindMonsterPanelControls();
 
   appEl.querySelectorAll(".map-node").forEach((g) => {
     g.addEventListener("click", () => {

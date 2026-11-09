@@ -330,7 +330,7 @@ export function monsterSpawnSlotHtml(board, { terrain, level }) {
   `;
 }
 
-export function monstersPanelHtml(board) {
+export function monstersPanelHtml(board, { editable = true } = {}) {
   const levels = ["I", "II", "III"];
   const slots = MONSTER_TERRAINS.map((terrain) => {
     const t = TERRAIN[terrain];
@@ -340,6 +340,19 @@ export function monstersPanelHtml(board) {
     const name = cur?.loc?.name || "— wybierz numer —";
     const level = cur?.level || "I";
     const filled = Boolean(cur);
+    if (!editable) {
+      const summary = filled
+        ? `#${escapeHtml(String(num))} · ${escapeHtml(name)} · Poz. ${escapeHtml(level)}`
+        : "brak żetonu";
+      return `
+      <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"} is-locked" data-terrain-slot="${terrain}">
+        <div class="monster-terrain-head">
+          <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
+          <strong>${escapeHtml(t.label)}</strong>
+          <span class="monster-terrain-meta">${summary}</span>
+        </div>
+      </div>`;
+    }
     return `
       <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"}" data-terrain-slot="${terrain}">
         <div class="monster-terrain-head">
@@ -375,12 +388,16 @@ export function monstersPanelHtml(board) {
       </div>`;
   }).join("");
 
+  const lead = editable
+    ? `Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy.`
+    : `Aktualne żetony na mapie (tylko podgląd). Zmiany w trakcie gry — przez wynik walki / spawn, nie ręczną edycję.`;
+
   return `
-    <div class="monsters-panel">
+    <div class="monsters-panel${editable ? "" : " is-locked"}">
       <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy.</p>
+      <p class="lead" style="margin:0">${lead}</p>
       ${
-        board.placeError
+        board.placeError && editable
           ? `<p class="warn" style="margin:0.45rem 0 0" role="alert">${escapeHtml(board.placeError)}</p>`
           : ""
       }
@@ -459,53 +476,64 @@ export function mapSvgHtml(
     if (!A || !B) return "";
     const lit =
       fromId && ((a === fromId && reachable.has(b)) || (b === fromId && reachable.has(a)));
-    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road${lit ? " map-road-lit" : ""}" />`;
+    return `<g class="map-road-group${lit ? " map-road-group-lit" : ""}">
+      <line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road-glow${lit ? " map-road-glow-lit" : ""}" />
+      <line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road${lit ? " map-road-lit" : ""}" />
+    </g>`;
   }).join("");
 
   const rot = board.rotation || 0;
   const labelUpright = -rot;
 
-  const nodes = LOCATIONS.map((loc) => {
+  const nodes = LOCATIONS.map((loc, nodeIdx) => {
     const t = TERRAIN[loc.terrain] || TERRAIN.forest;
-    const fill = loc.school ? TERRAIN.school.color : t.color;
+    const isSchool = Boolean(loc.school);
+    const fill = isSchool ? "url(#mapSchoolFill)" : t.color;
     const selected = board.selectedLoc === loc.id ? " map-node-selected" : "";
     const here = fromId === loc.id ? " map-node-here" : "";
     const reach = reachable.has(loc.id) ? " map-node-reach" : "";
+    const schoolCls = isSchool ? " map-node-school" : "";
     const monsters = board.monsters[loc.id];
     const witches = roster
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => p.locationId === loc.id);
     const numLabel =
       typeof loc.number === "number" ? String(loc.number) : "";
+    const enterDelay = `${(nodeIdx % 6) * 0.045}s`;
 
     const monsterBadge = monsters
-      ? `<g class="map-monster-badge" transform="translate(${loc.x + 3.2},${loc.y - 3.8}) rotate(${labelUpright})">
-           <circle r="2.2" fill="#6b3a2f" stroke="#f0e6d2" stroke-width="0.35"/>
-           <text y="0.85" text-anchor="middle" class="map-badge-text">${escapeXml(String(monsters.count || 1))}</text>
+      ? `<g class="map-monster-badge" transform="translate(${loc.x + 3.35},${loc.y - 3.9}) rotate(${labelUpright})">
+           <circle r="2.35" fill="#6b3a2f" stroke="#f0e6d2" stroke-width="0.42"/>
+           <text y="0.9" text-anchor="middle" class="map-badge-text map-badge-text--monster">${escapeXml(String(monsters.count || 1))}</text>
          </g>`
       : "";
 
     const witchBadges = witches
       .map(({ i }, idx) => {
-        const ox = -3.2 + idx * 2.4;
-        return `<g transform="translate(${loc.x + ox},${loc.y + 4.2}) rotate(${labelUpright})">
-          <circle r="1.7" fill="#244833" stroke="#d4b05a" stroke-width="0.35"/>
-          <text y="0.7" text-anchor="middle" class="map-badge-text">${i + 1}</text>
+        const ox = -3.35 + idx * 2.55;
+        return `<g class="map-player-badge" transform="translate(${loc.x + ox},${loc.y + 4.35}) rotate(${labelUpright})">
+          <circle r="1.85" fill="#1e3a2c" stroke="#d4b05a" stroke-width="0.42"/>
+          <text y="0.75" text-anchor="middle" class="map-badge-text map-badge-text--player">${i + 1}</text>
         </g>`;
       })
       .join("");
 
     return `
-      <g class="map-node${selected}${here}${reach}" data-loc="${loc.id}" style="cursor:pointer">
+      <g class="map-node${selected}${here}${reach}${schoolCls}" data-loc="${loc.id}" style="cursor:pointer;--map-enter-delay:${enterDelay}">
         ${
-          reach
-            ? `<circle cx="${loc.x}" cy="${loc.y}" r="4.6" fill="none" stroke="#d4b05a" stroke-width="0.55" stroke-dasharray="1.2 0.8" opacity="0.95"/>`
+          here
+            ? `<circle class="map-here-halo" cx="${loc.x}" cy="${loc.y}" r="5.35" fill="none" />`
             : ""
         }
-        <circle cx="${loc.x}" cy="${loc.y}" r="3.4" fill="${fill}" stroke="#f0e6d2" stroke-width="0.45"/>
-        <circle cx="${loc.x}" cy="${loc.y}" r="2.35" fill="none" stroke="${t.color}" stroke-width="0.55"/>
-        <text x="${loc.x}" y="${loc.y + 1.05}" text-anchor="middle" class="map-badge-text">${escapeXml(numLabel)}</text>
-        <text x="${loc.x}" y="${loc.y - 4.8}" text-anchor="middle" class="map-label" transform="rotate(${labelUpright} ${loc.x} ${loc.y - 4.8})">${escapeXml(loc.name)}</text>
+        ${
+          reach
+            ? `<circle class="map-reach-ring" cx="${loc.x}" cy="${loc.y}" r="4.75" fill="none" />`
+            : ""
+        }
+        <circle class="map-node-disk" cx="${loc.x}" cy="${loc.y}" r="3.45" fill="${fill}" stroke="#f0e6d2" stroke-width="0.48"/>
+        <circle class="map-node-ring" cx="${loc.x}" cy="${loc.y}" r="2.4" fill="none" stroke="${isSchool ? "#f0e6d2" : t.color}" stroke-width="0.5" opacity="0.55"/>
+        <text x="${loc.x}" y="${loc.y + 1.1}" text-anchor="middle" class="map-node-num">${escapeXml(numLabel)}</text>
+        <text x="${loc.x}" y="${loc.y - 5.05}" text-anchor="middle" class="map-label" transform="rotate(${labelUpright} ${loc.x} ${loc.y - 5.05})">${escapeXml(loc.name)}</text>
         ${monsterBadge}
         ${witchBadges}
       </g>`;
@@ -516,12 +544,29 @@ export function mapSvgHtml(
       <div class="map-wrap" style="--map-rot:${rot}deg">
         <svg class="map-svg" viewBox="0 0 100 85" role="img" aria-label="Mapa obszarów">
           <defs>
-            <radialGradient id="mapGlow" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stop-color="#2a4032"/>
-              <stop offset="100%" stop-color="#152018"/>
+            <radialGradient id="mapGlow" cx="48%" cy="38%" r="68%">
+              <stop offset="0%" stop-color="#314a3a"/>
+              <stop offset="55%" stop-color="#1a2a20"/>
+              <stop offset="100%" stop-color="#0d1510"/>
             </radialGradient>
+            <radialGradient id="mapVignette" cx="50%" cy="50%" r="72%">
+              <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#000" stop-opacity="0.42"/>
+            </radialGradient>
+            <linearGradient id="mapSchoolFill" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#d4b05a"/>
+              <stop offset="45%" stop-color="#b8923e"/>
+              <stop offset="100%" stop-color="#8a6a28"/>
+            </linearGradient>
+            <filter id="mapNodeShadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="0" dy="0.45" stdDeviation="0.35" flood-color="#000" flood-opacity="0.45"/>
+            </filter>
+            <filter id="mapBrassGlow" x="-80%" y="-80%" width="260%" height="260%">
+              <feDropShadow dx="0" dy="0" stdDeviation="0.55" flood-color="#d4b05a" flood-opacity="0.55"/>
+            </filter>
           </defs>
-          <rect x="0" y="0" width="100" height="85" rx="2" fill="url(#mapGlow)"/>
+          <rect class="map-svg-bg" x="0" y="0" width="100" height="85" rx="2.2" fill="url(#mapGlow)"/>
+          <rect class="map-svg-vignette" x="0" y="0" width="100" height="85" rx="2.2" fill="url(#mapVignette)" pointer-events="none"/>
           <g class="map-roads">${roads}</g>
           <g class="map-nodes">${nodes}</g>
         </svg>
