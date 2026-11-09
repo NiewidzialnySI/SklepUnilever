@@ -62,6 +62,8 @@ import {
   trailsHtml,
   attrsAdjustHtml,
   hasTrailForMonster,
+  fieldChangeModalHtml,
+  applyFieldChange,
   ATTR_KEYS,
 } from "./player-state.js";
 
@@ -151,16 +153,29 @@ function normalizeState(raw) {
           highlightFrom: raw.board.highlightFrom || null,
         }
       : defaultBoard();
-  // migracja Oxenfurt → Loc Ichaer
+  // migracja Oxenfurt → Loc Ichaer; Mantikora → Behelt Nar
   if (board.monsters?.oxenfurt) {
     board.monsters["loc-ichaer"] = board.monsters.oxenfurt;
     delete board.monsters.oxenfurt;
   }
+  if (board.monsters?.mantikora) {
+    board.monsters["behelt-nar"] = board.monsters.mantikora;
+    delete board.monsters.mantikora;
+  }
   if (board.selectedLoc === "oxenfurt") board.selectedLoc = "loc-ichaer";
+  if (board.selectedLoc === "mantikora") board.selectedLoc = "behelt-nar";
   const roster = Array.isArray(raw.roster)
     ? raw.roster.map((p) => {
         const copy = { ...(p || {}) };
         if (copy.locationId === "oxenfurt") copy.locationId = "loc-ichaer";
+        if (copy.locationId === "mantikora") copy.locationId = "behelt-nar";
+        if (copy.trails && typeof copy.trails === "object") {
+          for (const t of Object.keys(copy.trails)) {
+            const slot = copy.trails[t];
+            if (slot?.locId === "oxenfurt") slot.locId = "loc-ichaer";
+            if (slot?.locId === "mantikora") slot.locId = "behelt-nar";
+          }
+        }
         if (copy.locationId && !locByIdSafe(copy.locationId)) copy.locationId = null;
         return copy;
       })
@@ -974,16 +989,22 @@ function bindMoveCostTurn() {
   });
 }
 
-/** Po opłaceniu ruchu: potwór → walka; inaczej po ruchu (+ ewentualne zadanie). */
+/** Po opłaceniu ruchu: najpierw popup zmian (atrybuty/poziom), potem walka / po ruchu. */
 function finishMoveTo(p, toId, costId) {
+  p.nowDoing = "faza1";
+  setTurn("I", "field-confirm", { moveTo: toId, moveCost: costId });
+}
+
+function proceedAfterFieldConfirm(p) {
+  const toId = p.locationId;
   const mon = monsterAt(state.board, toId);
   if (mon) {
     p.nowDoing = "walka";
-    setTurn("II", "fight-monster", { moveTo: toId, moveCost: costId });
+    setTurn("II", "fight-monster", { moveTo: toId, moveCost: state.turn?.moveCost || null });
     return;
   }
   p.nowDoing = "faza1";
-  setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
+  setTurn("I", "after-move", { moveTo: toId, moveCost: state.turn?.moveCost || null });
 }
 
 function bindResourceAdjust(player) {
@@ -1029,6 +1050,21 @@ function bindAttrAdjust(player) {
 
 function bindTrailForms(player) {
   ensureCombatTrack(player);
+  appEl.querySelectorAll("[data-trail-monster]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-trail-monster");
+      const locId = btn.getAttribute("data-loc");
+      const kind = btn.getAttribute("data-kind") || "quest";
+      if (!terrain || !locId || !locById(locId)) return;
+      player.trails[terrain] = {
+        kind,
+        locId,
+        goldOnToken: kind === "quest" ? 1 : 0,
+      };
+      saveState();
+      render();
+    });
+  });
   appEl.querySelectorAll("[data-trail-set]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const terrain = btn.getAttribute("data-trail-set");
@@ -1071,6 +1107,28 @@ function bindTrailForms(player) {
       saveState();
       render();
     });
+  });
+}
+
+function bindFieldChangeModal(player) {
+  const btn = appEl.querySelector("#field-modal-confirm");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const checks = [...appEl.querySelectorAll("[data-field-action]:checked")];
+    // najpierw atrybuty/szkoła/złoto/eliksir, na końcu awans poziomu
+    const ordered = checks
+      .map((el) => el.getAttribute("data-field-action"))
+      .filter(Boolean)
+      .sort((a, b) => (a === "level:up") - (b === "level:up"));
+    for (const id of ordered) {
+      const res = applyFieldChange(player, id);
+      if (!res.ok) {
+        window.alert(res.reason || "Nie udało się zastosować zmiany.");
+        return;
+      }
+    }
+    saveState();
+    proceedAfterFieldConfirm(player);
   });
 }
 
@@ -1298,6 +1356,26 @@ function renderTurn() {
     return;
   }
 
+  if (screen === "field-confirm") {
+    const here = locById(p.locationId) || locById(state.turn.moveTo);
+    if (!here) {
+      setTurn("I", "move-pick", { clearMove: true });
+      return;
+    }
+    ensureCombatTrack(p);
+    turnShell(
+      "Faza I — zmiany na planszetce",
+      `
+        ${questArrivalHtml(p, here.id)}
+        <p class="lead">Weszłeś na <strong>${escapeHtml(here.name)}</strong>. Potwierdź, co zmieniasz (atrybuty / złoto / eliksir / poziom).</p>
+        ${fieldChangeModalHtml(p, here)}
+      `
+    );
+    bindQuestForms(p);
+    bindFieldChangeModal(p);
+    return;
+  }
+
   if (screen === "after-move") {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
@@ -1321,7 +1399,7 @@ function renderTurn() {
       "Faza I — po ruchu",
       `
         ${questArrivalHtml(p, p.locationId)}
-        <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Najpierw możesz zrobić <em>akcję ze znaku na tym polu</em>:</p>
+        <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Możesz jeszcze raz spojrzeć na znak pola albo iść dalej:</p>
         ${locationActionGuideHtml(here)}
         ${phase1AfterMove(solo)}
         <div class="choice-grid">
@@ -1431,7 +1509,7 @@ function renderTurn() {
             : `Brak tropu na ten teren → <strong>najpierw tura potwora</strong>.`
         }</p>
         ${attrsAdjustHtml(p)}
-        ${trailsHtml(p, { editable: true })}
+        ${trailsHtml(p, { editable: true, board: state.board })}
         ${resourceAdjustHtml(p, { title: "Karty / złoto / eliksiry w walce" })}
         ${fightMonster(solo)}
         ${
@@ -1576,7 +1654,7 @@ function renderTurn() {
       "Eksploracja — po karcie",
       `
         ${exploreResolveHtml({ deck, isSolo: solo, player: p })}
-        ${trailsHtml(p, { editable: true })}
+        ${trailsHtml(p, { editable: true, board: state.board })}
       `
     );
     bindResourceAdjust(p);
@@ -1873,19 +1951,12 @@ function renderBoard() {
       state.board.movePrompt = null;
       state.board.highlightFrom = null;
       state.board.selectedLoc = mp.toId;
-      // Na stole: też od razu do walki, jeśli potwór
-      const mon = monsterAt(state.board, mp.toId);
-      if (mon) {
-        pl.nowDoing = "walka";
-        state.activeIndex = mp.playerIdx;
-        saveState();
-        go("turn");
-        setTurn("II", "fight-monster", { moveTo: mp.toId, moveCost: costId });
-        return;
-      }
+      pl.locationId = mp.toId;
+      state.activeIndex = mp.playerIdx;
       pl.nowDoing = "faza1";
       saveState();
-      render();
+      go("turn");
+      finishMoveTo(pl, mp.toId, costId);
     });
   });
 

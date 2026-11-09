@@ -2,7 +2,7 @@
  * Atrybuty, tropy, medytacja, startowe zasoby.
  */
 import { ICO } from "./icons.js";
-import { locById, TERRAIN } from "./map-data.js";
+import { locById, TERRAIN, actionHintFor } from "./map-data.js";
 import { START_RESOURCES } from "./content.js";
 
 export const ATTR_KEYS = [
@@ -106,8 +106,9 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   };
 }
 
-export function trailsHtml(player, { editable = false } = {}) {
+export function trailsHtml(player, { editable = false, board = null } = {}) {
   ensureCombatTrack(player);
+  const monsters = monstersForTrails(board);
   const rows = TRAIL_TERRAINS.map((t) => {
     const slot = player.trails[t];
     const label = TERRAIN[t]?.label || t;
@@ -120,20 +121,54 @@ export function trailsHtml(player, { editable = false } = {}) {
     if (!editable) {
       return `<li><strong>${label}:</strong> ${status}</li>`;
     }
+    const opts = monsters[t] || [];
+    const monsterPick =
+      opts.length > 0
+        ? `<div class="trail-monster-pick" style="margin-top:0.4rem">
+            <p class="note" style="margin:0 0 0.3rem">Potwory ${escapeHtmlLite(label.toLowerCase())} na mapie — wybierz cel tropu:</p>
+            <div class="choice-grid" style="grid-template-columns:1fr">
+              ${opts
+                .map((o) => {
+                  const lvl = o.level ? ` poz.${o.level}` : "";
+                  const taken = slot?.locId === o.locId;
+                  return `<button type="button" class="choice ${taken ? "active" : ""}" data-trail-monster="${t}" data-loc="${o.locId}" data-kind="quest">
+                    <strong>${escapeHtmlLite(o.loc.name)} (#${o.loc.number})${lvl}</strong>
+                    <span>Zadanie tropienia · teren ${escapeHtmlLite(label)} · ×${o.count}</span>
+                  </button>
+                  <button type="button" class="choice ${
+                    taken && slot?.kind === "trail" ? "active" : ""
+                  }" data-trail-monster="${t}" data-loc="${o.locId}" data-kind="trail">
+                    <strong>Mam już trop: ${escapeHtmlLite(o.loc.name)}</strong>
+                    <span>Odwrócony żeton terenu</span>
+                  </button>`;
+                })
+                .join("")}
+            </div>
+          </div>`
+        : `<p class="note" style="margin:0.35rem 0 0">Brak potwora terenu „${escapeHtmlLite(
+            label
+          )}” na mapie — najpierw ustaw potwora na stole, albo podaj numer ręcznie.</p>`;
     return `
       <li data-trail-terrain="${t}">
         <strong>${label}:</strong> ${status}
+        ${monsterPick}
         <div class="actions" style="margin-top:0.35rem">
-          <button type="button" class="btn btn-secondary" data-trail-set="${t}" data-kind="quest">Zadanie (nr lokacji)</button>
-          <button type="button" class="btn btn-secondary" data-trail-set="${t}" data-kind="trail">Mam trop</button>
+          <button type="button" class="btn btn-secondary" data-trail-set="${t}" data-kind="quest">Zadanie (nr ręcznie)</button>
+          <button type="button" class="btn btn-secondary" data-trail-set="${t}" data-kind="trail">Mam trop (nr ręcznie)</button>
           <button type="button" class="btn btn-secondary" data-trail-clear="${t}">Wyczyść</button>
         </div>
       </li>`;
   }).join("");
+  const anyMon = TRAIL_TERRAINS.some((t) => (monsters[t] || []).length);
   return `
     <div class="guide-box">
       <p class="step-kicker" style="margin:0">${ICO.quest()} Żetony tropu / zadania tropienia</p>
-      <p class="lead" style="margin:0.3rem 0 0">Max 1 na teren (las / góry / woda). Pusty stos żetonów = nie bierzesz nowego zadania. Karta „weź żeton tropu” przy braku żetonów: ten fragment efektu przepada — resztę karty stosujesz.</p>
+      <p class="lead" style="margin:0.3rem 0 0">Max 1 na teren (las / góry / woda). Żeton bierzesz <strong>o terenie potwora</strong>, którego tropisz — lista poniżej bierze potwory z mapy stołu.</p>
+      ${
+        anyMon
+          ? ""
+          : `<p class="warn">Na mapie nie ma jeszcze potworów — dodaj je na Stole (Potwór +), wtedy tu pojawią się cele tropu.</p>`
+      }
       <ul class="checklist">${rows}</ul>
     </div>`;
 }
@@ -180,6 +215,237 @@ export function hasTrailForMonster(player, monsterLoc) {
   const terrain = monsterLoc.terrain;
   const slot = player.trails?.[terrain];
   return Boolean(slot && slot.kind === "trail");
+}
+
+/** Potwory z mapy → możliwe tereny tropu (+ lokacje). */
+export function monstersForTrails(board) {
+  const byTerrain = { forest: [], mountain: [], water: [] };
+  for (const [locId, m] of Object.entries(board?.monsters || {})) {
+    if (!m || !(m.count > 0)) continue;
+    const loc = locById(locId);
+    if (!loc || !byTerrain[loc.terrain]) continue;
+    byTerrain[loc.terrain].push({
+      locId,
+      loc,
+      count: m.count,
+      level: m.level || null,
+      label: m.label || null,
+    });
+  }
+  return byTerrain;
+}
+
+/** Awans poziomu: wszystkie 4 atrybuty > aktualny poziom → możesz +1 poziom (max 5). */
+export function levelUpStatus(player) {
+  ensureCombatTrack(player);
+  const level = player.attrs.level || 1;
+  const attrs = ATTR_KEYS.map((a) => ({
+    id: a.id,
+    label: a.label,
+    value: player.attrs[a.id] || 1,
+  }));
+  const allAbove = attrs.every((a) => a.value > level);
+  const can = allAbove && level < 5;
+  return {
+    level,
+    attrs,
+    can,
+    reason: can
+      ? `Wszystkie atrybuty > poziom ${level} → podnieś poziom wiedźmina do ${level + 1}.`
+      : level >= 5
+        ? "Poziom już na maksimum (5)."
+        : `Awans zablokowany: potrzebujesz wszystkich atrybutów > ${level} (teraz: ${attrs
+            .map((a) => `${a.label} ${a.value}`)
+            .join(", ")}).`,
+  };
+}
+
+/**
+ * Co gracz powinien zmienić po wejściu na pole (znak obszaru + ewentualny awans).
+ * Zwraca listę „działań do potwierdzenia”.
+ */
+export function fieldChangePrompt(player, loc) {
+  ensureCombatTrack(player);
+  const level = player.attrs.level || 1;
+  const actions = [];
+  const key = loc?.actionKey;
+
+  const freeAttr = (attrId, label) => {
+    const cur = player.attrs[attrId] || 1;
+    const ok = cur <= level && cur < 5;
+    actions.push({
+      id: `attr:${attrId}`,
+      kind: "attr",
+      attrId,
+      label: `+1 ${label}`,
+      detail: ok
+        ? `${label} ${cur} ≤ poziom ${level} → możesz podnieść do ${cur + 1}.`
+        : cur >= 5
+          ? `${label} już na V.`
+          : `${label} ${cur} > poziom ${level} — ten darmowy trening nie działa.`,
+      enabled: ok,
+      defaultOn: ok,
+    });
+  };
+
+  if (key === "schoolTrain") {
+    for (const a of ATTR_KEYS) {
+      const cur = player.attrs[a.id] || 1;
+      const target = cur + 1;
+      const cost = target;
+      const ok = cur < 5 && (player.gold || 0) >= cost;
+      actions.push({
+        id: `school:${a.id}`,
+        kind: "school",
+        attrId: a.id,
+        goldCost: cost,
+        label: `Szkoła: +1 ${a.label} (−${cost} zł)`,
+        detail: ok
+          ? `Zapłać ${cost} zł (poziom docelowy) → ${a.label} ${cur}→${target}.`
+          : cur >= 5
+            ? `${a.label} już na V.`
+            : `Za mało złota (${player.gold || 0}/${cost}) albo atrybut max.`,
+        enabled: ok,
+        defaultOn: false,
+      });
+    }
+  } else if (key === "defenseLevel") freeAttr("defense", "Obrona");
+  else if (key === "attackLevel") freeAttr("attack", "Atak");
+  else if (key === "specialtyLevel") freeAttr("specialty", "Specjalność");
+  else if (key === "alchemyLevel") {
+    const ok = (player.elixirs || 0) < 4;
+    actions.push({
+      id: "elixir:1",
+      kind: "elixir",
+      label: "+1 eliksir",
+      detail: ok
+        ? `Alchemia ≤ poziom? Sprawdź na planszy. Eliksiry: ${player.elixirs || 0}/4.`
+        : "Masz już 4 eliksiry (limit).",
+      enabled: ok && (player.attrs.alchemy || 1) <= level,
+      defaultOn: ok && (player.attrs.alchemy || 1) <= level,
+    });
+  } else if (key === "gainElixir" || key === "cintraElixir") {
+    const ok = (player.elixirs || 0) < 4;
+    actions.push({
+      id: "elixir:1",
+      kind: "elixir",
+      label: "+1 eliksir",
+      detail: ok ? `Eliksiry: ${player.elixirs || 0}/4.` : "Limit 4 eliksiry.",
+      enabled: ok,
+      defaultOn: ok,
+    });
+  } else if (key === "trailGold") {
+    actions.push({
+      id: "gold:1",
+      kind: "gold",
+      label: "+1 złoto (znak pola)",
+      detail: "Weź 1 złoto z banku. Opcja tropienia — osobno w żetonach tropu.",
+      enabled: true,
+      defaultOn: true,
+    });
+  }
+
+  const lvl = levelUpStatus(player);
+  actions.push({
+    id: "level:up",
+    kind: "level",
+    label: lvl.can ? `+1 poziom wiedźmina (${lvl.level}→${lvl.level + 1})` : "Awans poziomu",
+    detail: lvl.reason,
+    enabled: lvl.can,
+    defaultOn: lvl.can,
+  });
+
+  return {
+    loc,
+    level,
+    attrs: { ...player.attrs },
+    gold: player.gold || 0,
+    elixirs: player.elixirs || 0,
+    actions,
+    hint: actionHintFor(loc) || "",
+  };
+}
+
+export function applyFieldChange(player, actionId) {
+  ensureCombatTrack(player);
+  if (!actionId) return { ok: false, reason: "Brak akcji." };
+  if (actionId === "level:up") {
+    const st = levelUpStatus(player);
+    if (!st.can) return { ok: false, reason: st.reason };
+    player.attrs.level += 1;
+    return { ok: true };
+  }
+  if (actionId === "gold:1") {
+    player.gold = (player.gold || 0) + 1;
+    return { ok: true };
+  }
+  if (actionId === "elixir:1") {
+    if ((player.elixirs || 0) >= 4) return { ok: false, reason: "Limit 4 eliksiry." };
+    player.elixirs = (player.elixirs || 0) + 1;
+    return { ok: true };
+  }
+  if (actionId.startsWith("attr:")) {
+    const attrId = actionId.slice(5);
+    const cur = player.attrs[attrId] || 1;
+    if (cur >= 5) return { ok: false, reason: "Atrybut max." };
+    if (cur > (player.attrs.level || 1)) return { ok: false, reason: "Atrybut > poziom — darmowy trening nie działa." };
+    player.attrs[attrId] = cur + 1;
+    if (attrId === "defense") player.shield = Math.max(player.shield || 0, player.attrs.defense);
+    return { ok: true };
+  }
+  if (actionId.startsWith("school:")) {
+    const attrId = actionId.slice(7);
+    const cur = player.attrs[attrId] || 1;
+    if (cur >= 5) return { ok: false, reason: "Atrybut max." };
+    const cost = cur + 1;
+    if ((player.gold || 0) < cost) return { ok: false, reason: `Brak złota (${player.gold || 0}/${cost}).` };
+    player.gold -= cost;
+    player.attrs[attrId] = cur + 1;
+    if (attrId === "defense") player.shield = Math.max(player.shield || 0, player.attrs.defense);
+    if (attrId === "alchemy" && (player.elixirs || 0) < 4) {
+      player.elixirs = (player.elixirs || 0) + 1;
+    }
+    return { ok: true };
+  }
+  return { ok: false, reason: "Nieznana akcja." };
+}
+
+export function fieldChangeModalHtml(player, loc) {
+  const prompt = fieldChangePrompt(player, loc);
+  const a = prompt.attrs;
+  return `
+    <div class="field-modal" id="field-change-modal" role="dialog" aria-modal="true" aria-labelledby="field-modal-title">
+      <div class="field-modal-card">
+        <p class="step-kicker" style="margin:0">Po wejściu na pole</p>
+        <h2 id="field-modal-title" style="margin:0.25rem 0 0.4rem">${escapeHtmlLite(loc?.name || "?")}${
+          typeof loc?.number === "number" ? ` (#${loc.number})` : ""
+        }</h2>
+        <p class="lead" style="margin:0">Teraz: poziom <strong>${prompt.level}</strong> · atak ${a.attack} · obrona ${a.defense} · alchemia ${a.alchemy} · specjalność ${a.specialty} · złoto ${prompt.gold} · eliksiry ${prompt.elixirs}</p>
+        ${prompt.hint ? `<p class="note" style="margin:0.45rem 0 0"><strong>Znak:</strong> ${escapeHtmlLite(prompt.hint)}</p>` : ""}
+        <p class="tip" style="margin:0.65rem 0 0.35rem"><strong>Zaznacz, co zmieniasz na planszetce</strong>, potem Potwierdź.</p>
+        <div class="field-modal-actions">
+          ${prompt.actions
+            .map(
+              (act) => `
+            <label class="field-modal-row ${act.enabled ? "" : "is-disabled"}">
+              <input type="checkbox" data-field-action="${escapeHtmlLite(act.id)}" ${
+                act.enabled && act.defaultOn ? "checked" : ""
+              } ${act.enabled ? "" : "disabled"} />
+              <span>
+                <strong>${escapeHtmlLite(act.label)}</strong>
+                <span class="note" style="display:block;margin:0.15rem 0 0">${escapeHtmlLite(act.detail)}</span>
+              </span>
+            </label>`
+            )
+            .join("")}
+        </div>
+        <p class="note" style="margin:0.65rem 0 0"><strong>Poziom:</strong> awansujesz, gdy <em>wszystkie</em> atrybuty są wyższe niż aktualny poziom wiedźmina (potem +1 poziom).</p>
+        <div class="actions" style="margin-top:0.85rem">
+          <button type="button" class="btn btn-primary" id="field-modal-confirm">Potwierdź i dalej</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 export function escapeHtmlLite(s) {

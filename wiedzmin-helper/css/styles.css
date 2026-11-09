@@ -356,6 +356,69 @@ h3 {
   margin: 1rem 0 0.25rem;
 }
 
+.explore-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0.85rem 0 0.25rem;
+  align-items: end;
+}
+
+.explore-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.45rem 0.7rem;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.explore-card img {
+  display: block;
+  width: min(100%, 11.5rem);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+}
+
+.explore-card-label {
+  text-align: center;
+}
+
+.explore-card-label strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+}
+
+.explore-card-label span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  margin-top: 0.15rem;
+}
+
+.explore-card:hover,
+.explore-card.active {
+  border-color: var(--brass);
+  background: rgba(184, 146, 62, 0.12);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 520px) {
+  .explore-card-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+  }
+  .explore-card img {
+    width: min(100%, 9.5rem);
+  }
+}
+
 .choice {
   text-align: left;
   padding: 1.15rem 1.2rem;
@@ -533,15 +596,73 @@ h3 {
   display: block;
 }
 
-.ico-terrain .ico-img {
+.ico-terrain .ico-img,
+.ico-school-img .ico-img {
   width: 1.75rem;
   height: 1.75rem;
   object-fit: contain;
 }
 
-.ico-legend-item .ico-terrain .ico-img {
+.ico-legend-item .ico-terrain .ico-img,
+.ico-legend-item .ico-school-img .ico-img {
   width: 2.35rem;
   height: 2.35rem;
+}
+
+.player-chip .ico-school-img .ico-img {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+.field-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(12, 14, 12, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.field-modal-card {
+  width: min(100%, 28rem);
+  max-height: min(88vh, 36rem);
+  overflow: auto;
+  padding: 1rem 1.1rem 1.05rem;
+  border-radius: 14px;
+  background: rgba(246, 240, 228, 0.98);
+  color: #1a1814;
+  border: 1px solid rgba(184, 146, 62, 0.55);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  animation: map-loc-popup-in 0.22s ease-out;
+}
+
+.field-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.field-modal-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(26, 24, 20, 0.12);
+  cursor: pointer;
+}
+
+.field-modal-row.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.field-modal-row input {
+  margin-top: 0.2rem;
 }
 
 .ico-chip {
