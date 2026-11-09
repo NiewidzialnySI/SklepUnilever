@@ -440,39 +440,64 @@ export function phase1AfterMove(isSolo) {
 `;
 }
 
-export function phase2Choices(isSolo, { meditateEnabled = true, meditateHint = "" } = {}) {
+export function phase2Choices(
+  isSolo,
+  {
+    meditateEnabled = true,
+    meditateHint = "",
+    fightEnabled = true,
+    fightHint = "",
+  } = {}
+) {
   const medClass = meditateEnabled ? "choice choice-meditate-ready" : "choice choice-disabled";
   const medSpan = meditateEnabled
     ? meditateHint || "Atrybut na V — możesz wziąć trofeum"
     : meditateHint || "Zablokowane — żaden atrybut nie jest na V";
+  const fightClass = fightEnabled ? "choice" : "choice choice-disabled";
+  const fightSpan = fightEnabled
+    ? fightHint || (isSolo ? "Na Twoim obszarze" : "Z potworem lub wiedźminem")
+    : fightHint || "Brak celu walki na polu";
   if (isSolo) {
     return `
       <p class="lead">Wybierz <strong>dokładnie 1</strong> opcję. Potem nie wracasz do ruchu.</p>
       <div class="choice-grid" data-choices="phase2">
-        <button class="choice" data-goto="fight-monster"><strong>Walka z potworem</strong><span>Na Twoim obszarze</span></button>
+        <button class="${fightClass}" data-goto="fight-monster" ${fightEnabled ? "" : "disabled"}><strong>Walka z potworem</strong><span>${fightSpan}</span></button>
         <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
-      <p class="note">W solo nie ma walki z innymi wiedźminami.</p>
+      <p class="note">W solo nie ma walki z innymi wiedźminami. Bez potwora i bez medytacji helper idzie od razu do eksploracji.</p>
     `;
   }
   return `
     <p class="lead">Wybierz <strong>dokładnie 1</strong> opcję. Potem nie wracasz do ruchu w tej turze.</p>
     <div class="choice-grid" data-choices="phase2">
-      <button class="choice" data-goto="fight"><strong>Walka</strong><span>Z potworem lub wiedźminem</span></button>
+      <button class="${fightClass}" data-goto="fight" ${fightEnabled ? "" : "disabled"}><strong>Walka</strong><span>${fightSpan}</span></button>
       <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
+    <p class="note">Bez celu walki i bez medytacji helper od razu przechodzi do eksploracji.</p>
   `;
 }
 
-export const FIGHT_BRANCH = `
+export function fightBranchHtml({ monsterEnabled = true, witcherEnabled = true, hint = "" } = {}) {
+  const mClass = monsterEnabled ? "choice" : "choice choice-disabled";
+  const wClass = witcherEnabled ? "choice" : "choice choice-disabled";
+  return `
   <div class="choice-grid" data-choices="fight-type">
-    <button class="choice" data-goto="fight-monster"><strong>Walka z potworem</strong><span>Żeton na Twoim obszarze</span></button>
-    <button class="choice" data-goto="fight-witcher"><strong>Walka z wiedźminem</strong><span>Na tym samym obszarze</span></button>
+    <button class="${mClass}" data-goto="fight-monster" ${monsterEnabled ? "" : "disabled"}><strong>Walka z potworem</strong><span>${
+      monsterEnabled ? "Żeton na Twoim obszarze" : "Brak potwora na polu"
+    }</span></button>
+    <button class="${wClass}" data-goto="fight-witcher" ${witcherEnabled ? "" : "disabled"}><strong>Walka z wiedźminem</strong><span>${
+      witcherEnabled ? "Na tym samym obszarze" : "Brak innego wiedźmina tu"
+    }</span></button>
   </div>
+  ${hint ? `<p class="note">${hint}</p>` : ""}
   <p class="note">Tylko 1 walka na turę. <strong>Walka z wiedźminem</strong> zabroniona na szkole i na zamkniętej karczmie. Bez walki z kimś po pokerze w tej turze.</p>
 `;
+}
+
+/** @deprecated użyj fightBranchHtml — zostawione pod stare importy */
+export const FIGHT_BRANCH = fightBranchHtml();
 
 export function fightMonster(isSolo) {
   return `

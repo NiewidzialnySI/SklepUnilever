@@ -583,6 +583,7 @@ h3 {
 
 /* Mapa-schemat + tracker */
 .map-stage {
+  position: relative;
   margin: 0.75rem 0 0.5rem;
   border-radius: 12px;
   overflow: hidden;
@@ -591,6 +592,64 @@ h3 {
   min-height: 220px;
   display: grid;
   place-items: center;
+}
+
+.map-loc-popup {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  width: min(92%, 22rem);
+  max-height: min(70%, 18rem);
+  overflow: auto;
+  padding: 0.75rem 0.9rem 0.65rem;
+  border-radius: 12px;
+  background: rgba(246, 240, 228, 0.96);
+  color: #1a1814;
+  border: 1px solid rgba(184, 146, 62, 0.55);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  animation: map-loc-popup-in 0.22s ease-out;
+}
+
+.map-loc-popup.map-loc-popup--gone {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.map-loc-popup-title {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.map-loc-popup-meta {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.map-loc-popup-hint {
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+  font-size: 0.95rem;
+}
+
+.map-loc-popup-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+@keyframes map-loc-popup-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .map-wrap {

@@ -164,6 +164,45 @@ export function destinationPreviewHtml(toId, { player, roster = [], monsters = {
   `;
 }
 
+/** Krótki opis lokacji do dymekka nad mapą (Faza I — wybór celu). */
+export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {}) {
+  const to = locById(toId);
+  if (!to) return "";
+  const mon = monsters?.[toId];
+  const others = (roster || []).filter(
+    (r) => r && r !== player && r.locationId === toId
+  );
+  const t = TERRAIN[to.terrain];
+  const hint = actionHintFor(to) || LOCATION_ACTION_HINTS[to.actionKey] || "";
+  return `
+    <p class="step-kicker" style="margin:0">Cel ruchu</p>
+    <h3 class="map-loc-popup-title">${escapeHtml(to.name)} <span class="loc-num">#${to.number}</span></h3>
+    <p class="map-loc-popup-meta">${terrainChip(to.terrain)} ${t ? escapeHtml(t.label) : ""}${
+      to.school ? " · szkoła" : ""
+    }</p>
+    ${
+      hint
+        ? `<p class="map-loc-popup-hint"><strong>Znak:</strong> ${escapeHtml(hint)}</p>`
+        : ""
+    }
+    ${
+      mon
+        ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.monster()} <strong>Potwór</strong>${
+            mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
+          } — wejście → walka</p>`
+        : ""
+    }
+    ${
+      others.length
+        ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.specialty()} Inny wiedźmin: <strong>${others
+            .map((o) => escapeHtml(o.name))
+            .join(", ")}</strong></p>`
+        : ""
+    }
+    <p class="note map-loc-popup-note">Znika po 3 s albo kliku poza oknem</p>
+  `;
+}
+
 /** Lista sąsiadów z kosztem ruchu per cel (data-move-to). */
 export function neighborPickerHtml(fromId, { player, monsters } = {}) {
   const from = locById(fromId);

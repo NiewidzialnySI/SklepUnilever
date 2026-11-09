@@ -4,7 +4,7 @@ import {
   buildSetupSteps,
   phase1AfterMove,
   phase2Choices,
-  FIGHT_BRANCH,
+  fightBranchHtml,
   fightMonster,
   FIGHT_WITCHER,
   meditate,
@@ -23,6 +23,7 @@ import {
   selectedLocPanel,
   playerTrackerHtml,
   movePromptHtml,
+  bindMapLocPopup,
   fatigueForReputation,
   phase3DrawHint,
   locById,
@@ -41,6 +42,7 @@ import {
   locationActionGuideHtml,
   exploreGuideHtml,
   destinationPreviewHtml,
+  mapLocPopupHtml,
 } from "./guide.js";
 import {
   exploreDeckChooserHtml,
@@ -56,6 +58,7 @@ import {
   applyStartResources,
   startResourcesFor,
   meditationStatus,
+  phase2FightOptions,
   trailsHtml,
   attrsAdjustHtml,
   hasTrailForMonster,
@@ -933,6 +936,14 @@ function bindChoices() {
   });
 }
 
+function fightOptionsFor(player) {
+  return phase2FightOptions(player, {
+    board: state.board,
+    roster: state.roster,
+    isSolo: isSolo(),
+  });
+}
+
 function bindMovePick() {
   appEl.querySelectorAll("[data-move-to]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1200,27 +1211,35 @@ function renderTurn() {
     const fromId = p.locationId;
     state.board.highlightFrom = fromId;
     state.board.selectedLoc = fromId;
-    const preview =
-      state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo)
-        ? destinationPreviewHtml(state.turn.moveTo, {
-            player: p,
-            roster: state.roster,
-            monsters: state.board.monsters,
-          })
-        : `<p class="tip">Kliknij <strong>podświetlone</strong> pole na mapie — zobaczysz akcję obszaru, potwora i innych wiedźminów.</p>`;
+    const destOk =
+      state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo);
+    const popupInner = destOk
+      ? mapLocPopupHtml(state.turn.moveTo, {
+          player: p,
+          roster: state.roster,
+          monsters: state.board.monsters,
+        })
+      : null;
     turnShell(
       "Faza I — ruch na mapie",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka).</p>
-        ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
-        ${preview}
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka). Opis wyskoczy nad mapą.</p>
+        ${mapSvgHtml(state.board, state.roster, {
+          schoolById,
+          highlightFromId: fromId,
+          popupHtml: popupInner,
+        })}
         ${
-          state.turn.moveTo
-            ? `<div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
-            : ""
+          destOk
+            ? `<p class="tip" style="margin:0.55rem 0 0">Wybrano: <strong>${escapeHtml(
+                locById(state.turn.moveTo)?.name || "?"
+              )}</strong></p>
+               <div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
+            : `<p class="tip">Kliknij <strong>podświetlone</strong> pole — krótki opis pojawi się nad mapą (3 s / klik poza).</p>`
         }
       `
     );
+    bindMapLocPopup(appEl);
     appEl.querySelectorAll(".map-node-reach").forEach((g) => {
       g.addEventListener("click", () => {
         const toId = g.getAttribute("data-loc");
@@ -1320,11 +1339,37 @@ function renderTurn() {
   if (screen === "phase2") {
     ensureCombatTrack(p);
     const med = meditationStatus(p, { isSolo: solo });
+    const fight = fightOptionsFor(p);
+    // Bez celu walki i bez medytacji → od razu eksploracja
+    if (!fight.can && !med.can) {
+      p.nowDoing = "eksploracja";
+      saveState();
+      setTurn("II", "explore");
+      return;
+    }
     turnShell(
       "Faza II — wybór",
       `
-        ${med.can ? `<p class="tip choice-meditate-ready" style="padding:0.7rem 0.9rem"><strong>Medytacja dostępna!</strong> ${escapeHtml(med.reason)}</p>` : `<p class="note">${escapeHtml(med.reason)}</p>`}
-        ${phase2Choices(solo, { meditateEnabled: med.can, meditateHint: med.can ? med.reason : med.reason })}
+        ${
+          med.can
+            ? `<p class="tip choice-meditate-ready" style="padding:0.7rem 0.9rem"><strong>Medytacja dostępna!</strong> ${escapeHtml(med.reason)}</p>`
+            : `<p class="note">${escapeHtml(med.reason)}</p>`
+        }
+        ${
+          fight.can
+            ? `<p class="tip" style="padding:0.55rem 0.9rem">${escapeHtml(fight.reason)}</p>`
+            : `<p class="note">${escapeHtml(fight.reason)}</p>`
+        }
+        ${phase2Choices(solo, {
+          meditateEnabled: med.can,
+          meditateHint: med.reason,
+          fightEnabled: fight.can,
+          fightHint: fight.can
+            ? solo
+              ? "Na Twoim obszarze"
+              : "Z potworem lub wiedźminem"
+            : fight.reason,
+        })}
       `
     );
     bindChoices();
@@ -1332,7 +1377,32 @@ function renderTurn() {
   }
 
   if (screen === "fight") {
-    turnShell("Walka — typ", FIGHT_BRANCH);
+    const fight = fightOptionsFor(p);
+    if (!fight.can) {
+      setTurn("II", "phase2");
+      return;
+    }
+    if (solo) {
+      setTurn("II", fight.canMonster ? "fight-monster" : "phase2");
+      return;
+    }
+    // Multi: jeden możliwy typ → od razu tam
+    if (fight.canMonster && !fight.canWitcher) {
+      setTurn("II", "fight-monster");
+      return;
+    }
+    if (!fight.canMonster && fight.canWitcher) {
+      setTurn("II", "fight-witcher");
+      return;
+    }
+    turnShell(
+      "Walka — typ",
+      fightBranchHtml({
+        monsterEnabled: fight.canMonster,
+        witcherEnabled: fight.canWitcher,
+        hint: fight.reason,
+      })
+    );
     bindChoices();
     addTurnButtons([
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
@@ -1343,6 +1413,11 @@ function renderTurn() {
   if (screen === "fight-monster") {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
+    if (!mon) {
+      // Wejście bez potwora (np. stary stan) — wróć do wyboru fazy II
+      setTurn("II", "phase2");
+      return;
+    }
     ensureCombatTrack(p);
     const hasTrail = hasTrailForMonster(p, here);
     turnShell(
@@ -1397,6 +1472,11 @@ function renderTurn() {
   }
 
   if (screen === "fight-witcher") {
+    const fight = fightOptionsFor(p);
+    if (!fight.canWitcher) {
+      setTurn("II", "phase2");
+      return;
+    }
     ensureCombatTrack(p);
     turnShell(
       "Walka z wiedźminem",
