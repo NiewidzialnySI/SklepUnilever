@@ -489,7 +489,9 @@ export function fightMonster(isSolo) {
     <li>Inne symbole na kartach (tarcza, dobór ±, wróć kartę na rękę…) — rozpatrz wg ikon / karty pomocy.</li>
     <li><strong>Dobór na koniec Twojej tury:</strong> dobierz z <em>talii wytrzymałości</em> tyle kart, ile wynosi Twój <strong>Atak</strong> ± modyfikatory z kombinacji. Trafiają na rękę. Limit 7: przy 7 w walce nie dobierasz dalej. Zagrane karty → na Twój stos odrzuconych.</li>
   </ol>
-  <p class="warn">Przy 1 karcie na ręce: grasz ją → liczysz obrażenia → dobierasz wg Ataku (np. Atak II = zwykle 2 karty). Bez paniki — ręka się uzupełnia po każdym Twoim ataku.</p>
+  <p class="warn"><strong>Przy 1 karcie na ręce:</strong> i tak musisz ją zagrać (masz karty = musisz zagrać kombinację ≥1). Potem dobierasz wg Ataku — ręka się uzupełnia.</p>
+  <p class="warn"><strong>Karta tylko z tarczami (0 mieczy)?</strong> Też grasz ją. <em>Nie zadajesz obrażeń</em> w tym ataku — tylko podnosisz tarczę o symbole na karcie (tarcza nigdy &gt; obrona). Potem normalnie dobierasz wg Ataku. To nie jest „zła” tura: przeżywasz i dobierasz lepsze karty.</p>
+  <p class="tip"><strong>Bez żetonu tropu:</strong> <em>najpierw tura potwora</em>, dopiero potem Twoja. Przygotuj tarczę / czytaj zdolność potwora zanim odkryjecie jego kartę ataku.</p>
 
   <h3>2. Tura potwora</h3>
   <ol class="checklist">
