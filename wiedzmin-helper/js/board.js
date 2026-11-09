@@ -12,6 +12,7 @@ import {
   fatigueForReputation,
 } from "./map-data.js";
 import { ICO, SCHOOL_ICON } from "./icons.js";
+import { nowDoingGuideHtml, moveCostChooserHtml } from "./guide.js";
 
 export const NOW_ACTIONS = [
   { id: "czekam", label: "Czeka" },
@@ -30,6 +31,8 @@ export function defaultBoard() {
     selectedLoc: null,
     placePlayer: 0,
     monsters: {},
+    /** { playerIdx, fromId, toId, costId? } — komunikat po przesunięciu pionka */
+    movePrompt: null,
   };
 }
 
@@ -230,6 +233,7 @@ export function selectedLocPanel(board, roster) {
       <p class="note" style="margin:0.4rem 0 0">Sąsiedzi (ścieżki): ${
         neigh ? escapeHtml(neigh) : "—"
       }</p>
+      <p class="tip" style="margin:0.5rem 0 0">Po ruchu: przycisk „Faza I” / „Eksploracja” w trackerze pokaże kroki za rękę wg tego znaku.</p>
       <p>${ICO.monster()} Potwory tu: <strong>${m ? m.count : 0}</strong>${
         m?.label ? ` (${escapeHtml(m.label)})` : ""
       }</p>
@@ -249,7 +253,20 @@ export function selectedLocPanel(board, roster) {
   `;
 }
 
-export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOURCES, players }) {
+export function movePromptHtml(board, roster) {
+  const mp = board.movePrompt;
+  if (!mp) return "";
+  const p = roster[mp.playerIdx];
+  if (!p) return "";
+  return moveCostChooserHtml({
+    fromLoc: locById(mp.fromId),
+    toLoc: locById(mp.toId),
+    playerName: p.name,
+    selectedCostId: mp.costId || null,
+  });
+}
+
+export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOURCES, players, isSolo }) {
   return roster
     .map((p, i) => {
       const school = schoolById(p.schoolId);
@@ -260,6 +277,7 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
       const afterFat = handAfterFatigue(p.cards || 0, nextRep);
       const draw = phase3DrawHint(p.cards || 0);
       const start = START_RESOURCES[players]?.[i] || { cards: 5, gold: 3 };
+      const guide = nowDoingGuideHtml(p, { isSolo: !!isSolo });
 
       return `
         <article class="tracker-card ${i === activeIndex ? "tracker-active" : ""}" data-track="${i}">
@@ -321,6 +339,8 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
             </div>
           </div>
 
+          ${guide}
+
           <details class="tracker-math">
             <summary><strong>Ile kart: traci / zostaje / dobiera</strong></summary>
             <ul class="checklist">
@@ -349,4 +369,11 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
     .join("");
 }
 
-export { fatigueForReputation, locById, LOCATIONS, TERRAIN, neighborsOf, actionHintFor };
+export {
+  fatigueForReputation,
+  locById,
+  LOCATIONS,
+  TERRAIN,
+  neighborsOf,
+  actionHintFor,
+};

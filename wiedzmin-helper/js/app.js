@@ -8,7 +8,6 @@ import {
   fightMonster,
   FIGHT_WITCHER,
   meditate,
-  explore,
   phase3,
   LOCATION_ACTIONS,
   quickRef,
@@ -24,10 +23,19 @@ import {
   mapToolbarHtml,
   selectedLocPanel,
   playerTrackerHtml,
+  movePromptHtml,
   fatigueForReputation,
   phase3DrawHint,
   locById,
+  neighborsOf,
 } from "./board.js";
+import {
+  neighborPickerHtml,
+  moveCostChooserHtml,
+  applyMoveCost,
+  locationActionGuideHtml,
+  exploreGuideHtml,
+} from "./guide.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
 
@@ -40,7 +48,7 @@ function defaultState() {
     roster: [],
     activeIndex: 0,
     setupIndex: 0,
-    turn: { phase: "hub", screen: "hub" },
+    turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null },
     board: defaultBoard(),
   };
 }
@@ -58,11 +66,18 @@ function normalizeState(raw) {
       ? {
           phase: String(raw.turn.phase || "hub"),
           screen: String(raw.turn.screen || "hub"),
+          moveTo: raw.turn.moveTo ? String(raw.turn.moveTo) : null,
+          moveCost: raw.turn.moveCost ? String(raw.turn.moveCost) : null,
         }
       : base.turn;
   const board =
     raw.board && typeof raw.board === "object"
-      ? { ...defaultBoard(), ...raw.board, monsters: raw.board.monsters || {} }
+      ? {
+          ...defaultBoard(),
+          ...raw.board,
+          monsters: raw.board.monsters || {},
+          movePrompt: raw.board.movePrompt || null,
+        }
       : defaultBoard();
   // migracja Oxenfurt → Loc Ichaer
   if (board.monsters?.oxenfurt) {
@@ -526,8 +541,14 @@ function turnShell(title, body) {
   });
 }
 
-function setTurn(phase, screen) {
-  state.turn = { phase, screen };
+function setTurn(phase, screen, extra = {}) {
+  let moveTo = extra.moveTo !== undefined ? extra.moveTo : state.turn?.moveTo || null;
+  let moveCost = extra.moveCost !== undefined ? extra.moveCost : state.turn?.moveCost || null;
+  if (extra.clearMove) {
+    moveTo = null;
+    moveCost = null;
+  }
+  state.turn = { phase, screen, moveTo, moveCost };
   const p = activePlayer();
   if (p) {
     if (phase === "I") p.nowDoing = "faza1";
@@ -556,14 +577,44 @@ function bindChoices() {
   appEl.querySelectorAll(".choice[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const goto = btn.getAttribute("data-goto");
-      if (goto === "phase2") setTurn("II", "phase2");
-      else if (goto === "move") setTurn("I", "after-move");
+      if (goto === "phase2") setTurn("II", "phase2", { clearMove: true });
+      else if (goto === "move") setTurn("I", "move-pick", { clearMove: true });
       else if (goto === "fight") setTurn("II", "fight");
       else if (goto === "meditate") setTurn("II", "meditate");
       else if (goto === "explore") setTurn("II", "explore");
       else if (goto === "fight-monster") setTurn("II", "fight-monster");
       else if (goto === "fight-witcher") setTurn("II", "fight-witcher");
       else if (goto === "phase3") setTurn("III", "phase3");
+    });
+  });
+}
+
+function bindMovePick() {
+  appEl.querySelectorAll("[data-move-to]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const toId = btn.getAttribute("data-move-to");
+      setTurn("I", "move-cost", { moveTo: toId, moveCost: null });
+    });
+  });
+}
+
+function bindMoveCostTurn() {
+  appEl.querySelectorAll("[data-move-cost]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const costId = btn.getAttribute("data-move-cost");
+      const p = activePlayer();
+      const toId = state.turn.moveTo;
+      if (!p || !toId) return;
+      const result = applyMoveCost(p, costId);
+      if (!result.ok) {
+        window.alert(result.reason);
+        return;
+      }
+      p.locationId = toId;
+      state.board.selectedLoc = toId;
+      state.board.movePrompt = null;
+      p.nowDoing = "faza1";
+      setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
     });
   });
 }
@@ -653,7 +704,7 @@ function renderTurn() {
       `
         <p class="lead"><strong>${escapeHtml(p.name)}</strong>: instrukcja — <em>1 obowiązkowy ruch albo przejście do fazy II</em>. Nie zaczynasz akcją na obszarze, na którym już stoisz.</p>
         <div class="choice-grid">
-          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Obowiązkowy ruch, potem akcje</span></button>
+          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Wybierz sąsiada + koszt kart/złota</span></button>
           <button class="choice" data-goto="phase2"><strong>Idę do fazy II</strong><span>Bez ruchu i bez akcji obszaru</span></button>
         </div>
         ${MOVE_HELP}
@@ -663,16 +714,84 @@ function renderTurn() {
     return;
   }
 
+  if (screen === "move-pick") {
+    const fromId = p.locationId;
+    turnShell(
+      "Faza I — dokąd idziesz?",
+      `
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: kliknij sąsiada. Potem wybierzesz, czy oddajesz 1 kartę terenu, 2 karty, czy 1 kartę + 1 złoto.</p>
+        ${neighborPickerHtml(fromId)}
+        ${
+          !fromId
+            ? `<div class="choice-grid" style="margin-top:0.8rem">
+                ${["kaer-seren", "kaer-morhen", "haern-caduch", "stygga", "gorthur-gvaed"]
+                  .map((id) => {
+                    const L = locById(id);
+                    if (!L) return "";
+                    return `<button type="button" class="choice" data-set-start="${id}"><strong>Start: ${escapeHtml(L.name)}</strong><span>Szkoła — tylko ustawienie pionka</span></button>`;
+                  })
+                  .join("")}
+              </div>`
+            : ""
+        }
+        ${MOVE_HELP}
+      `
+    );
+    bindMovePick();
+    appEl.querySelectorAll("[data-set-start]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        p.locationId = btn.getAttribute("data-set-start");
+        state.board.selectedLoc = p.locationId;
+        saveState();
+        render();
+      });
+    });
+    addTurnButtons([
+      { id: "back", label: "Wróć", onClick: () => setTurn("I", "phase1-start", { clearMove: true }) },
+      { id: "to-board", label: "Stół — ustaw na mapie", onClick: () => go("board") },
+    ]);
+    return;
+  }
+
+  if (screen === "move-cost") {
+    const to = locById(state.turn.moveTo);
+    const from = locById(p.locationId);
+    if (!to) {
+      setTurn("I", "move-pick", { clearMove: true });
+      return;
+    }
+    turnShell(
+      "Faza I — koszt ruchu",
+      `
+        ${moveCostChooserHtml({
+          fromLoc: from,
+          toLoc: to,
+          playerName: p.name,
+          selectedCostId: state.turn.moveCost,
+        })}
+        <p class="tip">Tracker: masz <strong>${p.cards ?? 0}</strong> kart i <strong>${p.gold ?? 0}</strong> złota — po wyborze odejmiemy koszt.</p>
+      `
+    );
+    bindMoveCostTurn();
+    addTurnButtons([
+      { id: "back", label: "Inny cel", onClick: () => setTurn("I", "move-pick", { clearMove: true }) },
+    ]);
+    return;
+  }
+
   if (screen === "after-move") {
+    const here = locById(p.locationId);
     turnShell(
       "Faza I — po ruchu",
       `
+        <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Najpierw możesz zrobić <em>akcję ze znaku na tym polu</em>:</p>
+        ${locationActionGuideHtml(here)}
         ${phase1AfterMove(solo)}
         <div class="choice-grid">
-          <button class="choice" data-goto="move"><strong>Ruszam się znowu</strong><span>Mam karty</span></button>
+          <button class="choice" data-goto="move"><strong>Ruszam się znowu</strong><span>Znowu wybór celu + koszt kart</span></button>
           <button class="choice" data-goto="phase2"><strong>Przechodzę do fazy II</strong><span>Zostawiam rękę</span></button>
         </div>
-        <details style="margin-top:1rem"><summary><strong>Akcje obszarów</strong></summary>${LOCATION_ACTIONS}</details>
+        <details style="margin-top:1rem"><summary><strong>Ściąga wszystkich akcji obszarów</strong></summary>${LOCATION_ACTIONS}</details>
       `
     );
     bindChoices();
@@ -731,7 +850,8 @@ function renderTurn() {
   }
 
   if (screen === "explore") {
-    turnShell("Eksploracja", explore(solo));
+    const here = locById(p.locationId);
+    turnShell("Eksploracja", exploreGuideHtml(here, solo));
     addTurnButtons([
       { id: "to3", label: "Dalej → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
@@ -766,17 +886,26 @@ function renderBoard() {
     <section class="panel board-panel">
       <p class="step-kicker">Przy stole · mapa i status</p>
       <h1>Stół</h1>
-      <p class="lead">Schemat mapy do oznaczania potworów i wiedźminów (możesz obracać). Poniżej reputacja, karty, złoto, eliksiry i przyciski „co robi teraz” — plus wyliczenie ile kart tracisz przy zmęczeniu i ile dobierasz w fazie III.</p>
+      <p class="lead">Schemat mapy do oznaczania potworów i wiedźminów (możesz obracać). Jak przesuniesz wiedźmina na sąsiada — wyskoczy wybór kosztu ruchu (1 karta / 2 karty / 1+złoto). Przyciski „co robi teraz” prowadzą za rękę (m.in. eksploracja wg znaków pola).</p>
 
       <h2>Mapa (schemat)</h2>
       ${mapToolbarHtml(board, state.roster)}
       ${mapSvgHtml(board, state.roster, { schoolById })}
       ${selectedLocPanel(board, state.roster)}
+      ${movePromptHtml(board, state.roster)}
+      ${
+        board.movePrompt
+          ? `<div class="actions" style="margin:0.5rem 0 1rem">
+              <button type="button" class="btn btn-secondary" id="dismiss-move-prompt">Anuluj ten ruch (cofnij pionek)</button>
+            </div>`
+          : ""
+      }
 
       <h2>Gracze — reputacja i karty</h2>
       <div class="tracker-list">
         ${playerTrackerHtml(state.roster, {
           schoolById,
+          isSolo: isSolo(),
           activeIndex: state.activeIndex,
           START_RESOURCES,
           players: state.players,
@@ -852,9 +981,70 @@ function renderBoard() {
         delete state.board.monsters[locId];
       } else if (tool === "player") {
         const idx = state.board.placePlayer || 0;
-        if (state.roster[idx]) state.roster[idx].locationId = locId;
+        const pl = state.roster[idx];
+        if (pl) {
+          const fromId = pl.locationId;
+          // Pierwsze ustawienie albo to samo pole = bez kosztu ruchu
+          if (!fromId || fromId === locId) {
+            pl.locationId = locId;
+            state.board.movePrompt = null;
+          } else {
+            const adj = neighborsOf(fromId);
+            if (!adj.includes(locId)) {
+              window.alert(
+                "To nie jest sąsiad po ścieżce. Albo kliknij sąsiada, albo najpierw ustaw pionek (pierwszy raz) bez kosztu."
+              );
+            } else {
+              // Przesuń od razu, ale wymagaj wyboru kosztu (anuluj = cofnij)
+              pl.locationId = locId;
+              pl.nowDoing = "faza1";
+              state.activeIndex = idx;
+              state.board.movePrompt = {
+                playerIdx: idx,
+                fromId,
+                toId: locId,
+                costId: null,
+              };
+            }
+          }
+        }
       }
 
+      saveState();
+      render();
+    });
+  });
+
+  const dismissMove = appEl.querySelector("#dismiss-move-prompt");
+  if (dismissMove) {
+    dismissMove.addEventListener("click", () => {
+      const mp = state.board.movePrompt;
+      if (mp && state.roster[mp.playerIdx]) {
+        state.roster[mp.playerIdx].locationId = mp.fromId;
+        state.board.selectedLoc = mp.fromId;
+      }
+      state.board.movePrompt = null;
+      saveState();
+      render();
+    });
+  }
+
+  appEl.querySelectorAll("[data-move-cost]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const mp = state.board.movePrompt;
+      if (!mp) return;
+      const pl = state.roster[mp.playerIdx];
+      if (!pl) return;
+      const costId = btn.getAttribute("data-move-cost");
+      const result = applyMoveCost(pl, costId);
+      if (!result.ok) {
+        window.alert(result.reason);
+        return;
+      }
+      mp.costId = costId;
+      pl.nowDoing = "faza1";
+      state.board.movePrompt = null;
+      state.board.selectedLoc = mp.toId;
       saveState();
       render();
     });

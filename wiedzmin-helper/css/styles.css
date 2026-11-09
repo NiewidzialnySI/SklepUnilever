@@ -581,6 +581,31 @@ h3 {
   line-height: 1.45;
 }
 
+.guide-box,
+.guide-inline {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 12px;
+  background: rgba(36, 72, 51, 0.12);
+  border: 1px solid rgba(184, 146, 62, 0.35);
+}
+
+.guide-inline .guide-box {
+  margin: 0.55rem 0 0;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.guide-steps {
+  margin: 0.55rem 0 0;
+}
+
+.move-cost-grid .choice .note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.88em;
+  opacity: 0.9;
+}
+
 .tracker-list {
   display: grid;
   gap: 0.85rem;
