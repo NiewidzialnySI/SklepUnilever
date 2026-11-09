@@ -695,9 +695,18 @@ function renderTurn() {
   }
 
   if (screen === "fight-monster") {
-    turnShell("Walka z potworem", fightMonster(solo));
+    turnShell("Walka z potworem — co teraz?", fightMonster(solo));
     addTurnButtons([
-      { id: "to3", label: "Koniec walki → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
+      {
+        id: "to3",
+        label: "Koniec walki → faza III",
+        primary: true,
+        onClick: () => {
+          p.nowDoing = "faza3";
+          saveState();
+          setTurn("III", "phase3");
+        },
+      },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", solo ? "phase2" : "fight") },
     ]);
     return;

@@ -469,35 +469,59 @@ export const FIGHT_BRANCH = `
 
 export function fightMonster(isSolo) {
   return `
+  <p class="tip"><strong>Jesteś tuż po przygotowaniu?</strong> Talię + odrzucone złożyłeś w <em>talię wytrzymałości</em>, ręka została (nawet 1 karta) — <strong>OK, tak ma być</strong>. Dalej idzie naprzemienna walka.</p>
+
+  <h3>0. Start walki (checklist)</h3>
   <ol class="checklist">
-    <li>Sprawdź zdolność specjalną potwora (może być koszt wejścia).</li>
-    <li><strong>Wytrzymałość:</strong> tasujesz talię + odrzucone → talia wytrzymałości (ręka zostaje).</li>
-    <li>Talia potwora z kart walki (PW z karty).</li>
-    <li><strong>Żeton tropu</strong> tego potwora (odwrócony żeton obszaru przy planszetce) → <strong>Ty zaczynasz</strong>; inaczej potwór.</li>
-    ${
-      isSolo
-        ? `<li><strong>Solo — atak potwora:</strong> rzuć kością. <strong>1–3</strong> = szarża, <strong>4–6</strong> = ugryzienie.</li>`
-        : `<li>Kontrolujący potwora wybiera: szarża albo ugryzienie.</li>`
-    }
-    <li>Twoja tura: eliksiry / zdolność → kombinacja (≥1 karta, jeśli masz karty) → obrażenia (tarcza → talia → ręka) → dobór wg ataku.</li>
+    <li>Przeczytaj <strong>zdolność specjalną</strong> na karcie potwora (czasem koszt wejścia, np. odrzuć eliksir).</li>
+    <li>Twoja <strong>talia wytrzymałości</strong> = stara talia akcji + stos odrzuconych (tasowane). <strong>Ręka nie wchodzi</strong> do tej talii.</li>
+    <li>Potwór: weź z talii walki potworów tyle kart, ile wynosi jego <strong>PW</strong> na karcie — to jego „życie” (zakryta talia).</li>
+    <li><strong>Kto zaczyna?</strong> Masz <em>żeton tropu</em> tego potwora → <strong>Ty</strong>. Nie masz → <strong>potwór</strong>.</li>
   </ol>
-  <h3>Wynik walki z potworem</h3>
+
+  <h3>1. Twoja tura walki (gdy Ty grasz)</h3>
+  <ol class="checklist">
+    <li><strong>Opcjonalnie:</strong> wypij eliksir(y) łącznie ≤ alchemii w całej walce; raz na walkę zdolność szkoły / efekty trofeów.</li>
+    <li><strong>Kombinacja (obowiązkowa, jeśli masz karty na ręce):</strong> zagraj ≥1 kartę z ręki. Kolejne karty muszą pasować kolorami/przedłużeniami do poprzedniej (jak na karcie pomocy). Przy 1 karcie na ręce: grasz właśnie tę jedną.</li>
+    <li><strong>Obrażenia:</strong> policz symbole obrażeń (miecze itp.) na zagranych kartach + efekty eliksirów.
+      <div>Potwór <strong>zrzuca z wierzchu swojej talii walki</strong> tyle kart (odkryte na bok). To „rani” potwora. Jak talia potwora spadnie do <strong>0</strong> → pokonany.</div>
+    </li>
+    <li>Inne symbole na kartach (tarcza, dobór ±, wróć kartę na rękę…) — rozpatrz wg ikon / karty pomocy.</li>
+    <li><strong>Dobór na koniec Twojej tury:</strong> dobierz z <em>talii wytrzymałości</em> tyle kart, ile wynosi Twój <strong>Atak</strong> ± modyfikatory z kombinacji. Trafiają na rękę. Limit 7: przy 7 w walce nie dobierasz dalej. Zagrane karty → na Twój stos odrzuconych.</li>
+  </ol>
+  <p class="warn">Przy 1 karcie na ręce: grasz ją → liczysz obrażenia → dobierasz wg Ataku (np. Atak II = zwykle 2 karty). Bez paniki — ręka się uzupełnia po każdym Twoim ataku.</p>
+
+  <h3>2. Tura potwora</h3>
+  <ol class="checklist">
+    <li>${
+      isSolo
+        ? `<strong>Solo:</strong> rzuć kością — <strong>1–3 szarża</strong>, <strong>4–6 ugryzienie</strong>.`
+        : `Kontrolujący potwora wybiera: <strong>szarża</strong> albo <strong>ugryzienie</strong>.`
+    }</li>
+    <li>Odkryj <strong>1 kartę</strong> z wierzchu talii wytrzymałości potwora (jego talii walki) i rozpatrz efekt wybranego ataku + tekst karty.</li>
+    <li><strong>Obrażenia na Ciebie</strong> (typowo): najpierw obniż <strong>tarczę</strong>; jak zabraknie — zrzucaj karty z wierzchu <em>Twojej</em> talii wytrzymałości; czasem ręka (czytaj kartę). Jak nie masz już kart w talii wytrzymałości (i efekt wymaga) — padłeś.</li>
+  </ol>
+
+  <h3>3. Powtarzaj</h3>
+  <p class="lead">Ty → potwór → Ty → … aż ktoś „padnie” (talia walki potwora = 0 albo Ty bez wytrzymałości).</p>
+
+  <h3>4. Wynik</h3>
   <ul class="checklist">
-    <li><strong>Pokonanie</strong> (0 kart w talii potwora): <strong>2 złota</strong>, odwróć kartę potwora, +reputacja, zmęczenie, trofeum.
+    <li><strong>Pokonanie</strong> (0 kart u potwora): <strong>2 złota</strong>, odwróć kartę potwora, +reputacja, zmęczenie, trofeum.
       ${
         isSolo
           ? ` <strong>Solo: NIE dobieraj nowego potwora</strong>.`
           : ` Potem zwykle nowy potwór (poziom +1; III→III).`
       }
     </li>
-    <li><strong>Odpędzenie</strong> (została 0–1 karta PW wg instrukcji / skrótu pomocy): nagrody wg karty pomocy; ${
+    <li><strong>Odpędzenie</strong> (została 0–1 karta PW wg karty pomocy): nagrody wg pomocy; ${
       isSolo
-        ? `umieść <strong>nowy żeton tego samego poziomu</strong>.`
+        ? `nowy żeton <strong>tego samego poziomu</strong>.`
         : `nowy potwór tego samego poziomu.`
     }</li>
-    <li><strong>Klęska</strong> (≥2 karty PW u potwora): nagrody/kary wg instrukcji; w fazie III często dobór tylko do 2.</li>
+    <li><strong>Klęska</strong> (≥2 karty PW u potwora): kary/nagrody wg instrukcji; w fazie III często dobór tylko do 2.</li>
   </ul>
-  <p class="lead">Potem → Faza III.</p>
+  <p class="tip">Po walce: tarcza = obrona; zbuduj z powrotem normalną talię akcji z talii wytrzymałości + odrzuconych (wg instrukcji). Potem → <strong>Faza III</strong>.</p>
 `;
 }
 

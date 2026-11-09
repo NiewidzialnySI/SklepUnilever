@@ -56,12 +56,13 @@ export const COMBAT_STEPS = `
   <h3>Tura walki wiedźmina (4 kroki)</h3>
   <ol class="checklist">
     <li><strong>1. Eliksiry / zdolność / ekwipunek i trofea</strong> — eliksiry łącznie ≤ alchemii w całej walce; zdolność raz na walkę; efekty „raz na walkę” opcjonalne.</li>
-    <li><strong>2. Kombinacja</strong> — zagraj 1+ połączonych kart z ręki (kolory/przedłużenia). Efekty specjalne w kombinacji w dowolnej kolejności.</li>
-    <li><strong>3. Rozpatrzenie</strong> — suma obrażeń (przeciwnik zrzuca karty z talii wytrzymałości), tarcze, inne symbole/modyfikatory.</li>
-    <li><strong>4. Dobór</strong> — dobierz karty = poziom ataku ± modyfikatory z kombinacji. Limit 7: w walce przy 7 nie dobierasz dalej.</li>
+    <li><strong>2. Kombinacja</strong> — zagraj ≥1 kartę z ręki (obowiązkowe, jeśli masz karty). Kolejne muszą pasować przedłużeniami. 1 karta na ręce = grasz tę jedną.</li>
+    <li><strong>3. Rozpatrzenie</strong> — suma symboli obrażeń: potwór zrzuca tyle kart ze swojej talii walki. Inne symbole (tarcza, ±dobór…) wg ikon.</li>
+    <li><strong>4. Dobór</strong> — z talii wytrzymałości dobierz = poziom <strong>Ataku</strong> ± modyfikatory. Na rękę. Limit 7 w walce = stop.</li>
   </ol>
-  <p class="tip">Potwór: szarża albo ugryzienie → odkryj kartę walki → efekty. Solo: kość 1–3 szarża / 4–6 ugryzienie.</p>
-  <p class="warn">Obrażenia na Ciebie: najpierw tarcza, potem wierzch talii wytrzymałości, potem ręka (typowy porządek; wyjątki na kartach potworów — czytaj kartę).</p>
+  <p class="tip"><strong>Co liczyć?</strong> Obrażenia = liczba mieczy/symboli obrażeń na zagranych kartach (i eliksirach). Atak na planszetce = ile kart dobierasz po swoim ataku. Talia potwora = jego życie.</p>
+  <p class="tip">Potwór: szarża albo ugryzienie → odkryj 1 kartę walki → efekty. Solo: kość 1–3 szarża / 4–6 ugryzienie.</p>
+  <p class="warn">Obrażenia na Ciebie: najpierw tarcza, potem wierzch Twojej talii wytrzymałości, potem ręka (typowo; wyjątki na karcie potwora).</p>
 `;
 
 export const LEVEL_UP = `
