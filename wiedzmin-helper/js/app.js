@@ -2134,7 +2134,7 @@ function renderIcons() {
   shell(`
     <section class="panel">
       <p class="step-kicker">Ściąga symboli</p>
-      <h1>Ikony jak przy stole</h1>
+      <h1>Ikony</h1>
       ${iconsLegendHtml()}
       <div class="actions">
         <button class="btn btn-primary" id="to-turn">Do tury</button>
