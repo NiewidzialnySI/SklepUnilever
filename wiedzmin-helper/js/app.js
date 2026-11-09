@@ -23,6 +23,7 @@ import {
   selectedLocPanel,
   playerTrackerHtml,
   movePromptHtml,
+  bindMapLocPopup,
   fatigueForReputation,
   phase3DrawHint,
   locById,
@@ -41,6 +42,7 @@ import {
   locationActionGuideHtml,
   exploreGuideHtml,
   destinationPreviewHtml,
+  mapLocPopupHtml,
 } from "./guide.js";
 import {
   exploreDeckChooserHtml,
@@ -1200,27 +1202,35 @@ function renderTurn() {
     const fromId = p.locationId;
     state.board.highlightFrom = fromId;
     state.board.selectedLoc = fromId;
-    const preview =
-      state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo)
-        ? destinationPreviewHtml(state.turn.moveTo, {
-            player: p,
-            roster: state.roster,
-            monsters: state.board.monsters,
-          })
-        : `<p class="tip">Kliknij <strong>podświetlone</strong> pole na mapie — zobaczysz akcję obszaru, potwora i innych wiedźminów.</p>`;
+    const destOk =
+      state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo);
+    const popupInner = destOk
+      ? mapLocPopupHtml(state.turn.moveTo, {
+          player: p,
+          roster: state.roster,
+          monsters: state.board.monsters,
+        })
+      : null;
     turnShell(
       "Faza I — ruch na mapie",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka).</p>
-        ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
-        ${preview}
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka). Opis wyskoczy nad mapą.</p>
+        ${mapSvgHtml(state.board, state.roster, {
+          schoolById,
+          highlightFromId: fromId,
+          popupHtml: popupInner,
+        })}
         ${
-          state.turn.moveTo
-            ? `<div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
-            : ""
+          destOk
+            ? `<p class="tip" style="margin:0.55rem 0 0">Wybrano: <strong>${escapeHtml(
+                locById(state.turn.moveTo)?.name || "?"
+              )}</strong></p>
+               <div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
+            : `<p class="tip">Kliknij <strong>podświetlone</strong> pole — krótki opis pojawi się nad mapą (3 s / klik poza).</p>`
         }
       `
     );
+    bindMapLocPopup(appEl);
     appEl.querySelectorAll(".map-node-reach").forEach((g) => {
       g.addEventListener("click", () => {
         const toId = g.getAttribute("data-loc");

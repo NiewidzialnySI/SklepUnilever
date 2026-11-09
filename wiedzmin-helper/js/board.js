@@ -159,7 +159,11 @@ function escapeXml(s) {
     .replace(/"/g, "&quot;");
 }
 
-export function mapSvgHtml(board, roster, { schoolById, highlightFromId, showDisclaimer = false } = {}) {
+export function mapSvgHtml(
+  board,
+  roster,
+  { schoolById, highlightFromId, showDisclaimer = false, popupHtml = null } = {}
+) {
   const locMap = Object.fromEntries(LOCATIONS.map((l) => [l.id, l]));
   const fromId = highlightFromId || board.highlightFrom || null;
   const reachable = new Set(fromId ? neighborsOf(fromId) : []);
@@ -223,7 +227,7 @@ export function mapSvgHtml(board, roster, { schoolById, highlightFromId, showDis
   }).join("");
 
   return `
-    <div class="map-stage">
+    <div class="map-stage${popupHtml ? " map-stage--has-popup" : ""}">
       <div class="map-wrap" style="--map-rot:${rot}deg">
         <svg class="map-svg" viewBox="0 0 100 85" role="img" aria-label="Mapa obszarów">
           <defs>
@@ -237,6 +241,11 @@ export function mapSvgHtml(board, roster, { schoolById, highlightFromId, showDis
           <g class="map-nodes">${nodes}</g>
         </svg>
       </div>
+      ${
+        popupHtml
+          ? `<div class="map-loc-popup" id="map-loc-popup" role="dialog" aria-live="polite">${popupHtml}</div>`
+          : ""
+      }
     </div>
     ${
       showDisclaimer
@@ -244,6 +253,38 @@ export function mapSvgHtml(board, roster, { schoolById, highlightFromId, showDis
         : ""
     }
   `;
+}
+
+/** Dymek nad mapą: znika po 3 s albo kliku poza oknem (wybór celu zostaje). */
+export function bindMapLocPopup(root, { timeoutMs = 3000 } = {}) {
+  const popup = root?.querySelector?.("#map-loc-popup");
+  if (!popup) return () => {};
+
+  let gone = false;
+  const hide = () => {
+    if (gone) return;
+    gone = true;
+    popup.classList.add("map-loc-popup--gone");
+    window.clearTimeout(timer);
+    document.removeEventListener("pointerdown", onOutside, true);
+  };
+
+  const onOutside = (e) => {
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    if (popup.contains(t)) return;
+    // nowy klik w cel ruchu otworzy dymek od nowa (re-render)
+    if (t.closest(".map-node-reach")) return;
+    hide();
+  };
+
+  const timer = window.setTimeout(hide, timeoutMs);
+  // nie zamykaj od razu tym samym kliknięciem, które otworzyło dymek
+  window.setTimeout(() => {
+    if (!gone) document.addEventListener("pointerdown", onOutside, true);
+  }, 0);
+
+  return hide;
 }
 
 export function mapToolbarHtml(board, roster) {
