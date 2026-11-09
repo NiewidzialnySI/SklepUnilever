@@ -73,6 +73,39 @@ export function meditationStatus(player, { isSolo = false } = {}) {
   };
 }
 
+/** Czy w Fazie II jest z kim walczyć (potwór / inny wiedźmin na tym samym polu). */
+export function phase2FightOptions(player, { board, roster = [], isSolo = false } = {}) {
+  const locId = player?.locationId || null;
+  const m = locId ? board?.monsters?.[locId] : null;
+  const canMonster = Boolean(locId && m && m.count > 0);
+  const others = (roster || []).filter(
+    (r) => r && r !== player && r.locationId && locId && r.locationId === locId
+  );
+  const canWitcher = !isSolo && others.length > 0;
+  const can = canMonster || canWitcher;
+  let reason;
+  if (can) {
+    const bits = [];
+    if (canMonster) bits.push("potwór na Twoim polu");
+    if (canWitcher) bits.push(`wiedźmin: ${others.map((o) => o.name).join(", ")}`);
+    reason = `Możesz walczyć (${bits.join("; ")}).`;
+  } else if (!locId) {
+    reason = "Walka zablokowana: nie masz ustawionej lokacji na mapie.";
+  } else if (isSolo) {
+    reason = "Walka zablokowana: na Twoim polu nie ma potwora.";
+  } else {
+    reason = "Walka zablokowana: brak potwora i innego wiedźmina na tym polu.";
+  }
+  return {
+    can,
+    canMonster,
+    canWitcher,
+    others,
+    monster: canMonster ? m : null,
+    reason,
+  };
+}
+
 export function trailsHtml(player, { editable = false } = {}) {
   ensureCombatTrack(player);
   const rows = TRAIL_TERRAINS.map((t) => {
