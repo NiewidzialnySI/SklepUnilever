@@ -119,11 +119,22 @@ export function moveCostChooserHtml({ fromLoc, toLoc, playerName, selectedCostId
   `;
 }
 
-/** Lista sąsiadów do kliknięcia (data-move-to). */
-export function neighborPickerHtml(fromId) {
+function affordNote(player, cardsNeed, goldNeed) {
+  if (!player) return "";
+  const cardsOk = (player.cards || 0) >= cardsNeed;
+  const goldOk = (player.gold || 0) >= goldNeed;
+  if (cardsOk && goldOk) return "masz zasoby";
+  const miss = [];
+  if (!cardsOk) miss.push(`kart ${player.cards || 0}/${cardsNeed}`);
+  if (!goldOk) miss.push(`złota ${player.gold || 0}/${goldNeed}`);
+  return `uwaga: ${miss.join(", ")}`;
+}
+
+/** Lista sąsiadów z kosztem ruchu per cel (data-move-to). */
+export function neighborPickerHtml(fromId, { player } = {}) {
   const from = locById(fromId);
   if (!from) {
-    return `<p class="warn">Najpierw ustaw wiedźmina na mapie (Stół → „Ustaw wiedźmina”), albo wybierz start poniżej.</p>`;
+    return `<p class="warn">Brak pozycji startowej — wróć do <strong>Gracze</strong> i wybierz szkołę (pionek stawia się automatycznie na szkole).</p>`;
   }
   const neigh = neighborsOf(fromId)
     .map((id) => locById(id))
@@ -132,18 +143,30 @@ export function neighborPickerHtml(fromId) {
     return `<p class="warn">Brak sąsiadów w schemacie — sprawdź mapę.</p>`;
   }
   return `
-    <p class="lead">Stoisz na <strong>${escapeHtml(from.name)}</strong>. Kliknij, dokąd idziesz (tylko sąsiad po ścieżce):</p>
-    <div class="choice-grid">
-      ${neigh
-        .map((n) => {
-          const t = TERRAIN[n.terrain];
-          return `
+    <div class="guide-box guide-destinations">
+      <p class="step-kicker" style="margin:0">Dokąd możesz iść</p>
+      <p class="lead" style="margin:0.35rem 0 0">Stoisz na <strong>${escapeHtml(from.name)}</strong> (#${from.number}). Kliknij cel — potem wybierzesz dokładny koszt z ręki.</p>
+      <div class="choice-grid move-dest-grid">
+        ${neigh
+          .map((n) => {
+            const t = TERRAIN[n.terrain];
+            const tLabel = t?.label || n.terrain;
+            const matchOk = affordNote(player, 1, 0);
+            const twoOk = affordNote(player, 2, 0);
+            const mixOk = affordNote(player, 1, 1);
+            return `
           <button type="button" class="choice" data-move-to="${n.id}">
             <strong>${escapeHtml(n.name)} (#${n.number})</strong>
-            <span>Teren: ${escapeHtml(t?.label || n.terrain)} — weź kartę ${escapeHtml(t?.label || "")} albo 2 karty / 1+złoto</span>
+            <span>Teren celu: ${terrainChip(n.terrain)}</span>
+            <span class="move-cost-lines">
+              <span><strong>Najtaniej:</strong> 1 karta ${escapeHtml(tLabel)} <em>(${escapeHtml(matchOk)})</em></span>
+              <span><strong>Albo:</strong> 1× wild · 2 dowolne karty <em>(${escapeHtml(twoOk)})</em> · 1 karta + 1 złoto <em>(${escapeHtml(mixOk)})</em></span>
+            </span>
           </button>`;
-        })
-        .join("")}
+          })
+          .join("")}
+      </div>
+      <p class="note" style="margin:0.55rem 0 0">Na mapie (Stół) sąsiedzi są podświetleni na złoto, gdy ruszasz się w turze.</p>
     </div>
   `;
 }

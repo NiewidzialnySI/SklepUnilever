@@ -28,6 +28,8 @@ import {
   phase3DrawHint,
   locById,
   neighborsOf,
+  placeAtSchool,
+  schoolStartId,
 } from "./board.js";
 import {
   neighborPickerHtml,
@@ -77,6 +79,7 @@ function normalizeState(raw) {
           ...raw.board,
           monsters: raw.board.monsters || {},
           movePrompt: raw.board.movePrompt || null,
+          highlightFrom: raw.board.highlightFrom || null,
         }
       : defaultBoard();
   // migracja Oxenfurt → Loc Ichaer
@@ -150,24 +153,40 @@ function ensureRoster() {
   while (state.roster.length < n) {
     const i = state.roster.length;
     const start = START_RESOURCES[n]?.[i] || { cards: 5, gold: 3 };
-    state.roster.push(
-      ensurePlayerTrack(
-        {
-          name: n === 1 ? "Ja" : `Gracz ${i + 1}`,
-          schoolId: SCHOOLS[i % SCHOOLS.length].id,
-        },
-        start.cards,
-        start.gold
-      )
+    const p = ensurePlayerTrack(
+      {
+        name: n === 1 ? "Ja" : `Gracz ${i + 1}`,
+        schoolId: SCHOOLS[i % SCHOOLS.length].id,
+      },
+      start.cards,
+      start.gold
     );
+    placeAtSchool(p, { force: true });
+    p._prevSchoolId = p.schoolId;
+    state.roster.push(p);
   }
   if (state.roster.length > n) state.roster = state.roster.slice(0, n);
   state.roster.forEach((p, i) => {
     const start = START_RESOURCES[n]?.[i] || { cards: 5, gold: 3 };
     ensurePlayerTrack(p, start.cards, start.gold);
+    if (!p.locationId) {
+      placeAtSchool(p, { force: true });
+      p._prevSchoolId = p.schoolId;
+    }
   });
   if (state.activeIndex >= n) state.activeIndex = 0;
   if (state.board.placePlayer >= n) state.board.placePlayer = 0;
+}
+
+/** Po wyborze szkoły — pionek na startowej lokacji szkoły. */
+function applySchoolStarts() {
+  state.roster.forEach((p) => {
+    const schoolChanged = p._prevSchoolId && p._prevSchoolId !== p.schoolId;
+    if (!p.locationId || schoolChanged) {
+      placeAtSchool(p, { force: true });
+    }
+    p._prevSchoolId = p.schoolId;
+  });
 }
 
 function schoolById(id) {
@@ -336,7 +355,7 @@ function renderRoster() {
     <section class="panel">
       <p class="step-kicker">Skład stołu · ${playersLabel(state.players)}</p>
       <h1>Imiona i szkoły</h1>
-      <p class="lead">Dla każdego gracza wpisz imię i wybierz szkołę wiedźmińską (jak na planszetce).</p>
+      <p class="lead">Wpisz imię i wybierz szkołę — <strong>pionek od razu staje na szkole startowej</strong> (Wilk→Kaer Morhen, Gryf→Kaer Seren, Niedźwiedź→Haern Caduch, Kot→Stygga, Żmija→Gorthur Gvaed).</p>
       <div id="roster-forms">
         ${state.roster
           .map((p, i) => {
@@ -358,6 +377,9 @@ function renderRoster() {
                   ).join("")}
                 </select>
               </label>
+              <p class="note school-start-hint">Start: <strong>${escapeHtml(
+                locById(schoolStartId(p.schoolId))?.name || "—"
+              )}</strong></p>
             </div>`;
           })
           .join("")}
@@ -384,11 +406,16 @@ function renderRoster() {
       const schoolId = card.querySelector('[data-field="schoolId"]').value;
       const prev = state.roster[i] || {};
       const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
-      state.roster[i] = ensurePlayerTrack(
-        { ...prev, name, schoolId },
+      const next = ensurePlayerTrack(
+        { ...prev, name, schoolId, _prevSchoolId: prev.schoolId || prev._prevSchoolId },
         start.cards,
         start.gold
       );
+      if (!prev.locationId || prev.schoolId !== schoolId) {
+        placeAtSchool(next, { force: true });
+      }
+      next._prevSchoolId = schoolId;
+      state.roster[i] = next;
     });
     used.clear();
     let dup = false;
@@ -399,6 +426,7 @@ function renderRoster() {
       }
     }
     warn.hidden = !dup;
+    applySchoolStarts();
     saveState();
     return !dup;
   }
@@ -411,12 +439,14 @@ function renderRoster() {
   appEl.querySelector("#back-home").addEventListener("click", () => go("home"));
   appEl.querySelector("#to-setup").addEventListener("click", () => {
     if (!syncFromDom()) return;
+    applySchoolStarts();
     state.setupIndex = 0;
     go("setup");
   });
   appEl.querySelector("#to-turn").addEventListener("click", () => {
     if (!syncFromDom()) return;
-    go("turn", { turn: { phase: "hub", screen: "hub" } });
+    applySchoolStarts();
+    go("turn", { turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null } });
   });
 }
 
@@ -577,8 +607,15 @@ function bindChoices() {
   appEl.querySelectorAll(".choice[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const goto = btn.getAttribute("data-goto");
-      if (goto === "phase2") setTurn("II", "phase2", { clearMove: true });
-      else if (goto === "move") setTurn("I", "move-pick", { clearMove: true });
+      if (goto === "phase2") {
+        state.board.highlightFrom = null;
+        setTurn("II", "phase2", { clearMove: true });
+      } else if (goto === "move") {
+        const ap = activePlayer();
+        if (ap && !ap.locationId) placeAtSchool(ap, { force: true });
+        state.board.highlightFrom = ap?.locationId || null;
+        setTurn("I", "move-pick", { clearMove: true });
+      }
       else if (goto === "fight") setTurn("II", "fight");
       else if (goto === "meditate") setTurn("II", "meditate");
       else if (goto === "explore") setTurn("II", "explore");
@@ -613,6 +650,7 @@ function bindMoveCostTurn() {
       p.locationId = toId;
       state.board.selectedLoc = toId;
       state.board.movePrompt = null;
+      state.board.highlightFrom = null;
       p.nowDoing = "faza1";
       setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
     });
@@ -715,40 +753,37 @@ function renderTurn() {
   }
 
   if (screen === "move-pick") {
+    if (!p.locationId) {
+      placeAtSchool(p, { force: true });
+      p._prevSchoolId = p.schoolId;
+    }
     const fromId = p.locationId;
+    state.board.highlightFrom = fromId;
+    state.board.selectedLoc = fromId;
     turnShell(
-      "Faza I — dokąd idziesz?",
+      "Faza I — dokąd możesz iść?",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: kliknij sąsiada. Potem wybierzesz, czy oddajesz 1 kartę terenu, 2 karty, czy 1 kartę + 1 złoto.</p>
-        ${neighborPickerHtml(fromId)}
-        ${
-          !fromId
-            ? `<div class="choice-grid" style="margin-top:0.8rem">
-                ${["kaer-seren", "kaer-morhen", "haern-caduch", "stygga", "gorthur-gvaed"]
-                  .map((id) => {
-                    const L = locById(id);
-                    if (!L) return "";
-                    return `<button type="button" class="choice" data-set-start="${id}"><strong>Start: ${escapeHtml(L.name)}</strong><span>Szkoła — tylko ustawienie pionka</span></button>`;
-                  })
-                  .join("")}
-              </div>`
-            : ""
-        }
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong> stoi na szkole/polu startowym. Poniżej widać <em>wszystkich sąsiadów</em> i jaki koszt pasuje do każdego celu.</p>
+        ${neighborPickerHtml(fromId, { player: p })}
+        <p class="tip">Po kliknięciu celu wybierzesz dokładnie: 1 kartę terenu / wild / 2 karty / 1+złoto — tracker odejmie zasoby.</p>
+        <div class="map-mini" style="margin-top:1rem">
+          <h3>Mapa — podświetleni sąsiedzi</h3>
+          ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
+        </div>
         ${MOVE_HELP}
       `
     );
     bindMovePick();
-    appEl.querySelectorAll("[data-set-start]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        p.locationId = btn.getAttribute("data-set-start");
-        state.board.selectedLoc = p.locationId;
-        saveState();
-        render();
-      });
-    });
     addTurnButtons([
-      { id: "back", label: "Wróć", onClick: () => setTurn("I", "phase1-start", { clearMove: true }) },
-      { id: "to-board", label: "Stół — ustaw na mapie", onClick: () => go("board") },
+      {
+        id: "back",
+        label: "Wróć",
+        onClick: () => {
+          state.board.highlightFrom = null;
+          setTurn("I", "phase1-start", { clearMove: true });
+        },
+      },
+      { id: "to-board", label: "Pełny stół", onClick: () => go("board") },
     ]);
     return;
   }
@@ -890,8 +925,21 @@ function renderBoard() {
 
       <h2>Mapa (schemat)</h2>
       ${mapToolbarHtml(board, state.roster)}
-      ${mapSvgHtml(board, state.roster, { schoolById })}
+      ${mapSvgHtml(board, state.roster, {
+        schoolById,
+        highlightFromId:
+          board.highlightFrom ||
+          board.movePrompt?.fromId ||
+          (activePlayer()?.nowDoing === "faza1" ? activePlayer()?.locationId : null),
+      })}
       ${selectedLocPanel(board, state.roster)}
+      ${
+        (board.highlightFrom || activePlayer()?.nowDoing === "faza1") && activePlayer()?.locationId
+          ? neighborPickerHtml(board.highlightFrom || activePlayer().locationId, {
+              player: activePlayer(),
+            })
+          : ""
+      }
       ${movePromptHtml(board, state.roster)}
       ${
         board.movePrompt
@@ -1029,6 +1077,31 @@ function renderBoard() {
     });
   }
 
+  appEl.querySelectorAll("[data-move-to]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const toId = btn.getAttribute("data-move-to");
+      const pl = activePlayer();
+      if (!pl?.locationId || !toId) return;
+      const fromId = pl.locationId;
+      if (!neighborsOf(fromId).includes(toId)) {
+        window.alert("To nie jest sąsiad po ścieżce.");
+        return;
+      }
+      pl.locationId = toId;
+      pl.nowDoing = "faza1";
+      state.board.selectedLoc = toId;
+      state.board.highlightFrom = fromId;
+      state.board.movePrompt = {
+        playerIdx: state.activeIndex,
+        fromId,
+        toId,
+        costId: null,
+      };
+      saveState();
+      render();
+    });
+  });
+
   appEl.querySelectorAll("[data-move-cost]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const mp = state.board.movePrompt;
@@ -1044,6 +1117,7 @@ function renderBoard() {
       mp.costId = costId;
       pl.nowDoing = "faza1";
       state.board.movePrompt = null;
+      state.board.highlightFrom = null;
       state.board.selectedLoc = mp.toId;
       saveState();
       render();
@@ -1103,6 +1177,12 @@ function renderBoard() {
       if (state.roster[i]) {
         state.roster[i].nowDoing = now;
         if (now !== "czekam") state.activeIndex = i;
+        if (now === "faza1") {
+          if (!state.roster[i].locationId) placeAtSchool(state.roster[i], { force: true });
+          state.board.highlightFrom = state.roster[i].locationId;
+        } else {
+          state.board.highlightFrom = null;
+        }
       }
       saveState();
       render();

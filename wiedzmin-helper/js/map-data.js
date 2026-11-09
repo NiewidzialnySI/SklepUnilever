@@ -253,8 +253,42 @@ export const ROADS = [
   ["stygga", "ard-modron"],
 ];
 
+/** Szkoła gracza → lokacja startowa na planszy (podstawka). */
+export const SCHOOL_START = {
+  wilk: "kaer-morhen",
+  gryf: "kaer-seren",
+  niedzwiedz: "haern-caduch",
+  kot: "stygga",
+  zmija: "gorthur-gvaed",
+};
+
 export function locById(id) {
   return LOCATIONS.find((l) => l.id === id);
+}
+
+export function schoolStartId(schoolId) {
+  return SCHOOL_START[schoolId] || null;
+}
+
+export function isSchoolLocationId(locId) {
+  const loc = locById(locId);
+  return Boolean(loc?.school && loc.school !== "mantikora");
+}
+
+/** Ustaw pionek na szkole startowej. `force` — zawsze (np. zmiana szkoły w składzie). */
+export function placeAtSchool(player, { force = false } = {}) {
+  if (!player) return null;
+  const start = schoolStartId(player.schoolId);
+  if (!start) return null;
+  if (
+    force ||
+    !player.locationId ||
+    isSchoolLocationId(player.locationId) ||
+    player.locationId === schoolStartId(player._prevSchoolId)
+  ) {
+    player.locationId = start;
+  }
+  return start;
 }
 
 export function neighborsOf(id) {

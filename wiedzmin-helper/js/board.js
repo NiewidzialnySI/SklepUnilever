@@ -10,6 +10,8 @@ import {
   neighborsOf,
   actionHintFor,
   fatigueForReputation,
+  schoolStartId,
+  placeAtSchool,
 } from "./map-data.js";
 import { ICO, SCHOOL_ICON } from "./icons.js";
 import { nowDoingGuideHtml, moveCostChooserHtml } from "./guide.js";
@@ -33,6 +35,8 @@ export function defaultBoard() {
     monsters: {},
     /** { playerIdx, fromId, toId, costId? } — komunikat po przesunięciu pionka */
     movePrompt: null,
+    /** Podświetl sąsiadów z tej lokacji (ruch) */
+    highlightFrom: null,
   };
 }
 
@@ -81,13 +85,18 @@ function escapeXml(s) {
     .replace(/"/g, "&quot;");
 }
 
-export function mapSvgHtml(board, roster, { schoolById }) {
+export function mapSvgHtml(board, roster, { schoolById, highlightFromId } = {}) {
   const locMap = Object.fromEntries(LOCATIONS.map((l) => [l.id, l]));
+  const fromId = highlightFromId || board.highlightFrom || null;
+  const reachable = new Set(fromId ? neighborsOf(fromId) : []);
+
   const roads = ROADS.map(([a, b]) => {
     const A = locMap[a];
     const B = locMap[b];
     if (!A || !B) return "";
-    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road" />`;
+    const lit =
+      fromId && ((a === fromId && reachable.has(b)) || (b === fromId && reachable.has(a)));
+    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road${lit ? " map-road-lit" : ""}" />`;
   }).join("");
 
   const rot = board.rotation || 0;
@@ -97,6 +106,8 @@ export function mapSvgHtml(board, roster, { schoolById }) {
     const t = TERRAIN[loc.terrain] || TERRAIN.forest;
     const fill = loc.school ? TERRAIN.school.color : t.color;
     const selected = board.selectedLoc === loc.id ? " map-node-selected" : "";
+    const here = fromId === loc.id ? " map-node-here" : "";
+    const reach = reachable.has(loc.id) ? " map-node-reach" : "";
     const monsters = board.monsters[loc.id];
     const witches = roster
       .map((p, i) => ({ p, i }))
@@ -122,7 +133,12 @@ export function mapSvgHtml(board, roster, { schoolById }) {
       .join("");
 
     return `
-      <g class="map-node${selected}" data-loc="${loc.id}" style="cursor:pointer">
+      <g class="map-node${selected}${here}${reach}" data-loc="${loc.id}" style="cursor:pointer">
+        ${
+          reach
+            ? `<circle cx="${loc.x}" cy="${loc.y}" r="4.6" fill="none" stroke="#d4b05a" stroke-width="0.55" stroke-dasharray="1.2 0.8" opacity="0.95"/>`
+            : ""
+        }
         <circle cx="${loc.x}" cy="${loc.y}" r="3.4" fill="${fill}" stroke="#f0e6d2" stroke-width="0.45"/>
         <circle cx="${loc.x}" cy="${loc.y}" r="2.35" fill="none" stroke="${t.color}" stroke-width="0.55"/>
         <text x="${loc.x}" y="${loc.y + 1.05}" text-anchor="middle" class="map-badge-text">${escapeXml(numLabel)}</text>
@@ -376,4 +392,6 @@ export {
   TERRAIN,
   neighborsOf,
   actionHintFor,
+  schoolStartId,
+  placeAtSchool,
 };

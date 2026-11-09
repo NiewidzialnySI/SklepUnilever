@@ -606,6 +606,44 @@ h3 {
   opacity: 0.9;
 }
 
+.move-dest-grid .move-cost-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+  font-size: 0.9em;
+  text-align: left;
+}
+
+.move-dest-grid .move-cost-lines em {
+  opacity: 0.75;
+  font-style: normal;
+}
+
+.school-start-hint {
+  margin: 0.35rem 0 0;
+}
+
+.map-road-lit {
+  stroke: #d4b05a;
+  stroke-width: 0.55;
+  opacity: 0.95;
+}
+
+.map-node-here > circle:nth-of-type(1),
+.map-node-here > circle:nth-of-type(2) {
+  filter: drop-shadow(0 0 0.35px #f0e6d2);
+}
+
+.map-node-reach .map-label {
+  fill: #f3e2b0;
+  font-weight: 700;
+}
+
+.map-mini .map-svg {
+  max-height: 320px;
+}
+
 .tracker-list {
   display: grid;
   gap: 0.85rem;
