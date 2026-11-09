@@ -348,22 +348,8 @@ function buildMultiSetupSteps(n, roster = []) {
   return steps;
 }
 
-function buildMonsterSetupHtml(n) {
-  const special2 =
-    n === 2
-      ? `<li><strong>3.</strong> <strong>2× poziom I</strong> + <strong>1× poziom II</strong>. Pierwszy gracz wybiera miejsce dla II.</li>`
-      : `<li><strong>3.</strong> <strong>3 żetony poziomu I</strong> — po 1 przy każdym żetonie obszaru.</li>`;
-
-  return `
-    <ol class="checklist">
-      <li><strong>1.</strong> Karty potworów: stosy I / II / III (odkryte).</li>
-      <li><strong>2.</strong> Żetony: stosy I / II / III (zakryte, pomieszane).</li>
-      ${special2}
-      <li><strong>4–6.</strong> Odkryj → przenieś na obszary → dopasuj karty.</li>
-      <li><strong>W helperze:</strong> 3 ikony terenu → numer obszaru z żetonu + poziom (<strong>max 1 na teren</strong>).</li>
-      <li><strong>7.</strong> Potasuj karty walki potworów.</li>
-    </ol>
-  `;
+function buildMonsterSetupHtml(_n) {
+  return ``;
 }
 
 function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEntry) {
