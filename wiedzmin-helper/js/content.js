@@ -184,7 +184,8 @@ function buildSoloSetupSteps(player) {
           <li><strong>7.</strong> Potasuj 10 startowych kart akcji swojej szkoły → talia z lewej.</li>
           <li><strong>8. Start solo:</strong> <strong>3 złota</strong> z banku + <strong>5 kart</strong> na rękę.</li>
         </ol>
-        <p class="tip">Niewykorzystane zestawy wróć do pudełka.</p>
+        <p class="tip"><strong>Helper dopisał trackerowi:</strong> 5 kart · 3 złota.</p>
+        <p class="note">Niewykorzystane zestawy wróć do pudełka.</p>
       `,
     },
     {
@@ -395,8 +396,9 @@ function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEnt
         <li><strong>5.</strong> <strong>${schoolTrophies}</strong> trofeów szkoły (tylu przeciwników) — zakryte pod górną krawędzią.</li>
         <li><strong>6.</strong> Tarcza na „1”.</li>
         <li><strong>7.</strong> Talia 10 startowych kart szkoły.</li>
-        <li><strong>8.</strong> <strong>${res.gold} złota</strong> + <strong>${res.cards} kart(y)</strong> na rękę.</li>
+        <li><strong>8.</strong> Z banku i talii: <strong>${res.gold} złota</strong> + <strong>${res.cards} kart(y)</strong> na rękę.</li>
       </ol>
+      <p class="tip"><strong>Helper dopisał trackerowi:</strong> ${res.cards} kart · ${res.gold} złota (kolejność przy stole = pozycja gracza).</p>
     `,
   };
 }
@@ -435,17 +437,20 @@ export function phase1AfterMove(isSolo) {
       </details>`
       : `<p class="warn">Poker z kimś = <strong>nie walczysz</strong> z nim w fazie II tej tury.</p>`
   }
-  ${MOVE_HELP}
 `;
 }
 
-export function phase2Choices(isSolo) {
+export function phase2Choices(isSolo, { meditateEnabled = true, meditateHint = "" } = {}) {
+  const medClass = meditateEnabled ? "choice choice-meditate-ready" : "choice choice-disabled";
+  const medSpan = meditateEnabled
+    ? meditateHint || "Atrybut na V — możesz wziąć trofeum"
+    : meditateHint || "Zablokowane — żaden atrybut nie jest na V";
   if (isSolo) {
     return `
       <p class="lead">Wybierz <strong>dokładnie 1</strong> opcję. Potem nie wracasz do ruchu.</p>
       <div class="choice-grid" data-choices="phase2">
         <button class="choice" data-goto="fight-monster"><strong>Walka z potworem</strong><span>Na Twoim obszarze</span></button>
-        <button class="choice" data-goto="meditate"><strong>Medytacja</strong><span>Trofeum atrybutu z przygotowania (przy V)</span></button>
+        <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
       <p class="note">W solo nie ma walki z innymi wiedźminami.</p>
@@ -455,7 +460,7 @@ export function phase2Choices(isSolo) {
     <p class="lead">Wybierz <strong>dokładnie 1</strong> opcję. Potem nie wracasz do ruchu w tej turze.</p>
     <div class="choice-grid" data-choices="phase2">
       <button class="choice" data-goto="fight"><strong>Walka</strong><span>Z potworem lub wiedźminem</span></button>
-      <button class="choice" data-goto="meditate"><strong>Medytacja</strong><span>Trofeum za atrybut na V</span></button>
+      <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
   `;

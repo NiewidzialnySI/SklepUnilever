@@ -131,6 +131,39 @@ function affordNote(player, cardsNeed, goldNeed) {
   return `uwaga: ${miss.join(", ")}`;
 }
 
+/** Podgląd celu ruchu: akcja pola, potwór, inni wiedźmini. */
+export function destinationPreviewHtml(toId, { player, roster = [], monsters = {} } = {}) {
+  const to = locById(toId);
+  if (!to) return `<p class="warn">Nieznane pole.</p>`;
+  const mon = monsters?.[toId];
+  const others = (roster || []).filter(
+    (r) => r && r !== player && r.locationId === toId
+  );
+  const t = TERRAIN[to.terrain];
+  return `
+    <div class="guide-box guide-dest-preview">
+      <p class="step-kicker" style="margin:0">Cel ruchu</p>
+      <h3 style="margin:0.25rem 0 0.4rem">${escapeHtml(to.name)} (#${to.number})</h3>
+      <p class="lead" style="margin:0">Teren: ${terrainChip(to.terrain)} ${t ? escapeHtml(t.label) : ""}</p>
+      ${
+        mon
+          ? `<p class="warn" style="margin-top:0.55rem">${ICO.monster()} <strong>Potwór</strong> na polu${
+              mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
+            } — wejście → walka w fazie II.</p>`
+          : ""
+      }
+      ${
+        others.length
+          ? `<p class="warn" style="margin-top:0.55rem">${ICO.specialty()} Inny wiedźmin: <strong>${others
+              .map((o) => escapeHtml(o.name))
+              .join(", ")}</strong> — możliwa walka / poker.</p>`
+          : ""
+      }
+      ${locationActionGuideHtml(to, { heading: "Co zyskasz / zrobisz na tym polu (znak)" })}
+    </div>
+  `;
+}
+
 /** Lista sąsiadów z kosztem ruchu per cel (data-move-to). */
 export function neighborPickerHtml(fromId, { player, monsters } = {}) {
   const from = locById(fromId);

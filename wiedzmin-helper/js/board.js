@@ -112,6 +112,15 @@ export function ensurePlayerTrack(p, startCards = 5, startGold = 3) {
   if (!p.nowDoing) p.nowDoing = "czekam";
   if (typeof p.elixirs !== "number") p.elixirs = 0;
   if (!Array.isArray(p.quests)) p.quests = [];
+  if (!p.attrs || typeof p.attrs !== "object") {
+    p.attrs = { attack: 1, defense: 1, alchemy: 1, specialty: 1, level: 1 };
+  }
+  if (typeof p.shield !== "number") p.shield = p.attrs.defense || 1;
+  if (!Array.isArray(p.attrTrophies)) p.attrTrophies = [];
+  if (!p.trails || typeof p.trails !== "object") {
+    p.trails = { forest: null, mountain: null, water: null };
+  }
+  if (typeof p.resourcesApplied !== "boolean") p.resourcesApplied = false;
   return p;
 }
 
@@ -150,7 +159,7 @@ function escapeXml(s) {
     .replace(/"/g, "&quot;");
 }
 
-export function mapSvgHtml(board, roster, { schoolById, highlightFromId } = {}) {
+export function mapSvgHtml(board, roster, { schoolById, highlightFromId, showDisclaimer = false } = {}) {
   const locMap = Object.fromEntries(LOCATIONS.map((l) => [l.id, l]));
   const fromId = highlightFromId || board.highlightFrom || null;
   const reachable = new Set(fromId ? neighborsOf(fromId) : []);
@@ -216,7 +225,7 @@ export function mapSvgHtml(board, roster, { schoolById, highlightFromId } = {}) 
   return `
     <div class="map-stage">
       <div class="map-wrap" style="--map-rot:${rot}deg">
-        <svg class="map-svg" viewBox="0 0 100 85" role="img" aria-label="Uproszczona mapa schemat obszarów">
+        <svg class="map-svg" viewBox="0 0 100 85" role="img" aria-label="Mapa obszarów">
           <defs>
             <radialGradient id="mapGlow" cx="50%" cy="40%" r="60%">
               <stop offset="0%" stop-color="#2a4032"/>
@@ -229,7 +238,11 @@ export function mapSvgHtml(board, roster, { schoolById, highlightFromId } = {}) 
         </svg>
       </div>
     </div>
-    <p class="note">Schemat wg zdjęć planszy: numery 0–18, tereny (pierścień = las/góry/woda) i drogi. Szkoły = złoty punkt. <strong>Nie</strong> jest to kopia grafiki z pudełka.</p>
+    ${
+      showDisclaimer
+        ? `<p class="note">Schemat: numery 0–18, tereny i drogi. Szkoły = złoty punkt.</p>`
+        : ""
+    }
   `;
 }
 

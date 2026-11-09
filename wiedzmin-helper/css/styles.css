@@ -14,8 +14,8 @@
   --radius: 16px;
   --font-display: "Cinzel", "Palatino Linotype", serif;
   --font-body: "Crimson Pro", "Georgia", serif;
-  /* Bazowo duże — do oglądania zza stołu; A−/A/A+ w topbarze */
-  --ui-font: 26px;
+  /* Domyślnie A (= md). A− mniejsze, A+ większe — pod stół. */
+  --ui-font: 20px;
   --app-max: 1600px;
 }
 
@@ -27,16 +27,16 @@ html {
   font-size: var(--ui-font);
 }
 
+html[data-ui-scale="sm"] {
+  --ui-font: 17px;
+}
+
 html[data-ui-scale="md"] {
   --ui-font: 20px;
 }
 
 html[data-ui-scale="lg"] {
-  --ui-font: 22px;
-}
-
-html[data-ui-scale="xl"] {
-  --ui-font: 26px;
+  --ui-font: 24px;
 }
 
 html,
@@ -868,6 +868,56 @@ h3 {
 
 .turn-summary .checklist li {
   margin-bottom: 0.25rem;
+}
+
+.choice-disabled,
+.choice[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  filter: grayscale(0.35);
+}
+
+.choice-meditate-ready {
+  border-color: var(--ok) !important;
+  box-shadow: 0 0 0 2px rgba(47, 107, 69, 0.35);
+}
+
+.order-list {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+  cursor: grab;
+}
+
+.order-item.dragging {
+  opacity: 0.55;
+}
+
+.order-item .order-pos {
+  font-family: var(--font-display);
+  min-width: 2rem;
+}
+
+.map-node-reach {
+  cursor: pointer;
+}
+
+.setup-map-embed {
+  margin-top: 1rem;
 }
 
 .tracker-math summary {

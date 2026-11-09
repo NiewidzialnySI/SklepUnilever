@@ -68,6 +68,7 @@ export function exploreResolveHtml({ deck, isSolo, player }) {
       <h3 style="margin:0.25rem 0 0.4rem">Zastosuj efekt</h3>
       ${steps}
       <p class="note">Brak złota na opcję = nie możesz jej wybrać. Robisz tyle efektu, ile da się.</p>
+      <p class="tip">Jeśli karta daje <strong>żeton tropu / zadanie tropienia</strong> — zapisz poniżej (nr lokacji z żetonu). Brak żetonów w stosie = ten fragment efektu przepada.</p>
     </div>
     ${resourceAdjustHtml(player, { title: "Po karcie — popraw tracker" })}
     ${questAddFormHtml()}

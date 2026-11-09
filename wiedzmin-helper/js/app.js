@@ -11,7 +11,6 @@ import {
   phase3,
   LOCATION_ACTIONS,
   quickRef,
-  MOVE_HELP,
 } from "./content.js";
 import { SCHOOLS, sourcesHtml } from "./sources.js";
 import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
@@ -33,6 +32,7 @@ import {
   monsterAt,
   monsterEncounterHtml,
   monstersPanelHtml,
+  LOCATIONS,
 } from "./board.js";
 import {
   neighborPickerHtml,
@@ -40,6 +40,7 @@ import {
   applyMoveCost,
   locationActionGuideHtml,
   exploreGuideHtml,
+  destinationPreviewHtml,
 } from "./guide.js";
 import {
   exploreDeckChooserHtml,
@@ -50,24 +51,36 @@ import {
   ensureQuests,
   newQuestId,
 } from "./quests.js";
+import {
+  ensureCombatTrack,
+  applyStartResources,
+  startResourcesFor,
+  meditationStatus,
+  trailsHtml,
+  attrsAdjustHtml,
+  hasTrailForMonster,
+  ATTR_KEYS,
+} from "./player-state.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
 const UI_SCALE_KEY = "wiedzmin-stary-swiat-ui-scale";
-const UI_SCALES = ["md", "lg", "xl"];
+const UI_SCALES = ["sm", "md", "lg"];
 
 const appEl = document.getElementById("app");
 
 function loadUiScale() {
   try {
-    const raw = localStorage.getItem(UI_SCALE_KEY) || "xl";
-    return UI_SCALES.includes(raw) ? raw : "xl";
+    let raw = localStorage.getItem(UI_SCALE_KEY) || "md";
+    if (raw === "xl") raw = "lg";
+    return UI_SCALES.includes(raw) ? raw : "md";
   } catch {
-    return "xl";
+    return "md";
   }
 }
 
 function applyUiScale(scale) {
-  const next = UI_SCALES.includes(scale) ? scale : "xl";
+  let next = scale === "xl" ? "lg" : scale;
+  next = UI_SCALES.includes(next) ? next : "md";
   document.documentElement.setAttribute("data-ui-scale", next);
   try {
     localStorage.setItem(UI_SCALE_KEY, next);
@@ -79,6 +92,21 @@ function applyUiScale(scale) {
 
 applyUiScale(loadUiScale());
 
+if (!window.__wiedzminEnterBound) {
+  window.__wiedzminEnterBound = true;
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target && e.target.closest && e.target.closest("textarea")) return;
+    if (e.target && e.target.matches && e.target.matches("button, [contenteditable=true]")) return;
+    const primary =
+      appEl?.querySelector(".btn-primary:not([disabled])") ||
+      appEl?.querySelector("#next:not([disabled]), #to-roster, #to-setup, #to-turn, #confirm-order");
+    if (!primary) return;
+    e.preventDefault();
+    primary.click();
+  });
+}
+
 function defaultState() {
   return {
     view: "home",
@@ -88,6 +116,7 @@ function defaultState() {
     setupIndex: 0,
     turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null, exploreDeck: null },
     board: defaultBoard(),
+    orderDice: [],
   };
 }
 
@@ -136,6 +165,7 @@ function normalizeState(raw) {
   const views = new Set([
     "home",
     "roster",
+    "order",
     "setup",
     "board",
     "turn",
@@ -144,6 +174,7 @@ function normalizeState(raw) {
     "lexicon",
     "sources",
   ]);
+  roster.forEach((p) => ensureCombatTrack(ensurePlayerTrack(p)));
   return {
     ...base,
     view: views.has(raw.view) ? raw.view : "home",
@@ -153,6 +184,7 @@ function normalizeState(raw) {
     setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
     turn,
     board,
+    orderDice: Array.isArray(raw.orderDice) ? raw.orderDice.map(Number) : [],
   };
 }
 
@@ -206,6 +238,7 @@ function ensureRoster() {
   state.roster.forEach((p, i) => {
     const start = START_RESOURCES[n]?.[i] || { cards: 5, gold: 3 };
     ensurePlayerTrack(p, start.cards, start.gold);
+    ensureCombatTrack(p);
     if (!p.locationId) {
       placeAtSchool(p, { force: true });
       p._prevSchoolId = p.schoolId;
@@ -270,6 +303,7 @@ function render() {
   ensureRoster();
   if (state.view === "home") renderHome();
   else if (state.view === "roster") renderRoster();
+  else if (state.view === "order") renderOrder();
   else if (state.view === "setup") renderSetup();
   else if (state.view === "board") renderBoard();
   else if (state.view === "turn") renderTurn();
@@ -296,14 +330,14 @@ function shell(inner) {
     <header class="topbar">
       <div class="brand">
         Wiedźmin: Stary Świat
-        <small>Pomocnik · podstawka${isSolo() ? " · solo" : ""} · większy tekst pod stół</small>
+        ${isSolo() ? `<small>Solo</small>` : ""}
       </div>
       <div class="top-actions">
         <div class="ui-scale" role="group" aria-label="Rozmiar tekstu">
           ${[
-            ["md", "A−", "Średni"],
-            ["lg", "A", "Duży"],
-            ["xl", "A+", "Bardzo duży"],
+            ["sm", "A−", "Mniejszy"],
+            ["md", "A", "Domyślny"],
+            ["lg", "A+", "Większy"],
           ]
             .map(
               ([id, label, title]) =>
@@ -314,6 +348,7 @@ function shell(inner) {
         ${[
           ["home", "Start"],
           ["roster", "Gracze"],
+          ["order", "Kolejność"],
           ["setup", "Przygotowanie"],
           ["board", "Stół"],
           ["turn", "Tura"],
@@ -367,14 +402,8 @@ function renderHome() {
     <section class="panel home-hero">
       <p class="step-kicker">Pomocnik przy stole</p>
       <h1>Prowadzę Cię przez grę</h1>
-      <p class="lead">Wybierz liczbę graczy, przypisz <strong>imiona i szkoły</strong>, potem idziemy przez przygotowanie i tury. Na <strong>Stole</strong> masz schemat mapy, potwory, reputację i licznik kart. Ikony tłumaczą symbole (eliksir, kości…).</p>
-      <div class="badge-row">
-        <span class="badge">Podstawka</span>
-        <span class="badge">Solo + 2–5</span>
-        <span class="badge">Mapa + tracker</span>
-        <span class="badge">${ICO.elixir()}${ICO.dice()} Symbole</span>
-      </div>
-      <h3>1. Ile osób gra?</h3>
+      <p class="lead">Wybierz liczbę graczy, potem imiona i szkoły — dalej prowadzę przygotowanie i tury.</p>
+      <h3>Ile osób gra?</h3>
       <div class="choice-grid">
         ${options
           .map(
@@ -387,9 +416,7 @@ function renderHome() {
           .join("")}
       </div>
       <div class="actions">
-        <button class="btn btn-primary" id="to-roster">Dalej — imiona i szkoły</button>
-        <button class="btn btn-secondary" id="to-board">Stół — mapa i reputacja</button>
-        <button class="btn btn-secondary" id="skip-setup">Mam rozłożone — prowadź turę</button>
+        <button class="btn btn-primary" id="to-roster">Dalej</button>
       </div>
     </section>
   `);
@@ -398,10 +425,6 @@ function renderHome() {
     btn.addEventListener("click", () => setPlayers(Number(btn.dataset.players)));
   });
   appEl.querySelector("#to-roster").addEventListener("click", () => go("roster"));
-  appEl.querySelector("#to-board").addEventListener("click", () => go("board"));
-  appEl.querySelector("#skip-setup").addEventListener("click", () => {
-    go("turn", { turn: { phase: "hub", screen: "hub" } });
-  });
 }
 
 function renderRoster() {
@@ -416,10 +439,7 @@ function renderRoster() {
       <div id="roster-forms">
         ${state.roster
           .map((p, i) => {
-            const orderHint =
-              state.players === 1
-                ? "Ty"
-                : PLAYER_LABELS[i] + (i === 0 ? " (zaczyna)" : "");
+            const orderHint = state.players === 1 ? "Ty" : `Gracz ${i + 1}`;
             return `
             <div class="roster-card" data-idx="${i}">
               <strong>${orderHint}</strong>
@@ -444,8 +464,7 @@ function renderRoster() {
       <p class="warn" id="roster-warn" hidden>Każda szkoła może być tylko raz (w multi). Popraw wybór.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-home">Wstecz</button>
-        <button class="btn btn-primary" id="to-setup">Dalej — przygotowanie</button>
-        <button class="btn btn-secondary" id="to-turn">Od razu do tury</button>
+        <button class="btn btn-primary" id="to-order">${isSolo() ? "Dalej — przygotowanie" : "Dalej — kolejność"}</button>
       </div>
     </section>
   `);
@@ -468,11 +487,16 @@ function renderRoster() {
         start.cards,
         start.gold
       );
+      ensureCombatTrack(next);
       if (!prev.locationId || prev.schoolId !== schoolId) {
         placeAtSchool(next, { force: true });
       }
       next._prevSchoolId = schoolId;
       state.roster[i] = next;
+      const hintStrong = card.querySelector(".school-start-hint strong");
+      if (hintStrong) {
+        hintStrong.textContent = locById(schoolStartId(schoolId))?.name || "—";
+      }
     });
     used.clear();
     let dup = false;
@@ -494,16 +518,150 @@ function renderRoster() {
   });
 
   appEl.querySelector("#back-home").addEventListener("click", () => go("home"));
-  appEl.querySelector("#to-setup").addEventListener("click", () => {
+  appEl.querySelector("#to-order").addEventListener("click", () => {
     if (!syncFromDom()) return;
     applySchoolStarts();
+    if (isSolo()) {
+      applyStartResources(state.roster, state.players, { force: true });
+      state.setupIndex = 0;
+      go("setup");
+    } else {
+      state.orderDice = [];
+      go("order");
+    }
+  });
+}
+
+function renderOrder() {
+  ensureRoster();
+  if (isSolo()) {
+    applyStartResources(state.roster, state.players, { force: true });
     state.setupIndex = 0;
     go("setup");
+    return;
+  }
+
+  const diceDone = (state.orderDice || []).length;
+  const remaining = state.roster.length - diceDone;
+
+  shell(`
+    <section class="panel">
+      <p class="step-kicker">Kolejność przy stole</p>
+      <h1>Kto pierwszy?</h1>
+      <p class="lead">Kolejność ustala startowe <strong>karty i złoto</strong> — ustaw ją teraz, zanim rozdamy zasoby. Domyślnie: jak wpisywaliście. Przeciągnij kafelki albo rzuć kością.</p>
+      <ul class="order-list" id="order-list">
+        ${state.roster
+          .map((p, i) => {
+            const res = startResourcesFor(state.players, i);
+            return `
+            <li class="order-item" draggable="true" data-idx="${i}">
+              <span class="order-pos">${i + 1}.</span>
+              <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
+              <span class="tip" style="margin:0">→ ${res.cards} kart · ${res.gold} złota</span>
+              <button type="button" class="btn btn-secondary" data-order-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
+              <button type="button" class="btn btn-secondary" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""}>↓</button>
+            </li>`;
+          })
+          .join("")}
+      </ul>
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
+          ${ICO.dice()} Kość — wylosuj ${diceDone === 0 ? "1. gracza" : diceDone === 1 ? "2. gracza" : "kolejnego"}
+        </button>
+        <button type="button" class="btn btn-secondary" id="order-reset">Reset kolejności / kości</button>
+      </div>
+      <p class="note">Po 1. i 2. rzucie reszta ustawia się sama (przy 3 graczach). Przy więcej — rzucaj dalej albo przeciągnij.</p>
+      <div class="actions">
+        <button class="btn btn-secondary" id="back-roster">Wstecz</button>
+        <button class="btn btn-primary" id="confirm-order">Zatwierdź i rozdaj karty/złoto</button>
+      </div>
+    </section>
+  `);
+
+  const list = appEl.querySelector("#order-list");
+  let dragFrom = null;
+  list.querySelectorAll(".order-item").forEach((item) => {
+    item.addEventListener("dragstart", () => {
+      dragFrom = Number(item.dataset.idx);
+      item.classList.add("dragging");
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", (e) => e.preventDefault());
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const to = Number(item.dataset.idx);
+      if (dragFrom === null || dragFrom === to) return;
+      const next = [...state.roster];
+      const [moved] = next.splice(dragFrom, 1);
+      next.splice(to, 0, moved);
+      state.roster = next;
+      state.orderDice = [];
+      saveState();
+      render();
+    });
   });
-  appEl.querySelector("#to-turn").addEventListener("click", () => {
-    if (!syncFromDom()) return;
-    applySchoolStarts();
-    go("turn", { turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null } });
+
+  appEl.querySelectorAll("[data-order-up]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-order-up"));
+      if (i <= 0) return;
+      const next = [...state.roster];
+      [next[i - 1], next[i]] = [next[i], next[i - 1]];
+      state.roster = next;
+      state.orderDice = [];
+      saveState();
+      render();
+    });
+  });
+  appEl.querySelectorAll("[data-order-down]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-order-down"));
+      if (i >= state.roster.length - 1) return;
+      const next = [...state.roster];
+      [next[i], next[i + 1]] = [next[i + 1], next[i]];
+      state.roster = next;
+      state.orderDice = [];
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelector("#order-dice")?.addEventListener("click", () => {
+    const pool = state.roster
+      .map((_, i) => i)
+      .filter((i) => !(state.orderDice || []).includes(i));
+    if (pool.length <= 1) return;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const assigned = [...(state.orderDice || []), pick];
+    state.orderDice = assigned;
+    // Rebuild order: assigned first, then remaining in original relative order
+    const rest = state.roster
+      .map((p, i) => ({ p, i }))
+      .filter(({ i }) => !assigned.includes(i))
+      .map(({ p }) => p);
+    const head = assigned.map((i) => state.roster[i]).filter(Boolean);
+    // When only one left after 2 picks for 3p, rest auto-fills
+    state.roster = [...head, ...rest];
+    // Remap dice indices to new positions 0..k-1
+    state.orderDice = head.map((_, i) => i);
+    saveState();
+    render();
+  });
+
+  appEl.querySelector("#order-reset")?.addEventListener("click", () => {
+    state.orderDice = [];
+    saveState();
+    render();
+  });
+
+  appEl.querySelector("#back-roster").addEventListener("click", () => go("roster"));
+  appEl.querySelector("#confirm-order").addEventListener("click", () => {
+    applyStartResources(state.roster, state.players, { force: true });
+    state.activeIndex = 0;
+    state.setupIndex = 0;
+    state.orderDice = [];
+    saveState();
+    go("setup");
   });
 }
 
@@ -522,11 +680,51 @@ function renderSetup() {
   const step = steps[index];
   const pct = Math.round(((index + 1) / steps.length) * 100);
   const rosterHint = state.roster
-    .map(
-      (p) =>
-        `<span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>`
-    )
+    .map((p, i) => {
+      const res = startResourcesFor(state.players, i);
+      return `<span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span> · ${res.cards}k/${res.gold}zł</span>`;
+    })
     .join(" ");
+
+  // Przy krokach gracza / solo wiedźmina — dopisz karty i złoto do trackera
+  if (String(step.id || "").startsWith("player") || step.id === "player-solo") {
+    applyStartResources(state.roster, state.players, { force: false });
+    const m = String(step.id).match(/player-(\d+)/);
+    if (m) {
+      const idx = Number(m[1]);
+      const start = startResourcesFor(state.players, idx);
+      if (state.roster[idx]) {
+        state.roster[idx].cards = start.cards;
+        state.roster[idx].gold = start.gold;
+        state.roster[idx].resourcesApplied = true;
+      }
+    }
+    if (step.id === "player-solo" && state.roster[0]) {
+      state.roster[0].cards = 5;
+      state.roster[0].gold = 3;
+      state.roster[0].resourcesApplied = true;
+    }
+  }
+
+  const monsterMap =
+    step.id === "monsters"
+      ? `
+      <div class="setup-map-embed">
+        <h3>Rozstaw potwory na mapie</h3>
+        <p class="lead">Wybierz poziom, potem kliknij lokację (Potwór +). Widać, gdzie stoi każdy żeton.</p>
+        ${mapToolbarHtml(state.board, state.roster)}
+        <div class="choice-grid" style="margin:0.5rem 0">
+          ${[1, 2, 3]
+            .map(
+              (lv) =>
+                `<button type="button" class="choice ${state.board.pendingMonsterLevel === lv ? "active" : ""}" data-mlevel="${lv}"><strong>Poziom ${lv}</strong><span>Następny potwór</span></button>`
+            )
+            .join("")}
+        </div>
+        ${mapSvgHtml(state.board, state.roster, { schoolById })}
+        ${monstersPanelHtml(state.board)}
+      </div>`
+      : "";
 
   shell(`
     <section class="panel">
@@ -541,6 +739,7 @@ function renderSetup() {
       <p class="step-kicker">Krok ${index + 1}</p>
       <h1>${step.title}</h1>
       <div class="step-body">${step.body}</div>
+      ${monsterMap}
       <div class="actions">
         <button class="btn btn-secondary" id="prev" ${index === 0 ? "disabled" : ""}>Wstecz</button>
         ${
@@ -551,6 +750,52 @@ function renderSetup() {
       </div>
     </section>
   `);
+
+  if (step.id === "monsters") {
+    state.board.tool = state.board.tool || "monster";
+    appEl.querySelectorAll("[data-mlevel]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.board.pendingMonsterLevel = Number(btn.getAttribute("data-mlevel"));
+        state.board.tool = "monster";
+        saveState();
+        render();
+      });
+    });
+    appEl.querySelectorAll(".map-tool").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.board.tool = btn.getAttribute("data-tool");
+        saveState();
+        render();
+      });
+    });
+    appEl.querySelectorAll(".map-node").forEach((g) => {
+      g.addEventListener("click", () => {
+        const locId = g.getAttribute("data-loc");
+        const tool = state.board.tool || "monster";
+        state.board.selectedLoc = locId;
+        if (tool === "monster" || tool === "select") {
+          const cur = state.board.monsters[locId] || { count: 0 };
+          const level = state.board.pendingMonsterLevel || cur.level || 1;
+          state.board.monsters[locId] = {
+            count: (cur.count || 0) + 1,
+            level,
+            label: `Poz. ${level}`,
+          };
+          state.board.tool = "monster";
+        } else if (tool === "monster-") {
+          const cur = state.board.monsters[locId];
+          if (cur) {
+            cur.count = Math.max(0, (cur.count || 0) - 1);
+            if (cur.count === 0) delete state.board.monsters[locId];
+          }
+        } else if (tool === "clear-m") {
+          delete state.board.monsters[locId];
+        }
+        saveState();
+        render();
+      });
+    });
+  }
 
   const prev = appEl.querySelector("#prev");
   const next = appEl.querySelector("#next");
@@ -573,6 +818,7 @@ function renderSetup() {
   }
   if (toTurn) {
     toTurn.addEventListener("click", () => {
+      applyStartResources(state.roster, state.players, { force: true });
       state.activeIndex = 0;
       go("turn", { turn: { phase: "hub", screen: "hub" } });
     });
@@ -666,6 +912,7 @@ function nextPlayer() {
 function bindChoices() {
   appEl.querySelectorAll(".choice[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.disabled || btn.classList.contains("choice-disabled")) return;
       const goto = btn.getAttribute("data-goto");
       if (goto === "phase2") {
         state.board.highlightFrom = null;
@@ -737,6 +984,79 @@ function bindResourceAdjust(player) {
       if (field === "cards") player.cards = Math.max(0, Math.min(20, (player.cards || 0) + delta));
       if (field === "gold") player.gold = Math.max(0, Math.min(99, (player.gold || 0) + delta));
       if (field === "elixirs") player.elixirs = Math.max(0, Math.min(4, (player.elixirs || 0) + delta));
+      saveState();
+      render();
+    });
+  });
+}
+
+function bindAttrAdjust(player) {
+  ensureCombatTrack(player);
+  appEl.querySelectorAll("[data-attr]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.getAttribute("data-attr");
+      const delta = Number(btn.getAttribute("data-delta"));
+      if (!key || !player.attrs) return;
+      player.attrs[key] = Math.max(1, Math.min(5, (player.attrs[key] || 1) + delta));
+      if (key === "defense" && (player.shield || 0) > player.attrs.defense) {
+        player.shield = player.attrs.defense;
+      }
+      saveState();
+      render();
+    });
+  });
+  appEl.querySelectorAll("[data-shield-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const delta = Number(btn.getAttribute("data-shield-delta"));
+      const max = player.attrs?.defense || 1;
+      player.shield = Math.max(0, Math.min(max, (player.shield || 0) + delta));
+      saveState();
+      render();
+    });
+  });
+}
+
+function bindTrailForms(player) {
+  ensureCombatTrack(player);
+  appEl.querySelectorAll("[data-trail-set]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-trail-set");
+      const kind = btn.getAttribute("data-kind") || "trail";
+      const raw = window.prompt(
+        kind === "quest"
+          ? "Numer lokacji z żetonu (0–18), np. 6 = Novigrad:"
+          : "Opcjonalnie numer lokacji źródła tropu (Enter = pomiń):",
+        ""
+      );
+      if (raw === null) return;
+      const num = String(raw).trim();
+      let locId = null;
+      if (num !== "") {
+        const n = Number(num);
+        const loc = LOCATIONS.find((l) => l.number === n) || locById(num);
+        if (!loc) {
+          window.alert("Nie znam takiej lokacji — sprawdź numer 0–18.");
+          return;
+        }
+        locId = loc.id;
+      }
+      if (kind === "quest" && !locId) {
+        window.alert("Do zadania tropienia podaj numer lokacji z żetonu.");
+        return;
+      }
+      player.trails[terrain] = {
+        kind,
+        locId,
+        goldOnToken: kind === "quest" ? 1 : 0,
+      };
+      saveState();
+      render();
+    });
+  });
+  appEl.querySelectorAll("[data-trail-clear]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const terrain = btn.getAttribute("data-trail-clear");
+      player.trails[terrain] = null;
       saveState();
       render();
     });
@@ -861,12 +1181,11 @@ function renderTurn() {
     turnShell(
       "Faza I — start",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: instrukcja — <em>1 obowiązkowy ruch albo przejście do fazy II</em>. Nie zaczynasz akcją na obszarze, na którym już stoisz.</p>
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong>: <em>obowiązkowy ruch</em> albo od razu faza II. Nie zaczynasz akcją na polu, na którym już stoisz.</p>
         <div class="choice-grid">
-          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Wybierz sąsiada + koszt kart/złota</span></button>
-          <button class="choice" data-goto="phase2"><strong>Idę do fazy II</strong><span>Bez ruchu i bez akcji obszaru</span></button>
+          <button class="choice" data-goto="move"><strong>Ruszam się</strong><span>Mapa — kliknij sąsiada</span></button>
+          <button class="choice" data-goto="phase2"><strong>Idę do fazy II</strong><span>Bez ruchu</span></button>
         </div>
-        ${MOVE_HELP}
       `
     );
     bindChoices();
@@ -881,20 +1200,41 @@ function renderTurn() {
     const fromId = p.locationId;
     state.board.highlightFrom = fromId;
     state.board.selectedLoc = fromId;
+    const preview =
+      state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo)
+        ? destinationPreviewHtml(state.turn.moveTo, {
+            player: p,
+            roster: state.roster,
+            monsters: state.board.monsters,
+          })
+        : `<p class="tip">Kliknij <strong>podświetlone</strong> pole na mapie — zobaczysz akcję obszaru, potwora i innych wiedźminów.</p>`;
     turnShell(
-      "Faza I — dokąd możesz iść?",
+      "Faza I — ruch na mapie",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong> stoi na szkole/polu startowym. Poniżej widać <em>wszystkich sąsiadów</em> i jaki koszt pasuje do każdego celu.</p>
-        ${neighborPickerHtml(fromId, { player: p, monsters: state.board.monsters })}
-        <p class="tip">Po kliknięciu celu wybierzesz dokładnie: 1 kartę terenu / wild / 2 karty / 1+złoto — tracker odejmie zasoby. Cel z potworem → od razu walka.</p>
-        <div class="map-mini" style="margin-top:1rem">
-          <h3>Mapa — podświetleni sąsiedzi</h3>
-          ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
-        </div>
-        ${MOVE_HELP}
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka).</p>
+        ${mapSvgHtml(state.board, state.roster, { schoolById, highlightFromId: fromId })}
+        ${preview}
+        ${
+          state.turn.moveTo
+            ? `<div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
+            : ""
+        }
       `
     );
-    bindMovePick();
+    appEl.querySelectorAll(".map-node-reach").forEach((g) => {
+      g.addEventListener("click", () => {
+        const toId = g.getAttribute("data-loc");
+        state.board.selectedLoc = toId;
+        setTurn("I", "move-pick", { moveTo: toId, moveCost: null });
+      });
+    });
+    const confirm = appEl.querySelector("#confirm-dest");
+    if (confirm) {
+      confirm.addEventListener("click", () => {
+        if (!state.turn.moveTo) return;
+        setTurn("I", "move-cost", { moveTo: state.turn.moveTo, moveCost: null });
+      });
+    }
     addTurnButtons([
       {
         id: "back",
@@ -904,7 +1244,6 @@ function renderTurn() {
           setTurn("I", "phase1-start", { clearMove: true });
         },
       },
-      { id: "to-board", label: "Pełny stół", onClick: () => go("board") },
     ]);
     return;
   }
@@ -919,13 +1258,18 @@ function renderTurn() {
     turnShell(
       "Faza I — koszt ruchu",
       `
+        ${destinationPreviewHtml(to.id, {
+          player: p,
+          roster: state.roster,
+          monsters: state.board.monsters,
+        })}
         ${moveCostChooserHtml({
           fromLoc: from,
           toLoc: to,
           playerName: p.name,
           selectedCostId: state.turn.moveCost,
         })}
-        <p class="tip">Tracker: masz <strong>${p.cards ?? 0}</strong> kart i <strong>${p.gold ?? 0}</strong> złota — po wyborze odejmiemy koszt.</p>
+        <p class="tip">Tracker: <strong>${p.cards ?? 0}</strong> kart · <strong>${p.gold ?? 0}</strong> złota — po wyborze odejmiemy koszt.</p>
       `
     );
     bindMoveCostTurn();
@@ -974,7 +1318,15 @@ function renderTurn() {
   }
 
   if (screen === "phase2") {
-    turnShell("Faza II — wybór", phase2Choices(solo));
+    ensureCombatTrack(p);
+    const med = meditationStatus(p, { isSolo: solo });
+    turnShell(
+      "Faza II — wybór",
+      `
+        ${med.can ? `<p class="tip choice-meditate-ready" style="padding:0.7rem 0.9rem"><strong>Medytacja dostępna!</strong> ${escapeHtml(med.reason)}</p>` : `<p class="note">${escapeHtml(med.reason)}</p>`}
+        ${phase2Choices(solo, { meditateEnabled: med.can, meditateHint: med.can ? med.reason : med.reason })}
+      `
+    );
     bindChoices();
     return;
   }
@@ -991,11 +1343,21 @@ function renderTurn() {
   if (screen === "fight-monster") {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
+    ensureCombatTrack(p);
+    const hasTrail = hasTrailForMonster(p, here);
     turnShell(
       "Walka z potworem — co teraz?",
       `
         ${mon && here ? monsterEncounterHtml(here, mon) : ""}
         ${questArrivalHtml(p, p.locationId)}
+        <p class="${hasTrail ? "tip" : "warn"}"><strong>Żeton tropu:</strong> ${
+          hasTrail
+            ? `Masz trop terenu tego pola (${here?.terrain || "?"}) → <strong>Ty zaczynasz</strong> walkę.`
+            : `Brak tropu na ten teren → <strong>najpierw tura potwora</strong>.`
+        }</p>
+        ${attrsAdjustHtml(p)}
+        ${trailsHtml(p, { editable: true })}
+        ${resourceAdjustHtml(p, { title: "Karty / złoto / eliksiry w walce" })}
         ${fightMonster(solo)}
         ${
           mon
@@ -1007,6 +1369,9 @@ function renderTurn() {
       `
     );
     bindQuestForms(p);
+    bindResourceAdjust(p);
+    bindAttrAdjust(p);
+    bindTrailForms(p);
     const clearBtn = appEl.querySelector("#clear-monster-after-win");
     if (clearBtn) {
       clearBtn.addEventListener("click", () => {
@@ -1032,7 +1397,17 @@ function renderTurn() {
   }
 
   if (screen === "fight-witcher") {
-    turnShell("Walka z wiedźminem", FIGHT_WITCHER);
+    ensureCombatTrack(p);
+    turnShell(
+      "Walka z wiedźminem",
+      `
+        ${attrsAdjustHtml(p)}
+        ${resourceAdjustHtml(p, { title: "Karty / złoto" })}
+        ${FIGHT_WITCHER}
+      `
+    );
+    bindResourceAdjust(p);
+    bindAttrAdjust(p);
     addTurnButtons([
       { id: "to3", label: "Koniec walki → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "fight") },
@@ -1041,7 +1416,52 @@ function renderTurn() {
   }
 
   if (screen === "meditate") {
-    turnShell("Medytacja", meditate(solo));
+    ensureCombatTrack(p);
+    const med = meditationStatus(p, { isSolo: solo });
+    if (!med.can) {
+      turnShell(
+        "Medytacja — niedostępna",
+        `
+          <p class="warn">${escapeHtml(med.reason)}</p>
+          ${meditate(solo)}
+          ${attrsAdjustHtml(p)}
+          <p class="note">${escapeHtml(med.soloNote)}</p>
+        `
+      );
+      bindAttrAdjust(p);
+      addTurnButtons([{ id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") }]);
+      return;
+    }
+    turnShell(
+      "Medytacja",
+      `
+        <p class="tip"><strong>OK — możesz medytować.</strong> ${escapeHtml(med.reason)}</p>
+        ${meditate(solo)}
+        ${attrsAdjustHtml(p)}
+        <div class="actions" style="margin:0.6rem 0">
+          ${med.available
+            .map(
+              (id) =>
+                `<button type="button" class="btn btn-primary" data-take-trophy="${id}">Weź trofeum: ${ATTR_KEYS.find((a) => a.id === id)?.label || id}</button>`
+            )
+            .join("")}
+        </div>
+        <p class="note">${escapeHtml(med.soloNote)}</p>
+      `
+    );
+    bindAttrAdjust(p);
+    appEl.querySelectorAll("[data-take-trophy]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-take-trophy");
+        ensureCombatTrack(p);
+        if (!p.attrTrophies.includes(id)) p.attrTrophies.push(id);
+        if ((p.reputation || 0) < 3) {
+          p.reputation = Math.min(4, (p.reputation || 0) + 1);
+        }
+        saveState();
+        render();
+      });
+    });
     addTurnButtons([
       { id: "to3", label: "Dalej → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
@@ -1074,10 +1494,14 @@ function renderTurn() {
     const deck = state.turn.exploreDeck || "city";
     turnShell(
       "Eksploracja — po karcie",
-      exploreResolveHtml({ deck, isSolo: solo, player: p })
+      `
+        ${exploreResolveHtml({ deck, isSolo: solo, player: p })}
+        ${trailsHtml(p, { editable: true })}
+      `
     );
     bindResourceAdjust(p);
     bindQuestForms(p);
+    bindTrailForms(p);
     addTurnButtons([
       {
         id: "to3",

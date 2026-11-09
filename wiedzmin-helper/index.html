@@ -6,14 +6,15 @@
     <script>
       (function () {
         try {
-          var s = localStorage.getItem("wiedzmin-stary-swiat-ui-scale") || "xl";
-          if (s === "md" || s === "lg" || s === "xl") {
+          var s = localStorage.getItem("wiedzmin-stary-swiat-ui-scale") || "md";
+          if (s === "xl") s = "lg";
+          if (s === "sm" || s === "md" || s === "lg") {
             document.documentElement.setAttribute("data-ui-scale", s);
           } else {
-            document.documentElement.setAttribute("data-ui-scale", "xl");
+            document.documentElement.setAttribute("data-ui-scale", "md");
           }
         } catch (e) {
-          document.documentElement.setAttribute("data-ui-scale", "xl");
+          document.documentElement.setAttribute("data-ui-scale", "md");
         }
       })();
     </script>
