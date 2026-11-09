@@ -1054,55 +1054,19 @@ function bindTrailForms(player) {
       const terrain = btn.getAttribute("data-trail-monster");
       const locId = btn.getAttribute("data-loc");
       const kind = btn.getAttribute("data-kind") || "quest";
-      if (!terrain || !locId || !locById(locId)) return;
-      player.trails[terrain] = {
-        kind,
-        locId,
-        goldOnToken: kind === "quest" ? 1 : 0,
-      };
-      saveState();
-      render();
-    });
-  });
-  appEl.querySelectorAll("[data-trail-set]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const terrain = btn.getAttribute("data-trail-set");
-      const kind = btn.getAttribute("data-kind") || "trail";
-      const raw = window.prompt(
-        kind === "quest"
-          ? "Numer lokacji z żetonu (0–18), np. 6 = Novigrad:"
-          : "Opcjonalnie numer lokacji źródła tropu (Enter = pomiń):",
-        ""
-      );
-      if (raw === null) return;
-      const num = String(raw).trim();
-      let locId = null;
-      if (num !== "") {
-        const n = Number(num);
-        const loc = LOCATIONS.find((l) => l.number === n) || locById(num);
-        if (!loc) {
-          window.alert("Nie znam takiej lokacji — sprawdź numer 0–18.");
-          return;
-        }
-        locId = loc.id;
-      }
-      if (kind === "quest" && !locId) {
-        window.alert("Do zadania tropienia podaj numer lokacji z żetonu.");
+      if (!terrain) return;
+      if (kind === "clear") {
+        player.trails[terrain] = null;
+        saveState();
+        render();
         return;
       }
+      if (!locId || !locById(locId)) return;
       player.trails[terrain] = {
         kind,
         locId,
         goldOnToken: kind === "quest" ? 1 : 0,
       };
-      saveState();
-      render();
-    });
-  });
-  appEl.querySelectorAll("[data-trail-clear]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const terrain = btn.getAttribute("data-trail-clear");
-      player.trails[terrain] = null;
       saveState();
       render();
     });
