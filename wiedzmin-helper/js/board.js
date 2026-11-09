@@ -385,7 +385,6 @@ export function monstersPanelHtml(board) {
           : ""
       }
       <div class="monster-terrain-grid">${slots}</div>
-      <p class="note" style="margin:0.45rem 0 0">Walka w fazie II jest <strong>opcjonalna</strong> — tylko gdy żeton stoi na Twoim polu.</p>
     </div>
   `;
 }
