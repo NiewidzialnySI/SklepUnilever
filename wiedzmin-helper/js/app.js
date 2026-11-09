@@ -1268,9 +1268,10 @@ function renderTurn() {
     }
     const fromId = p.locationId;
     state.board.highlightFrom = fromId;
-    state.board.selectedLoc = fromId;
+    if (!state.turn.moveTo) state.board.selectedLoc = fromId;
     const destOk =
       state.turn.moveTo && neighborsOf(fromId).includes(state.turn.moveTo);
+    if (destOk) state.board.selectedLoc = state.turn.moveTo;
     const popupInner = destOk
       ? mapLocPopupHtml(state.turn.moveTo, {
           player: p,
@@ -1281,37 +1282,89 @@ function renderTurn() {
     turnShell(
       "Faza I — ruch na mapie",
       `
-        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka). Opis wyskoczy nad mapą.</p>
+        <p class="lead"><strong>${escapeHtml(p.name)}</strong> · kliknij sąsiada (złota obwódka). Opis wyskoczy nad mapą — bez przeładowania strony.</p>
         ${mapSvgHtml(state.board, state.roster, {
           schoolById,
           highlightFromId: fromId,
           popupHtml: popupInner,
         })}
-        ${
-          destOk
-            ? `<p class="tip" style="margin:0.55rem 0 0">Wybrano: <strong>${escapeHtml(
-                locById(state.turn.moveTo)?.name || "?"
-              )}</strong></p>
-               <div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
-            : `<p class="tip">Kliknij <strong>podświetlone</strong> pole — krótki opis pojawi się nad mapą (3 s / klik poza).</p>`
-        }
+        <div id="move-pick-footer">
+          ${
+            destOk
+              ? `<p class="tip" style="margin:0.55rem 0 0">Wybrano: <strong>${escapeHtml(
+                  locById(state.turn.moveTo)?.name || "?"
+                )}</strong></p>
+                 <div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`
+              : `<p class="tip">Kliknij <strong>podświetlone</strong> pole — krótki opis pojawi się nad mapą (3 s / klik poza).</p>`
+          }
+        </div>
       `
     );
-    bindMapLocPopup(appEl);
+    if (destOk) bindMapLocPopup(appEl);
+
+    const updateMovePickSelection = (toId) => {
+      if (!neighborsOf(fromId).includes(toId)) return;
+      state.board.selectedLoc = toId;
+      state.turn = {
+        ...(state.turn || {}),
+        phase: "I",
+        screen: "move-pick",
+        moveTo: toId,
+        moveCost: null,
+        exploreDeck: state.turn?.exploreDeck || null,
+      };
+      saveState();
+
+      appEl.querySelectorAll(".map-node").forEach((g) => {
+        g.classList.toggle("map-node-selected", g.getAttribute("data-loc") === toId);
+      });
+
+      const stage = appEl.querySelector(".map-stage");
+      if (stage) {
+        stage.classList.add("map-stage--has-popup");
+        let popup = stage.querySelector("#map-loc-popup");
+        if (!popup) {
+          popup = document.createElement("div");
+          popup.id = "map-loc-popup";
+          popup.className = "map-loc-popup";
+          popup.setAttribute("role", "dialog");
+          popup.setAttribute("aria-live", "polite");
+          stage.appendChild(popup);
+        }
+        popup.classList.remove("map-loc-popup--gone");
+        popup.innerHTML = mapLocPopupHtml(toId, {
+          player: p,
+          roster: state.roster,
+          monsters: state.board.monsters,
+        });
+        bindMapLocPopup(appEl);
+      }
+
+      const footer = appEl.querySelector("#move-pick-footer");
+      if (footer) {
+        const name = locById(toId)?.name || "?";
+        footer.innerHTML = `
+          <p class="tip" style="margin:0.55rem 0 0">Wybrano: <strong>${escapeHtml(name)}</strong></p>
+          <div class="actions"><button type="button" class="btn btn-primary" id="confirm-dest">Idę tutaj — wybór kosztu</button></div>`;
+        footer.querySelector("#confirm-dest")?.addEventListener("click", () => {
+          if (!state.turn.moveTo) return;
+          setTurn("I", "move-cost", { moveTo: state.turn.moveTo, moveCost: null });
+        });
+      }
+    };
+
     appEl.querySelectorAll(".map-node-reach").forEach((g) => {
-      g.addEventListener("click", () => {
+      g.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const toId = g.getAttribute("data-loc");
-        state.board.selectedLoc = toId;
-        setTurn("I", "move-pick", { moveTo: toId, moveCost: null });
+        if (toId) updateMovePickSelection(toId);
       });
     });
-    const confirm = appEl.querySelector("#confirm-dest");
-    if (confirm) {
-      confirm.addEventListener("click", () => {
-        if (!state.turn.moveTo) return;
-        setTurn("I", "move-cost", { moveTo: state.turn.moveTo, moveCost: null });
-      });
-    }
+    appEl.querySelector("#confirm-dest")?.addEventListener("click", () => {
+      if (!state.turn.moveTo) return;
+      setTurn("I", "move-cost", { moveTo: state.turn.moveTo, moveCost: null });
+    });
     addTurnButtons([
       {
         id: "back",
