@@ -37,17 +37,21 @@ export const ICO = {
       { className: "ico-water" }
     ),
   /**
-   * NIE jest żetonem z planszy. Na kartach akcji: symbol „pasuje do każdego terenu”
-   * (las/góry/woda) przy ruchu. W helperze nazywamy to „uniwersalny”.
+   * Symbol na karcie (nie żeton): w okręgu woda + las + góry obok siebie
+   * = pasuje do dowolnego terenu przy ruchu.
    */
   wild: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.2" fill="currentColor" opacity="0.1" stroke="currentColor" stroke-width="1.2"/>
-       <path d="M7.2 16.8 L9.5 12.2 L11.8 16.8 Z" fill="currentColor" stroke="none" opacity="0.55"/>
-       <path d="M8.8 16.9 L12 9.2 L15.2 16.9 Z" fill="currentColor" stroke="none" opacity="0.45"/>
-       <path d="M4.5 17 L8.2 10.5 L10.2 13.5 L12.8 9.2 L19.5 17 Z" fill="none" stroke="currentColor" stroke-width="1.35" opacity="0.9"/>
-       <path d="M5.2 13.8c1.4-1.6 2.9-1.7 4.3 0" stroke="currentColor" stroke-width="1.35" fill="none"/>
-       <path d="M12 4.6l.7 1.9h2l-1.6 1.2.6 2-1.7-1.2-1.7 1.2.6-2-1.6-1.2h2z" fill="currentColor" stroke="none"/>`,
+      `<circle cx="12" cy="12" r="10.4" fill="#d8dde0" stroke="#8aa4b5" stroke-width="1.6"/>
+       <circle cx="12" cy="12" r="8.6" fill="#c5b8a4" stroke="none"/>
+       <path d="M3.8 14.8c1.1-2.4 2.6-2.6 4.1-.15.55.9.95.95 1.45.1" fill="none" stroke="#5b8fb0" stroke-width="1.55"/>
+       <path d="M4.1 11.6c.95-1.9 2.2-2.05 3.5-.1.45.7.8.75 1.2.05" fill="none" stroke="#7aa7c2" stroke-width="1.35"/>
+       <path d="M5.6 9.4c.35-.15.75.05 1 .45.35.55.2 1.15-.25 1.35" fill="none" stroke="#eef6fb" stroke-width="1.1"/>
+       <path d="M9.35 17.4 L12 7.6 L14.65 17.4 Z" fill="#3f6b3a" stroke="none"/>
+       <path d="M10.55 13.2 L12 9.4 L13.45 13.2 Z" fill="#4f8348" stroke="none"/>
+       <path d="M11.25 17.4 V18.55" stroke="#2f4f2c" stroke-width="1.15"/>
+       <path d="M14.55 17.5 L17.1 9.3 L19.2 12.6 L20.55 17.5 Z" fill="#e8e6e1" stroke="none"/>
+       <path d="M17.1 9.3 L17.85 11.15 L16.35 11.35 Z" fill="#f7f7f5" stroke="none"/>`,
       { className: "ico-wild" }
     ),
   gold: () =>
@@ -230,7 +234,7 @@ export function iconsLegendHtml() {
     ])}
     <h3>Symbol na karcie (nie żeton)</h3>
     ${row([
-      [ICO.wild, "Uniwersalny (*)", "Tylko na kartach akcji: zastępuje las/góry/wodę przy ruchu. To NIE jest 4. żeton z pudełka."],
+      [ICO.wild, "Uniwersalny", "Na karcie: woda + las + góry w jednym okręgu = dowolny teren przy ruchu. To NIE jest 4. żeton z pudełka."],
     ])}
 
     <h3>Kolory kart akcji (walka / talia)</h3>
