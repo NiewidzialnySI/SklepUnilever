@@ -227,13 +227,12 @@ function buildMultiSetupSteps(n, roster = []) {
       id: "intro",
       title: "Zaczynamy przygotowanie",
       body: `
-        <p class="lead">Prowadzę Was krok po kroku przez przygotowanie <strong>podstawki</strong> (bez dodatków).</p>
+        <p class="lead">Przygotowanie <strong>podstawki</strong> (bez dodatków).</p>
         <div class="badge-row">
           <span class="badge">${n} graczy</span>
           <span class="badge">Tylko podstawka</span>
           <span class="badge">Cel: 4 reputacji</span>
         </div>
-        <p class="tip"><strong>Wskazówka:</strong> pierwsza partia najlepiej w max. 3 osoby.</p>
       `,
     },
     {

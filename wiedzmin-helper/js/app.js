@@ -285,6 +285,25 @@ function ensureRoster() {
       p._prevSchoolId = p.schoolId;
     }
   });
+  // Multi: rozdziel zduplikowane szkoły (stare zapisy) — bez twardego błędu.
+  if (n > 1) {
+    const seen = new Set();
+    const free = SCHOOLS.map((s) => s.id).filter(
+      (id) => !state.roster.some((p) => p.schoolId === id)
+    );
+    state.roster.forEach((p) => {
+      if (!seen.has(p.schoolId)) {
+        seen.add(p.schoolId);
+        return;
+      }
+      const nextId = free.shift() || SCHOOLS.find((s) => !seen.has(s.id))?.id;
+      if (!nextId) return;
+      p.schoolId = nextId;
+      placeAtSchool(p, { force: true });
+      p._prevSchoolId = nextId;
+      seen.add(nextId);
+    });
+  }
   if (state.activeIndex >= n) state.activeIndex = 0;
   if (state.board.placePlayer >= n) state.board.placePlayer = 0;
 }
@@ -468,32 +487,66 @@ function renderHome() {
   appEl.querySelector("#to-roster").addEventListener("click", () => go("roster"));
 }
 
+function schoolOptionsHtml(forIdx) {
+  const mine = state.roster[forIdx]?.schoolId;
+  const taken = new Set(
+    state.roster.map((p, i) => (i === forIdx ? null : p.schoolId)).filter(Boolean)
+  );
+  return SCHOOLS.map((s) => {
+    const occupied = taken.has(s.id) && s.id !== mine;
+    // Zajęte szkoły zostają na liście — wybór = zamiana ze współgraczem (wygodniej przy 5 osobach).
+    const label = occupied
+      ? `${s.short} · zajęta (zamiana)`
+      : s.name;
+    return `<option value="${s.id}" ${s.id === mine ? "selected" : ""} data-color="${escapeAttr(
+      s.color || ""
+    )}">${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
+function applyRosterSchoolChoice(idx, newSchoolId) {
+  const me = state.roster[idx];
+  if (!me) return;
+  const prevSchool = me.schoolId;
+  if (prevSchool === newSchoolId) return;
+  const otherIdx = state.roster.findIndex((p, i) => i !== idx && p.schoolId === newSchoolId);
+  if (otherIdx >= 0) {
+    const other = state.roster[otherIdx];
+    other.schoolId = prevSchool;
+    placeAtSchool(other, { force: true });
+    other._prevSchoolId = other.schoolId;
+  }
+  me.schoolId = newSchoolId;
+  placeAtSchool(me, { force: true });
+  me._prevSchoolId = newSchoolId;
+}
+
 function renderRoster() {
   ensureRoster();
-  const used = new Set();
 
   shell(`
     <section class="panel">
       <p class="step-kicker">Skład stołu · ${playersLabel(state.players)}</p>
       <h1>Imiona i szkoły</h1>
-      <p class="lead">Wpisz imię i wybierz szkołę — <strong>pionek od razu staje na szkole startowej</strong> (Wilk→Kaer Morhen, Gryf→Kaer Seren, Niedźwiedź→Haern Caduch, Kot→Stygga, Żmija→Gorthur Gvaed).</p>
-      <div id="roster-forms">
+      <div id="roster-forms" class="roster-grid">
         ${state.roster
           .map((p, i) => {
             const orderHint = state.players === 1 ? "Ty" : `Gracz ${i + 1}`;
+            const school = schoolById(p.schoolId);
+            const color = school.color || "#244833";
             return `
-            <div class="roster-card" data-idx="${i}">
-              <strong>${orderHint}</strong>
+            <div class="roster-card" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+              <header class="roster-card-head">
+                <span class="roster-card-badge" style="background:${escapeAttr(color)}">${schoolIcon(
+                  p.schoolId
+                )}</span>
+                <strong>${orderHint}</strong>
+              </header>
               <label>Imię
                 <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
               </label>
               <label>Szkoła
-                <select data-field="schoolId">
-                  ${SCHOOLS.map(
-                    (s) =>
-                      `<option value="${s.id}" ${p.schoolId === s.id ? "selected" : ""}>${s.name}</option>`
-                  ).join("")}
-                </select>
+                <select data-field="schoolId">${schoolOptionsHtml(i)}</select>
               </label>
               <p class="note school-start-hint">Start: <strong>${escapeHtml(
                 locById(schoolStartId(p.schoolId))?.name || "—"
@@ -502,7 +555,6 @@ function renderRoster() {
           })
           .join("")}
       </div>
-      <p class="warn" id="roster-warn" hidden>Każda szkoła może być tylko raz (w multi). Popraw wybór.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-home">Wstecz</button>
         <button class="btn btn-primary" id="to-order">${isSolo() ? "Dalej — przygotowanie" : "Dalej — kolejność"}</button>
@@ -510,9 +562,7 @@ function renderRoster() {
     </section>
   `);
 
-  const warn = appEl.querySelector("#roster-warn");
-
-  function syncFromDom() {
+  function syncNamesFromDom() {
     appEl.querySelectorAll(".roster-card").forEach((card) => {
       const i = Number(card.dataset.idx);
       const name =
@@ -520,47 +570,44 @@ function renderRoster() {
           .querySelector('[data-field="name"]')
           .value.replace(/[<>]/g, "")
           .trim() || `Gracz ${i + 1}`;
-      const schoolId = card.querySelector('[data-field="schoolId"]').value;
       const prev = state.roster[i] || {};
       const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
       const next = ensurePlayerTrack(
-        { ...prev, name, schoolId, _prevSchoolId: prev.schoolId || prev._prevSchoolId },
+        { ...prev, name, schoolId: prev.schoolId, _prevSchoolId: prev.schoolId },
         start.cards,
         start.gold
       );
       ensureCombatTrack(next);
-      if (!prev.locationId || prev.schoolId !== schoolId) {
-        placeAtSchool(next, { force: true });
-      }
-      next._prevSchoolId = schoolId;
       state.roster[i] = next;
-      const hintStrong = card.querySelector(".school-start-hint strong");
-      if (hintStrong) {
-        hintStrong.textContent = locById(schoolStartId(schoolId))?.name || "—";
-      }
     });
-    used.clear();
-    let dup = false;
-    if (!isSolo()) {
-      for (const p of state.roster) {
-        if (used.has(p.schoolId)) dup = true;
-        used.add(p.schoolId);
-      }
-    }
-    warn.hidden = !dup;
     applySchoolStarts();
     saveState();
-    return !dup;
   }
 
-  appEl.querySelectorAll(".roster-card input, .roster-card select").forEach((el) => {
-    el.addEventListener("change", syncFromDom);
-    el.addEventListener("input", syncFromDom);
+  appEl.querySelectorAll('.roster-card [data-field="name"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      syncNamesFromDom();
+    });
+    el.addEventListener("input", () => {
+      syncNamesFromDom();
+    });
+  });
+
+  appEl.querySelectorAll('.roster-card [data-field="schoolId"]').forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const card = sel.closest(".roster-card");
+      const i = Number(card?.dataset.idx);
+      syncNamesFromDom();
+      applyRosterSchoolChoice(i, sel.value);
+      applySchoolStarts();
+      saveState();
+      render();
+    });
   });
 
   appEl.querySelector("#back-home").addEventListener("click", () => go("home"));
   appEl.querySelector("#to-order").addEventListener("click", () => {
-    if (!syncFromDom()) return;
+    syncNamesFromDom();
     applySchoolStarts();
     if (isSolo()) {
       applyStartResources(state.roster, state.players, { force: true });
@@ -589,7 +636,6 @@ function renderOrder() {
     <section class="panel">
       <p class="step-kicker">Kolejność przy stole</p>
       <h1>Kto pierwszy?</h1>
-      <p class="lead">Kolejność ustala startowe <strong>karty i złoto</strong> — ustaw ją teraz, zanim rozdamy zasoby. Domyślnie: jak wpisywaliście. Przeciągnij kafelki albo rzuć kością.</p>
       <ul class="order-list" id="order-list">
         ${state.roster
           .map((p, i) => {
@@ -597,7 +643,9 @@ function renderOrder() {
             return `
             <li class="order-item" draggable="true" data-idx="${i}">
               <span class="order-pos">${i + 1}.</span>
-              <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
+              <span class="player-chip" style="background:${escapeAttr(
+                schoolById(p.schoolId).color || "#244833"
+              )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
               <span class="tip" style="margin:0">→ ${res.cards} kart · ${res.gold} złota</span>
               <button type="button" class="btn btn-secondary" data-order-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
               <button type="button" class="btn btn-secondary" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""}>↓</button>
@@ -611,7 +659,6 @@ function renderOrder() {
         </button>
         <button type="button" class="btn btn-secondary" id="order-reset">Reset kolejności / kości</button>
       </div>
-      <p class="note">Po 1. i 2. rzucie reszta ustawia się sama (przy 3 graczach). Przy więcej — rzucaj dalej albo przeciągnij.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-roster">Wstecz</button>
         <button class="btn btn-primary" id="confirm-order">Zatwierdź i rozdaj karty/złoto</button>
@@ -723,7 +770,9 @@ function renderSetup() {
   const rosterHint = state.roster
     .map((p, i) => {
       const res = startResourcesFor(state.players, i);
-      return `<span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span> · ${res.cards}k/${res.gold}zł</span>`;
+      return `<span class="player-chip" style="background:${escapeAttr(
+        schoolById(p.schoolId).color || "#244833"
+      )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span> · ${res.cards}k/${res.gold}zł</span>`;
     })
     .join(" ");
 
@@ -845,7 +894,9 @@ function turnShell(title, body) {
   shell(`
     <section class="panel">
       <div class="badge-row">
-        <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
+        <span class="player-chip" style="background:${escapeAttr(
+          school.color || "#244833"
+        )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
         ${isSolo() ? `<span class="badge">Tura ${state.turnNumber || 1}</span>` : ""}
       </div>
       ${soloTurnBadgeHtml()}

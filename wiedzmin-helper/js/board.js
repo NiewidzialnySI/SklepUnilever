@@ -697,7 +697,9 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
       return `
         <article class="tracker-card ${i === activeIndex ? "tracker-active" : ""}" data-track="${i}">
           <header>
-            <span class="player-chip">${iconFn()}${escapeHtml(p.name)} <span>${school.short}</span></span>
+            <span class="player-chip" style="background:${escapeHtml(
+              school.color || "#244833"
+            )}">${iconFn()}${escapeHtml(p.name)} <span>${school.short}</span></span>
             ${i === activeIndex ? `<span class="badge">Teraz gra</span>` : ""}
           </header>
 

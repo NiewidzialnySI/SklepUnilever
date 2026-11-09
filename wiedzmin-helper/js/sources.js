@@ -3,12 +3,13 @@
  *  więc poniżej: scalone streszczenia z opisów/rozdziałów filmów + oficjalne FAQ.
  */
 
+/** Kolory znaczników / podstawki szkół (jak na komponentach przy stole). */
 export const SCHOOLS = [
-  { id: "wilk", name: "Szkoła Wilka", short: "Wilk" },
-  { id: "gryf", name: "Szkoła Gryfa", short: "Gryf" },
-  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedź" },
-  { id: "kot", name: "Szkoła Kota", short: "Kot" },
-  { id: "zmija", name: "Szkoła Żmii", short: "Żmija" },
+  { id: "wilk", name: "Szkoła Wilka", short: "Wilk", color: "#9a3b2f" },
+  { id: "gryf", name: "Szkoła Gryfa", short: "Gryf", color: "#c4a35a" },
+  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedź", color: "#6b4a32" },
+  { id: "kot", name: "Szkoła Kota", short: "Kot", color: "#2a3340" },
+  { id: "zmija", name: "Szkoła Żmii", short: "Żmija", color: "#3d6b45" },
 ];
 
 export const SOURCES = [
