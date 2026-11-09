@@ -198,8 +198,8 @@ export const LOCATIONS = [
     actionKey: "attackLevel",
   },
   {
-    id: "mantikora",
-    name: "Szkoła Mantikory",
+    id: "behelt-nar",
+    name: "Behelt Nar",
     number: 0,
     terrain: "forest",
     school: "mantikora",
@@ -211,47 +211,82 @@ export const LOCATIONS = [
 
 /**
  * Połączenia (drogi + trasy morskie) — ruch tylko do sąsiada po ścieżce.
- * Ułożone na podstawie zdjęć planszy użytkownika.
+ * Graf od użytkownika (lokacje 0–18).
  */
-export const ROADS = [
-  // północ
-  ["kaer-seren", "hengfors"],
-  ["kaer-seren", "novigrad"],
-  ["kaer-seren", "cidaris"], // trasa morska
-  ["hengfors", "kaer-morhen"],
-  ["hengfors", "wyzima"],
-  ["hengfors", "novigrad"],
-  ["hengfors", "ban-ard"],
-  ["kaer-morhen", "ban-ard"],
-  ["ban-ard", "vengerberg"],
-  // zachód / centrum
-  ["cidaris", "novigrad"],
-  ["cidaris", "cintra"], // trasa morska / brzeg
-  ["novigrad", "wyzima"],
-  ["novigrad", "cintra"],
-  ["wyzima", "vengerberg"],
-  ["wyzima", "haern-caduch"],
-  ["vengerberg", "beauclair"],
-  ["vengerberg", "mantikora"],
-  // południe / szkoły
-  ["cintra", "haern-caduch"],
-  ["cintra", "glenmore"],
-  ["haern-caduch", "beauclair"],
-  ["haern-caduch", "glenmore"],
-  ["haern-caduch", "loc-ichaer"],
-  ["beauclair", "mantikora"],
-  ["beauclair", "gorthur-gvaed"],
-  ["beauclair", "loc-ichaer"],
-  ["glenmore", "doldeth"],
-  ["doldeth", "loc-ichaer"],
-  ["doldeth", "dhuwod"],
-  ["loc-ichaer", "stygga"],
-  ["mantikora", "gorthur-gvaed"],
-  ["gorthur-gvaed", "ard-modron"],
-  ["gorthur-gvaed", "stygga"],
-  ["dhuwod", "stygga"],
-  ["stygga", "ard-modron"],
-];
+export const ROADS = (() => {
+  const pairs = [
+    // 0 Behelt Nar
+    ["behelt-nar", "vengerberg"],
+    ["behelt-nar", "ban-ard"],
+    ["behelt-nar", "beauclair"],
+    ["behelt-nar", "gorthur-gvaed"],
+    // 1 Kaer Seren
+    ["kaer-seren", "cintra"],
+    ["kaer-seren", "cidaris"],
+    ["kaer-seren", "novigrad"],
+    ["kaer-seren", "hengfors"],
+    // 2 Hengfors
+    ["hengfors", "novigrad"],
+    ["hengfors", "wyzima"],
+    ["hengfors", "kaer-morhen"],
+    // 3 Kaer Morhen
+    ["kaer-morhen", "wyzima"],
+    ["kaer-morhen", "ban-ard"],
+    // 4 Ban Ard
+    ["ban-ard", "vengerberg"],
+    ["ban-ard", "wyzima"],
+    // 5 Cidaris
+    ["cidaris", "cintra"],
+    ["cidaris", "novigrad"],
+    // 6 Novigrad
+    ["novigrad", "cintra"],
+    ["novigrad", "wyzima"],
+    // 7 Wyzima
+    ["wyzima", "cintra"],
+    ["wyzima", "vengerberg"],
+    ["wyzima", "beauclair"],
+    ["wyzima", "haern-caduch"],
+    // 8 Vengerberg
+    ["vengerberg", "beauclair"],
+    // 9 Cintra
+    ["cintra", "glenmore"],
+    ["cintra", "haern-caduch"],
+    // 10 Haern Caduch
+    ["haern-caduch", "glenmore"],
+    ["haern-caduch", "loc-ichaer"],
+    ["haern-caduch", "beauclair"],
+    // 11 Beauclair
+    ["beauclair", "loc-ichaer"],
+    ["beauclair", "ard-modron"],
+    ["beauclair", "gorthur-gvaed"],
+    // 12 Glenmore
+    ["glenmore", "doldeth"],
+    ["glenmore", "loc-ichaer"],
+    // 13 Doldeth
+    ["doldeth", "loc-ichaer"],
+    ["doldeth", "dhuwod"],
+    // 14 Loc Ichaer
+    ["loc-ichaer", "dhuwod"],
+    ["loc-ichaer", "stygga"],
+    ["loc-ichaer", "ard-modron"],
+    ["loc-ichaer", "gorthur-gvaed"],
+    // 15 Gorthur Gvaed
+    ["gorthur-gvaed", "ard-modron"],
+    // 16 Dhuwod
+    ["dhuwod", "stygga"],
+    // 17 Stygga
+    ["stygga", "ard-modron"],
+  ];
+  const seen = new Set();
+  const out = [];
+  for (const [a, b] of pairs) {
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push([a, b]);
+  }
+  return out;
+})();
 
 /** Szkoła gracza → lokacja startowa na planszy (podstawka). */
 export const SCHOOL_START = {
@@ -260,6 +295,7 @@ export const SCHOOL_START = {
   niedzwiedz: "haern-caduch",
   kot: "stygga",
   zmija: "gorthur-gvaed",
+  mantikora: "behelt-nar",
 };
 
 export function locById(id) {

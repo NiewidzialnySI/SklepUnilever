@@ -11,6 +11,11 @@ function terrainPng(file, className, size = 28) {
   return `<span class="ico ico-terrain ${className}" aria-hidden="true"><img class="ico-img" src="./img/terrain/${file}.png" alt="" width="${size}" height="${size}" decoding="async" /></span>`;
 }
 
+/** Medale szkół — PNG z Gemini (bez tła). */
+function schoolPng(file, className, size = 28) {
+  return `<span class="ico ico-school-img ${className}" aria-hidden="true"><img class="ico-img" src="./img/schools/${file}.png" alt="" width="${size}" height="${size}" decoding="async" /></span>`;
+}
+
 export const ICO = {
   /** Żeton las — asset Gemini (3 świerki). */
   forest: () => terrainPng("forest", "ico-forest"),
@@ -112,31 +117,12 @@ export const ICO = {
       `<circle cx="12" cy="12" r="9"/><path d="M9 9.5c.4-1.4 1.5-2.5 3.2-2.5 1.7 0 2.8 1 2.8 2.4S14 12 12.2 12H11"/><path d="M9 14.5c.4 1.4 1.5 2.5 3.2 2.5 1.7 0 2.8-1 2.8-2.4"/>`,
       { className: "ico-phase" }
     ),
-  schoolWilk: () =>
-    svg(
-      `<circle cx="12" cy="12" r="9"/><path d="M7 13c1-4 3-6 5-6s4 2 5 6"/><path d="M9 11h.01M15 11h.01"/><path d="M10 15c.8.8 3.2.8 4 0"/>`,
-      { className: "ico-school" }
-    ),
-  schoolGryf: () =>
-    svg(
-      `<circle cx="12" cy="12" r="9"/><path d="M8 14c2-5 6-5 8 0"/><path d="M12 7v3"/><path d="M9 10l3-2 3 2"/>`,
-      { className: "ico-school" }
-    ),
-  schoolNiedzwiedz: () =>
-    svg(
-      `<circle cx="12" cy="12" r="9"/><circle cx="8" cy="9" r="1.6"/><circle cx="16" cy="9" r="1.6"/><circle cx="12" cy="13" r="3.2"/><path d="M10.5 13.5h3"/>`,
-      { className: "ico-school" }
-    ),
-  schoolKot: () =>
-    svg(
-      `<circle cx="12" cy="12" r="9"/><path d="M8 14c0-3 8-3 8 0"/><path d="M8 10l-1.5-3 3 1"/><path d="M16 10l1.5-3-3 1"/><path d="M10 13h.01M14 13h.01"/>`,
-      { className: "ico-school" }
-    ),
-  schoolZmija: () =>
-    svg(
-      `<circle cx="12" cy="12" r="9"/><path d="M8 15c2-1 3-4 4-4s2 3 4 4"/><path d="M12 7v4"/><circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none"/>`,
-      { className: "ico-school" }
-    ),
+  schoolWilk: () => schoolPng("wilk", "ico-school"),
+  schoolGryf: () => schoolPng("gryf", "ico-school"),
+  schoolNiedzwiedz: () => schoolPng("niedzwiedz", "ico-school"),
+  schoolKot: () => schoolPng("kot", "ico-school"),
+  schoolZmija: () => schoolPng("zmija", "ico-school"),
+  schoolMantikora: () => schoolPng("mantikora", "ico-school"),
   elixir: () =>
     svg(
       `<path d="M10 3h4"/><path d="M11 3v3.5L7.5 14a4.2 4.2 0 003.8 6h1.4a4.2 4.2 0 003.8-6L13 6.5V3"/><path d="M9 15c1.5 1 4.5 1 6 0"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>`,
@@ -175,6 +161,7 @@ export const SCHOOL_ICON = {
   niedzwiedz: ICO.schoolNiedzwiedz,
   kot: ICO.schoolKot,
   zmija: ICO.schoolZmija,
+  mantikora: ICO.schoolMantikora,
 };
 
 export function chip(iconFn, label) {
@@ -268,13 +255,14 @@ export function iconsLegendHtml() {
       <strong>Żeton tropu ≠ nowe żetony z pudełka.</strong> To zwykły <em>żeton obszaru</em> (las/góry/woda). Najpierw leży u Ciebie <em>nazwą lokacji do góry</em> (zadanie), potem po wejściu na tę lokację odwracasz go na symbol terenu = masz trop. Szczegóły: Ściąga / Leksykon.
     </div>
 
-    <h3>Szkoły</h3>
+    <h3>Szkoły (medale Gemini)</h3>
     ${row([
-      [ICO.schoolWilk, "Wilk", "Szermierka"],
-      [ICO.schoolGryf, "Gryf", "Magia"],
-      [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja"],
-      [ICO.schoolKot, "Kot", "Szybkość"],
-      [ICO.schoolZmija, "Żmija", "Zatruta stal"],
+      [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
+      [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
+      [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
+      [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
+      [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
+      [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0) — na mapie podstawki"],
     ])}
   `;
 }
