@@ -2123,3 +2123,28 @@ h3 {
     gap: 1rem;
   }
 }
+
+
+/* —— Zwycięstwo (4 reputacji / solo) —— */
+.victory-panel {
+  margin: 0.75rem 0 1rem;
+  padding: 1rem 1.1rem 1.15rem;
+  border-radius: 12px;
+  border: 1px solid rgba(184, 146, 62, 0.55);
+  background:
+    linear-gradient(145deg, rgba(184, 146, 62, 0.18), rgba(47, 107, 69, 0.12)),
+    rgba(255, 255, 255, 0.42);
+  box-shadow: 0 8px 24px rgba(20, 24, 18, 0.12);
+}
+.victory-title {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 1.85rem;
+  letter-spacing: 0.02em;
+  color: #244833;
+}
+.victory-lead {
+  margin: 0.25rem 0 0.55rem;
+}
+.victory-panel .table {
+  margin-top: 0.75rem;
+}

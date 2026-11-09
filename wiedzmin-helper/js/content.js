@@ -64,6 +64,61 @@ export const SOLO_SCORE_TABLE = `
   </table>
 `;
 
+
+export function soloScoreLabel(turnNumber) {
+  const n = Math.max(1, Number(turnNumber) || 1);
+  if (n <= 6) return "Żywa legenda!";
+  if (n <= 8) return "Na drodze do legendy.";
+  if (n <= 10) return "Profesjonalista — świat Cię potrzebuje.";
+  if (n <= 12) return "Można na Tobie polegać.";
+  return "Nieźle jak na żółtodzioba…";
+}
+
+/** Panel zwycięstwa — multi (4 rep z walki) albo solo (3 potwory + atrybut). */
+export function victoryPanelHtml({
+  playerName,
+  schoolName,
+  isSolo,
+  turnNumber,
+  reason,
+  monsterTrophies = 0,
+  attrTrophyCount = 0,
+} = {}) {
+  const who = escapeLite(playerName || "Wiedźmin");
+  const school = escapeLite(schoolName || "");
+  if (isSolo) {
+    const score = soloScoreLabel(turnNumber);
+    return `
+      <section class="victory-panel" role="status" aria-live="polite">
+        <p class="step-kicker">Koniec gry · solo</p>
+        <h2 class="victory-title">Wygrana!</h2>
+        <p class="lead victory-lead"><strong>${who}</strong>${
+          school ? ` · ${school}` : ""
+        } — 4 reputacji po legalnej ścieżce.</p>
+        <ul class="checklist">
+          <li>Trofea potworów: <strong>${monsterTrophies}</strong> / 3</li>
+          <li>Trofeum atrybutu: <strong>${attrTrophyCount > 0 ? "tak" : "brak"}</strong></li>
+          <li>Tury: <strong>${Math.max(1, Number(turnNumber) || 1)}</strong> → ${escapeLite(score)}</li>
+        </ul>
+        ${reason ? `<p class="tip">${escapeLite(reason)}</p>` : ""}
+        <p class="note">Medytacja nigdy nie domyka wygranej jako ostatnie trofeum. Dalsze tury są zablokowane — możesz tylko przeglądać stół / ściągi.</p>
+        ${SOLO_SCORE_TABLE}
+      </section>
+    `;
+  }
+  return `
+    <section class="victory-panel" role="status" aria-live="polite">
+      <p class="step-kicker">Koniec gry</p>
+      <h2 class="victory-title">Zwycięstwo!</h2>
+      <p class="lead victory-lead"><strong>${who}</strong>${
+        school ? ` · ${school}` : ""
+      } osiąga <strong>4 reputacji</strong>.</p>
+      ${reason ? `<p class="tip">${escapeLite(reason)}</p>` : ""}
+      <p class="note">Wygrana natychmiast po trofeum z walki (potwór lub wiedźmin). Medytacja <em>nie kończy</em> gry przy 4. reputacji. Zwykły przebieg tur jest zatrzymany.</p>
+    </section>
+  `;
+}
+
 export function buildSetupSteps(playerCount, roster = []) {
   if (playerCount === 1) return buildSoloSetupSteps(roster[0]);
   return buildMultiSetupSteps(playerCount, roster);

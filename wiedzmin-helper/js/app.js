@@ -11,6 +11,7 @@ import {
   phase3,
   LOCATION_ACTIONS,
   quickRef,
+  victoryPanelHtml,
 } from "./content.js";
 import { SCHOOLS, sourcesHtml } from "./sources.js";
 import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
@@ -71,6 +72,8 @@ import {
   hasTrailForMonster,
   fieldChangeModalHtml,
   applyFieldChange,
+  checkVictory,
+  applyFightTrophy,
   ATTR_KEYS,
 } from "./player-state.js";
 
@@ -128,6 +131,8 @@ function defaultState() {
     setupIndex: 0,
     turnNumber: 1,
     gameStarted: false,
+    gameOver: false,
+    winner: null,
     turn: {
       phase: "hub",
       screen: "hub",
@@ -149,6 +154,60 @@ function isGameStarted() {
 function markGameStarted() {
   if (state.gameStarted) return;
   state.gameStarted = true;
+}
+
+function clearVictory() {
+  state.gameOver = false;
+  state.winner = null;
+}
+
+function isGameOver() {
+  return state.gameOver === true && Boolean(state.winner);
+}
+
+function declareVictory(playerIndex, { kind, reason, source } = {}) {
+  const p = state.roster[playerIndex];
+  if (!p) return false;
+  state.gameOver = true;
+  state.winner = {
+    index: playerIndex,
+    name: p.name || "",
+    schoolId: p.schoolId || null,
+    kind: kind === "solo" ? "solo" : "multi",
+    reason: reason || "",
+    source: source || "manual",
+  };
+  state.activeIndex = playerIndex;
+  return true;
+}
+
+function tryDeclareVictory(playerIndex, source) {
+  if (isGameOver()) return false;
+  const p = state.roster[playerIndex];
+  if (!p) return false;
+  const verdict = checkVictory(p, { isSolo: isSolo(), source });
+  if (!verdict.won) return false;
+  return declareVictory(playerIndex, {
+    kind: verdict.kind,
+    reason: verdict.reason,
+    source,
+  });
+}
+
+function victoryBannerHtml() {
+  if (!isGameOver()) return "";
+  const w = state.winner;
+  const p = state.roster[w.index] || {};
+  const school = schoolById(w.schoolId || p.schoolId);
+  return victoryPanelHtml({
+    playerName: w.name || p.name,
+    schoolName: school?.short || school?.name || "",
+    isSolo: isSolo() || w.kind === "solo",
+    turnNumber: state.turnNumber || 1,
+    reason: w.reason,
+    monsterTrophies: p.monsterTrophies || 0,
+    attrTrophyCount: (p.attrTrophies || []).length,
+  });
 }
 
 function isSolo() {
@@ -228,6 +287,17 @@ function normalizeState(raw) {
   const turnNumber = Math.max(1, Math.min(999, Number(raw.turnNumber) || 1));
   const view = views.has(raw.view) ? raw.view : "home";
   const gameStarted = raw.gameStarted === true || view === "turn";
+  const winner =
+    raw.winner && typeof raw.winner === "object"
+      ? {
+          index: Math.max(0, Number(raw.winner.index) || 0),
+          name: String(raw.winner.name || ""),
+          schoolId: raw.winner.schoolId ? String(raw.winner.schoolId) : null,
+          kind: raw.winner.kind === "solo" ? "solo" : "multi",
+          reason: raw.winner.reason ? String(raw.winner.reason) : "",
+          source: raw.winner.source ? String(raw.winner.source) : "manual",
+        }
+      : null;
   return {
     ...base,
     view,
@@ -237,6 +307,8 @@ function normalizeState(raw) {
     setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
     turnNumber,
     gameStarted,
+    gameOver: raw.gameOver === true && Boolean(winner),
+    winner: raw.gameOver === true ? winner : null,
     turn,
     board,
     orderDice: Array.isArray(raw.orderDice) ? raw.orderDice.map(Number) : [],
@@ -361,6 +433,7 @@ function setPlayers(n) {
   state.setupIndex = 0;
   state.activeIndex = 0;
   state.gameStarted = false;
+  clearVictory();
   ensureRoster();
   saveState();
   render();
@@ -934,17 +1007,26 @@ function turnShell(title, body) {
         ${isSolo() ? `<span class="badge">Tura ${state.turnNumber || 1}</span>` : ""}
       </div>
       ${soloTurnBadgeHtml()}
-      <div class="phase-tabs">
+      ${victoryBannerHtml()}
+      ${
+        isGameOver()
+          ? ""
+          : `<div class="phase-tabs">
         ${tabs
           .map(
             ([id, label]) =>
               `<button class="phase-tab ${active === id ? "active" : ""}" data-phase="${id}">${label}</button>`
           )
           .join("")}
-      </div>
+      </div>`
+      }
       <p class="step-kicker">Przewodnik tury${isSolo() ? " · solo" : ""}</p>
-      <h1>${title}</h1>
-      <div class="step-body">${body}</div>
+      <h1>${isGameOver() ? "Koniec gry" : title}</h1>
+      <div class="step-body">${
+        isGameOver()
+          ? `<p class="lead">Zwykły przebieg tur jest zatrzymany. Możesz przeglądać stół i ściągi.</p>`
+          : body
+      }</div>
       <div class="actions" id="turn-actions"></div>
     </section>
   `);
@@ -996,6 +1078,10 @@ function setTurn(phase, screen, extra = {}) {
 }
 
 function nextPlayer() {
+  if (isGameOver()) {
+    setTurn("hub", "hub");
+    return;
+  }
   if (isSolo()) {
     state.activeIndex = 0;
     state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
@@ -1302,6 +1388,15 @@ function renderTurn() {
   const { screen } = state.turn;
   const solo = isSolo();
   const p = activePlayer();
+
+  if (isGameOver()) {
+    turnShell("Zwycięstwo", "");
+    addTurnButtons([
+      { id: "to-board", label: "Podgląd stołu", onClick: () => go("board") },
+      { id: "to-ref", label: "Ściąga", onClick: () => go("ref") },
+    ]);
+    return;
+  }
 
   if (screen === "hub") {
     const picker = solo
@@ -1713,6 +1808,28 @@ function renderTurn() {
       setTurn("III", "phase3");
       return;
     }
+    if (plan.kind === "defeat" && !plan.rewardsApplied) {
+      ensureCombatTrack(p);
+      p.gold = Math.min(99, (p.gold || 0) + 2);
+      const award = applyFightTrophy(p, { source: "monster", applyFatigueToHand: true });
+      plan.rewardsApplied = true;
+      plan.rewardNote = award.alreadyMax
+        ? "Trofeum potwora zapisane (reputacja już 4)."
+        : `+2 złota, +1 reputacja → ${award.reputation}, zmęczenie −${award.lose} z ręki, trofea potworów: ${p.monsterTrophies}.`;
+      const idx = state.roster.indexOf(p);
+      tryDeclareVictory(idx >= 0 ? idx : state.activeIndex, "monster");
+      saveState();
+      if (isGameOver()) {
+        setTurn("hub", "hub");
+        return;
+      }
+    }
+    if (plan.kind === "drive" && !plan.rewardsApplied) {
+      p.gold = Math.min(99, (p.gold || 0) + 2);
+      plan.rewardsApplied = true;
+      plan.rewardNote = "+2 złota (odpędzenie — bez +reputacji).";
+      saveState();
+    }
     if (plan.needsSpawn && plan.terrain && plan.spawnLevel) {
       // Utrzymaj wymagany poziom na slocie, jeśli już wybrano numer
       const cur = state.board.monsters
@@ -1745,6 +1862,11 @@ function renderTurn() {
       `
         <div class="guide-box">
           <p class="lead" style="margin:0">${plan.summary}</p>
+          ${
+            plan.rewardNote
+              ? `<p class="tip" style="margin:0.55rem 0 0"><strong>Tracker:</strong> ${escapeHtml(plan.rewardNote)}</p>`
+              : ""
+          }
           ${
             plan.spawnHint
               ? `<p class="tip" style="margin:0.55rem 0 0">${plan.spawnHint}</p>`
@@ -1832,12 +1954,41 @@ function renderTurn() {
         ${attrsAdjustHtml(p)}
         ${resourceAdjustHtml(p, { title: "Karty / złoto" })}
         ${FIGHT_WITCHER}
+        <div class="guide-box" style="margin-top:0.85rem">
+          <p class="step-kicker" style="margin:0">Wynik walki</p>
+          <p class="lead" style="margin:0.35rem 0 0">Zwycięzca: trofeum szkoły, złoto wg reputacji, +reputacja, zmęczenie — może domknąć wygraną (4. reputacja).</p>
+          <div class="choice-grid" style="margin-top:0.65rem">
+            <button type="button" class="choice" data-witcher-outcome="win"><strong>Wygrana</strong><span>+reputacja, trofeum szkoły, zmęczenie</span></button>
+            <button type="button" class="choice" data-witcher-outcome="loss"><strong>Porażka</strong><span>Bez +reputacji — dalej faza III</span></button>
+          </div>
+        </div>
       `
     );
     bindResourceAdjust(p);
     bindAttrAdjust(p);
+    appEl.querySelectorAll("[data-witcher-outcome]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.getAttribute("data-witcher-outcome");
+        if (kind === "win") {
+          const award = applyFightTrophy(p, { source: "witcher", applyFatigueToHand: true });
+          const idx = state.roster.indexOf(p);
+          tryDeclareVictory(idx >= 0 ? idx : state.activeIndex, "witcher");
+          saveState();
+          if (isGameOver()) {
+            setTurn("hub", "hub");
+            return;
+          }
+          window.alert(
+            award.alreadyMax
+              ? "Trofeum szkoły zapisane (reputacja już 4)."
+              : `+1 reputacja → ${award.reputation}, zmęczenie −${award.lose} z ręki.`
+          );
+        }
+        setTurn("III", "phase3");
+      });
+    });
     addTurnButtons([
-      { id: "to3", label: "Koniec walki → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
+      { id: "to3", label: "Bez wyniku → faza III", onClick: () => setTurn("III", "phase3") },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "fight") },
     ]);
     return;
@@ -1883,9 +2034,14 @@ function renderTurn() {
         const id = btn.getAttribute("data-take-trophy");
         ensureCombatTrack(p);
         if (!p.attrTrophies.includes(id)) p.attrTrophies.push(id);
-        if ((p.reputation || 0) < 3) {
-          p.reputation = Math.min(4, (p.reputation || 0) + 1);
+        const before = p.reputation || 0;
+        // Medytacja: +reputacja tylko gdy < 3 — nigdy 4. i nigdy koniec gry
+        if (before < 3) {
+          p.reputation = before + 1;
+          const lose = fatigueForReputation(p.reputation);
+          p.cards = Math.max(0, (p.cards || 0) - lose);
         }
+        tryDeclareVictory(state.activeIndex, "meditate");
         saveState();
         render();
       });
@@ -2019,6 +2175,7 @@ function renderBoard() {
     <section class="panel board-panel">
       <p class="step-kicker">Przy stole · mapa i status</p>
       <h1>Stół</h1>
+      ${victoryBannerHtml()}
       <p class="lead">Schemat mapy do oznaczania potworów i wiedźminów (możesz obracać). Jak przesuniesz wiedźmina na sąsiada — wyskoczy wybór kosztu ruchu (1 karta / 2 karty / 1+złoto). Przyciski „co robi teraz” prowadzą za rękę (m.in. eksploracja wg znaków pola).</p>
 
       <h2>Mapa (schemat)</h2>
@@ -2146,9 +2303,30 @@ function renderBoard() {
 
   appEl.querySelectorAll("[data-rep]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const i = Number(btn.dataset.idx);
       const n = Number(btn.dataset.rep);
-      if (state.roster[i]) state.roster[i].reputation = n;
+      const pl = state.roster[i];
+      if (!pl) return;
+      if (n === 4) {
+        const ok = window.confirm(
+          isSolo()
+            ? "Ustawić reputację na 4? Solo wygrywa tylko przy 3 trofeach potworów + trofeum atrybutu (4. z walki z potworem — nie z medytacji)."
+            : "Ustawić reputację na 4 z trofeum walki? (Medytacja nie kończy gry — potwierdź tylko jeśli to walka.)"
+        );
+        if (!ok) return;
+        pl.reputation = 4;
+        const source = isSolo() ? "monster" : "manual";
+        const verdict = checkVictory(pl, { isSolo: isSolo(), source });
+        if (verdict.won) {
+          declareVictory(i, { kind: verdict.kind, reason: verdict.reason, source });
+        } else if (verdict.reason) {
+          window.alert(verdict.reason);
+        }
+      } else {
+        pl.reputation = n;
+        if (n < 4 && state.gameOver && state.winner?.index === i) clearVictory();
+      }
       saveState();
       render();
     });
@@ -2224,20 +2402,33 @@ function renderBoard() {
 
   appEl.querySelectorAll("[data-apply-fatigue]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const i = Number(btn.dataset.idx);
-      const p = state.roster[i];
-      if (!p || p.reputation >= 4) return;
-      const next = p.reputation + 1;
+      const pl = state.roster[i];
+      if (!pl || pl.reputation >= 4) return;
+      const next = pl.reputation + 1;
       const lose = fatigueForReputation(next);
+      const fightAsk =
+        next === 4
+          ? isSolo()
+            ? " To 4. reputacja: solo wygrywa tylko przy 3 potworach + atrybucie (źródło = walka z potworem)."
+            : " To 4. reputacja z trofeum walki — gra się kończy (medytacja NIE kończy)."
+          : "";
       if (
         !window.confirm(
-          `+1 reputacja → ${next}. Usunąć z gry ${lose} kart(y) z ręki (uproszczenie trackera)? Na stole możesz brać też z talii/odrzuconych.`
+          `+1 reputacja → ${next}. Usunąć z gry ${lose} kart(y) z ręki (uproszczenie trackera)? Na stole możesz brać też z talii/odrzuconych.${fightAsk}`
         )
       ) {
         return;
       }
-      p.reputation = next;
-      p.cards = Math.max(0, (p.cards || 0) - lose);
+      pl.reputation = next;
+      pl.cards = Math.max(0, (pl.cards || 0) - lose);
+      if (next === 4) {
+        const source = isSolo() ? "monster" : "manual";
+        const verdict = checkVictory(pl, { isSolo: isSolo(), source });
+        if (verdict.won) declareVictory(i, { kind: verdict.kind, reason: verdict.reason, source });
+        else if (verdict.reason) window.alert(verdict.reason);
+      }
       saveState();
       render();
     });
@@ -2302,6 +2493,7 @@ function renderRef() {
     if (!window.confirm("Wyczyścić cały zapis helpera (gracze, mapa, reputacja)?")) return;
     localStorage.removeItem(STORAGE_KEY);
     Object.assign(state, defaultState());
+    clearVictory();
     render();
   });
 }
