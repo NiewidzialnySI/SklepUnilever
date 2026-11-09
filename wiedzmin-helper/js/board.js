@@ -544,7 +544,7 @@ export function mapSvgHtml(
       .map(({ i }, idx) => {
         const ox = -3.35 + idx * 2.55;
         return `<g class="map-player-badge" transform="translate(${loc.x + ox},${loc.y + 4.35}) rotate(${labelUpright})">
-          <circle r="1.85" fill="#1e3a2c" stroke="#d4b05a" stroke-width="0.42"/>
+          <circle r="1.9" fill="#e8d9b0" stroke="#b8923e" stroke-width="0.45"/>
           <text y="0.75" text-anchor="middle" class="map-badge-text map-badge-text--player">${i + 1}</text>
         </g>`;
       })

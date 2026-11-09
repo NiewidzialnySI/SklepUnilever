@@ -1012,19 +1012,21 @@ h3 {
   margin: 0.75rem 0 0.5rem;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(212, 176, 90, 0.28);
+  border: 1px solid rgba(212, 176, 90, 0.32);
   background:
-    radial-gradient(ellipse at 28% 18%, rgba(52, 78, 58, 0.95), transparent 52%),
-    radial-gradient(ellipse at 82% 72%, rgba(36, 72, 51, 0.5), transparent 48%),
-    radial-gradient(ellipse at 50% 100%, rgba(18, 28, 20, 0.9), transparent 55%),
-    linear-gradient(165deg, #152018 0%, #101812 55%, #0c120e 100%);
+    radial-gradient(ellipse at 26% 16%, rgba(62, 92, 68, 0.95), transparent 48%),
+    radial-gradient(ellipse at 78% 28%, rgba(184, 146, 62, 0.08), transparent 42%),
+    radial-gradient(ellipse at 84% 78%, rgba(36, 72, 51, 0.55), transparent 46%),
+    radial-gradient(ellipse at 50% 110%, rgba(8, 14, 10, 0.95), transparent 55%),
+    linear-gradient(165deg, #17241c 0%, #101812 52%, #0a100c 100%);
   min-height: 220px;
   display: grid;
   place-items: center;
   box-shadow:
-    inset 0 1px 0 rgba(240, 230, 210, 0.08),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
-    0 14px 36px rgba(0, 0, 0, 0.34);
+    inset 0 1px 0 rgba(240, 230, 210, 0.1),
+    inset 0 -18px 40px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.28),
+    0 16px 40px rgba(0, 0, 0, 0.38);
 }
 
 .map-stage::before {
@@ -1217,7 +1219,8 @@ h3 {
 
 .map-badge-text--player {
   font-size: 2.05px;
-  fill: #f0e6d2;
+  fill: #1a1814;
+  stroke: rgba(240, 230, 210, 0.25);
 }
 
 .map-node-school .map-label {
