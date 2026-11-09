@@ -215,9 +215,12 @@ export function chip(iconFn, label) {
 }
 
 export function iconsLegendHtml() {
-  const row = (items) =>
-    `<div class="ico-legend-row">${items
-      .map(([fn, label, hint]) => `<div class="ico-legend-item">${fn()}<div><strong>${label}</strong><span>${hint}</span></div></div>`)
+  const row = (items, rowClass = "") =>
+    `<div class="ico-legend-row${rowClass ? ` ${rowClass}` : ""}">${items
+      .map(
+        ([fn, label, hint]) =>
+          `<div class="ico-legend-item"><div class="ico-legend-ico">${fn()}</div><div class="ico-legend-text"><strong>${label}</strong><span>${hint}</span></div></div>`
+      )
       .join("")}</div>`;
 
   return `
@@ -318,13 +321,16 @@ export function iconsLegendHtml() {
     </div>
 
     <h3>Szkoły (medale Gemini)</h3>
-    ${row([
-      [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
-      [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
-      [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
-      [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
-      [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
-      [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0) — na mapie podstawki"],
-    ])}
+    ${row(
+      [
+        [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
+        [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
+        [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
+        [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
+        [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
+        [ICO.schoolMantikora, "Mantikora", "Start Behelt Nar (#0)"],
+      ],
+      "ico-legend-row--schools"
+    )}
   `;
 }
