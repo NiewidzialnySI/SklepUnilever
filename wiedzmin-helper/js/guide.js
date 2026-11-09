@@ -149,7 +149,7 @@ export function destinationPreviewHtml(toId, { player, roster = [], monsters = {
         mon
           ? `<p class="warn" style="margin-top:0.55rem">${ICO.monster()} <strong>Potwór</strong> na polu${
               mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
-            } — wejście → walka w fazie II.</p>`
+            } — w fazie II możesz walczyć (opcjonalnie).</p>`
           : ""
       }
       ${
@@ -189,7 +189,7 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
       mon
         ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.monster()} <strong>Potwór</strong>${
             mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
-          } — wejście → walka</p>`
+          } — walka opcjonalna (faza II)</p>`
         : ""
     }
     ${
