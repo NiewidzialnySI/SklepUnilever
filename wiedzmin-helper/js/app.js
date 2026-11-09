@@ -17,8 +17,18 @@ import {
 import { SCHOOLS, sourcesHtml } from "./sources.js";
 import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
 import { ICO, SCHOOL_ICON, iconsLegendHtml } from "./icons.js";
+import {
+  defaultBoard,
+  ensurePlayerTrack,
+  mapSvgHtml,
+  mapToolbarHtml,
+  selectedLocPanel,
+  playerTrackerHtml,
+  fatigueForReputation,
+  phase3DrawHint,
+} from "./board.js";
 
-const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v3";
+const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
 
 const state = loadState() || defaultState();
 
@@ -32,6 +42,7 @@ function defaultState() {
     activeIndex: 0,
     setupIndex: 0,
     turn: { phase: "hub", screen: "hub" },
+    board: defaultBoard(),
   };
 }
 
@@ -54,15 +65,28 @@ function saveState() {
 function ensureRoster() {
   const n = state.players;
   if (!Array.isArray(state.roster)) state.roster = [];
+  if (!state.board) state.board = defaultBoard();
   while (state.roster.length < n) {
     const i = state.roster.length;
-    state.roster.push({
-      name: n === 1 ? "Ja" : `Gracz ${i + 1}`,
-      schoolId: SCHOOLS[i % SCHOOLS.length].id,
-    });
+    const start = START_RESOURCES[n]?.[i] || { cards: 5, gold: 3 };
+    state.roster.push(
+      ensurePlayerTrack(
+        {
+          name: n === 1 ? "Ja" : `Gracz ${i + 1}`,
+          schoolId: SCHOOLS[i % SCHOOLS.length].id,
+        },
+        start.cards,
+        start.gold
+      )
+    );
   }
   if (state.roster.length > n) state.roster = state.roster.slice(0, n);
+  state.roster.forEach((p, i) => {
+    const start = START_RESOURCES[n]?.[i] || { cards: 5, gold: 3 };
+    ensurePlayerTrack(p, start.cards, start.gold);
+  });
   if (state.activeIndex >= n) state.activeIndex = 0;
+  if (state.board.placePlayer >= n) state.board.placePlayer = 0;
 }
 
 function schoolById(id) {
@@ -101,6 +125,7 @@ function render() {
   if (state.view === "home") renderHome();
   else if (state.view === "roster") renderRoster();
   else if (state.view === "setup") renderSetup();
+  else if (state.view === "board") renderBoard();
   else if (state.view === "turn") renderTurn();
   else if (state.view === "ref") renderRef();
   else if (state.view === "icons") renderIcons();
@@ -130,6 +155,7 @@ function shell(inner) {
         <button class="btn btn-ghost" data-nav="home">Start</button>
         <button class="btn btn-ghost" data-nav="roster">Gracze</button>
         <button class="btn btn-ghost" data-nav="setup">Przygotowanie</button>
+        <button class="btn btn-ghost" data-nav="board">Stół</button>
         <button class="btn btn-ghost" data-nav="turn">Tura</button>
         <button class="btn btn-ghost" data-nav="ref">Ściąga</button>
         <button class="btn btn-ghost" data-nav="icons">Ikony</button>
@@ -163,12 +189,12 @@ function renderHome() {
     <section class="panel home-hero">
       <p class="step-kicker">Pomocnik przy stole</p>
       <h1>Prowadzę Cię przez grę</h1>
-      <p class="lead">Wybierz liczbę graczy, przypisz <strong>imiona i szkoły</strong>, potem idziemy przez przygotowanie i tury. Ikony to ściąga symboli przy stole — to <strong>pomocnik</strong>, nie cyfrowa kopia gry.</p>
+      <p class="lead">Wybierz liczbę graczy, przypisz <strong>imiona i szkoły</strong>, potem idziemy przez przygotowanie i tury. Na <strong>Stole</strong> masz schemat mapy, potwory, reputację i licznik kart. Ikony tłumaczą symbole (eliksir, kości…).</p>
       <div class="badge-row">
         <span class="badge">Podstawka</span>
         <span class="badge">Solo + 2–5</span>
-        <span class="badge">Imiona + szkoły</span>
-        <span class="badge">${ICO.forest()}${ICO.mountain()}${ICO.water()} Ikony</span>
+        <span class="badge">Mapa + tracker</span>
+        <span class="badge">${ICO.elixir()}${ICO.dice()} Symbole</span>
       </div>
       <h3>1. Ile osób gra?</h3>
       <div class="choice-grid">
@@ -184,6 +210,7 @@ function renderHome() {
       </div>
       <div class="actions">
         <button class="btn btn-primary" id="to-roster">Dalej — imiona i szkoły</button>
+        <button class="btn btn-secondary" id="to-board">Stół — mapa i reputacja</button>
         <button class="btn btn-secondary" id="skip-setup">Mam rozłożone — prowadź turę</button>
       </div>
     </section>
@@ -193,6 +220,7 @@ function renderHome() {
     btn.addEventListener("click", () => setPlayers(Number(btn.dataset.players)));
   });
   appEl.querySelector("#to-roster").addEventListener("click", () => go("roster"));
+  appEl.querySelector("#to-board").addEventListener("click", () => go("board"));
   appEl.querySelector("#skip-setup").addEventListener("click", () => {
     go("turn", { turn: { phase: "hub", screen: "hub" } });
   });
@@ -248,7 +276,13 @@ function renderRoster() {
       const i = Number(card.dataset.idx);
       const name = card.querySelector('[data-field="name"]').value.trim() || `Gracz ${i + 1}`;
       const schoolId = card.querySelector('[data-field="schoolId"]').value;
-      state.roster[i] = { name, schoolId };
+      const prev = state.roster[i] || {};
+      const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
+      state.roster[i] = ensurePlayerTrack(
+        { ...prev, name, schoolId },
+        start.cards,
+        start.gold
+      );
     });
     used.clear();
     let dup = false;
@@ -398,6 +432,16 @@ function turnShell(title, body) {
 
 function setTurn(phase, screen) {
   state.turn = { phase, screen };
+  const p = activePlayer();
+  if (p) {
+    if (phase === "I") p.nowDoing = "faza1";
+    else if (screen === "fight" || screen === "fight-monster" || screen === "fight-witcher")
+      p.nowDoing = "walka";
+    else if (screen === "meditate") p.nowDoing = "medytacja";
+    else if (screen === "explore") p.nowDoing = "eksploracja";
+    else if (phase === "III") p.nowDoing = "faza3";
+    else if (phase === "hub") p.nowDoing = "czekam";
+  }
   saveState();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -490,9 +534,18 @@ function renderTurn() {
     addTurnButtons([
       {
         id: "go-i",
-        label: `Zaczynam fazę I (${p.name})`,
+        label: `Zaczynam fazę I (${escapeHtml(p.name)})`,
         primary: true,
-        onClick: () => setTurn("I", "phase1-start"),
+        onClick: () => {
+          p.nowDoing = "faza1";
+          saveState();
+          setTurn("I", "phase1-start");
+        },
+      },
+      {
+        id: "to-board",
+        label: "Stół — mapa / reputacja / karty",
+        onClick: () => go("board"),
       },
     ]);
     return;
@@ -589,12 +642,216 @@ function renderTurn() {
         id: "next",
         label: solo
           ? "Koniec tury (+1) — znów Ty"
-          : `Koniec tury → ${next.name}`,
+          : `Koniec tury → ${escapeHtml(next.name)}`,
         primary: true,
         onClick: () => nextPlayer(),
       },
+      {
+        id: "to-board",
+        label: "Stół — mapa / reputacja / karty",
+        onClick: () => go("board"),
+      },
     ]);
   }
+}
+
+function renderBoard() {
+  const board = state.board;
+  shell(`
+    <section class="panel board-panel">
+      <p class="step-kicker">Przy stole · mapa i status</p>
+      <h1>Stół</h1>
+      <p class="lead">Schemat mapy do oznaczania potworów i wiedźminów (możesz obracać). Poniżej reputacja, karty, złoto, eliksiry i przyciski „co robi teraz” — plus wyliczenie ile kart tracisz przy zmęczeniu i ile dobierasz w fazie III.</p>
+
+      <h2>Mapa (schemat)</h2>
+      ${mapToolbarHtml(board, state.roster)}
+      ${mapSvgHtml(board, state.roster, { schoolById })}
+      ${selectedLocPanel(board, state.roster)}
+
+      <h2>Gracze — reputacja i karty</h2>
+      <div class="tracker-list">
+        ${playerTrackerHtml(state.roster, {
+          schoolById,
+          activeIndex: state.activeIndex,
+          START_RESOURCES,
+          players: state.players,
+        })}
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="to-turn">Prowadź turę</button>
+        <button class="btn btn-secondary" id="to-icons">Co oznaczają symbole?</button>
+        <button class="btn btn-secondary" id="reset-board">Wyczyść tylko mapę</button>
+      </div>
+    </section>
+  `);
+
+  appEl.querySelectorAll(".map-tool").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.board.tool = btn.getAttribute("data-tool");
+      saveState();
+      render();
+    });
+  });
+
+  const rotCcw = appEl.querySelector("#map-rotate-ccw");
+  const rotCw = appEl.querySelector("#map-rotate-cw");
+  const rotReset = appEl.querySelector("#map-rotate-reset");
+  if (rotCcw) {
+    rotCcw.addEventListener("click", () => {
+      state.board.rotation = ((state.board.rotation || 0) - 90 + 360) % 360;
+      saveState();
+      render();
+    });
+  }
+  if (rotCw) {
+    rotCw.addEventListener("click", () => {
+      state.board.rotation = ((state.board.rotation || 0) + 90) % 360;
+      saveState();
+      render();
+    });
+  }
+  if (rotReset) {
+    rotReset.addEventListener("click", () => {
+      state.board.rotation = 0;
+      saveState();
+      render();
+    });
+  }
+
+  appEl.querySelectorAll("[data-place-player]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.board.placePlayer = Number(btn.dataset.placePlayer);
+      state.board.tool = "player";
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll(".map-node").forEach((g) => {
+    g.addEventListener("click", () => {
+      const locId = g.getAttribute("data-loc");
+      const tool = state.board.tool || "select";
+      state.board.selectedLoc = locId;
+
+      if (tool === "monster") {
+        const cur = state.board.monsters[locId] || { count: 0 };
+        state.board.monsters[locId] = { count: (cur.count || 0) + 1 };
+      } else if (tool === "monster-") {
+        const cur = state.board.monsters[locId];
+        if (cur) {
+          cur.count = Math.max(0, (cur.count || 0) - 1);
+          if (cur.count === 0) delete state.board.monsters[locId];
+        }
+      } else if (tool === "clear-m") {
+        delete state.board.monsters[locId];
+      } else if (tool === "player") {
+        const idx = state.board.placePlayer || 0;
+        if (state.roster[idx]) state.roster[idx].locationId = locId;
+      }
+
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-rep]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const n = Number(btn.dataset.rep);
+      if (state.roster[i]) state.roster[i].reputation = n;
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-cards-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const d = Number(btn.dataset.cardsDelta);
+      const p = state.roster[i];
+      if (!p) return;
+      p.cards = Math.max(0, Math.min(20, (p.cards || 0) + d));
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-gold-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const d = Number(btn.dataset.goldDelta);
+      const p = state.roster[i];
+      if (!p) return;
+      p.gold = Math.max(0, Math.min(99, (p.gold || 0) + d));
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-elixir-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const d = Number(btn.dataset.elixirDelta);
+      const p = state.roster[i];
+      if (!p) return;
+      p.elixirs = Math.max(0, Math.min(4, (p.elixirs || 0) + d));
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-now]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const now = btn.dataset.now;
+      if (state.roster[i]) {
+        state.roster[i].nowDoing = now;
+        if (now !== "czekam") state.activeIndex = i;
+      }
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-apply-fatigue]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const p = state.roster[i];
+      if (!p || p.reputation >= 4) return;
+      const next = p.reputation + 1;
+      const lose = fatigueForReputation(next);
+      p.reputation = next;
+      p.cards = Math.max(0, (p.cards || 0) - lose);
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll("[data-apply-draw7]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const p = state.roster[i];
+      if (!p) return;
+      const hint = phase3DrawHint(p.cards || 0);
+      p.cards = hint.afterDraw;
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelector("#to-turn").addEventListener("click", () =>
+    go("turn", { turn: { phase: "hub", screen: "hub" } })
+  );
+  appEl.querySelector("#to-icons").addEventListener("click", () => go("icons"));
+  appEl.querySelector("#reset-board").addEventListener("click", () => {
+    state.board = defaultBoard();
+    state.roster.forEach((p) => {
+      p.locationId = null;
+    });
+    saveState();
+    render();
+  });
 }
 
 function resourcesTable(n) {

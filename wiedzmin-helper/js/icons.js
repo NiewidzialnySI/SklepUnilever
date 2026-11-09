@@ -144,6 +144,36 @@ export const ICO = {
       `<circle cx="12" cy="12" r="9"/><path d="M8 15c2-1 3-4 4-4s2 3 4 4"/><path d="M12 7v4"/><circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none"/>`,
       { className: "ico-school" }
     ),
+  elixir: () =>
+    svg(
+      `<path d="M10 3h4"/><path d="M11 3v3.5L7.5 14a4.2 4.2 0 003.8 6h1.4a4.2 4.2 0 003.8-6L13 6.5V3"/><path d="M9 15c1.5 1 4.5 1 6 0"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>`,
+      { className: "ico-elixir" }
+    ),
+  burn: () =>
+    svg(
+      `<path d="M12 21c3.5 0 5.5-2.2 5.5-5.2 0-2.6-1.6-4.2-3.2-5.6.2 1.6-.4 2.6-1.3 3.2.1-2.4-1.1-4.4-3.5-6.4 0 2.8-1.2 4.4-2.4 5.6C5.8 14.2 6.5 21 12 21Z"/>`,
+      { className: "ico-burn" }
+    ),
+  discard: () =>
+    svg(
+      `<rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/>`,
+      { className: "ico-discard" }
+    ),
+  fatigue: () =>
+    svg(
+      `<path d="M5 19h14"/><path d="M8 19V9l4-4 4 4v10"/><path d="M10 13h4M10 16h4"/>`,
+      { className: "ico-fatigue" }
+    ),
+  reputation: () =>
+    svg(
+      `<circle cx="12" cy="12" r="9"/><path d="M8 14l2.5-5L12 12l1.5-3L16 14"/><path d="M7 17h10"/>`,
+      { className: "ico-reputation" }
+    ),
+  hand: () =>
+    svg(
+      `<path d="M7 11V8.5a1.5 1.5 0 013 0V11"/><path d="M10 11V7.5a1.5 1.5 0 013 0V11"/><path d="M13 11V8a1.5 1.5 0 013 0v6.5a4.5 4.5 0 01-4.5 4.5H12a5 5 0 01-5-5V12"/><path d="M7 12H5.5A1.5 1.5 0 004 13.5v.5"/>`,
+      { className: "ico-hand" }
+    ),
 };
 
 export const SCHOOL_ICON = {
@@ -165,8 +195,8 @@ export function iconsLegendHtml() {
       .join("")}</div>`;
 
   return `
-    <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> z planszówki (uproszczone, własne SVG — nie grafiki z pudełka). Mają pomóc szybciej ogarnąć ruch, karty i atrybuty przy stole.</p>
-    <p class="note">To nadal pomocnik, nie cyfrowa kopia gry. Karty i ilustracje zostają fizycznie przed Wami.</p>
+    <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> z planszówki (uproszczone, własne SVG — nie grafiki z pudełka). Widzisz na karcie butelkę, kości albo „ogień”? Tu jest co to znaczy.</p>
+    <p class="note">To nadal pomocnik, nie cyfrowa kopia gry. Tekstów i ilustracji kart nie kopiujemy — czytasz je z fizycznych kart.</p>
 
     <h3>Teren (ruch)</h3>
     ${row([
@@ -178,29 +208,63 @@ export function iconsLegendHtml() {
 
     <h3>Kolory kart akcji (walka / talia)</h3>
     ${row([
-      [ICO.cardBlue, "Szybki atak", "Niebieski"],
-      [ICO.cardRed, "Silny atak", "Czerwony"],
-      [ICO.cardGreen, "Unik", "Zielony"],
-      [ICO.cardYellow, "Znak defensywny", "Żółty"],
-      [ICO.cardPurple, "Znak ofensywny", "Fioletowy"],
+      [ICO.cardBlue, "Szybki atak", "Niebieski — często inicjatywa / szybkie uderzenie"],
+      [ICO.cardRed, "Silny atak", "Czerwony — mocniejsze obrażenia"],
+      [ICO.cardGreen, "Unik", "Zielony — unikanie / manewr"],
+      [ICO.cardYellow, "Znak defensywny", "Żółty — obrona znakiem"],
+      [ICO.cardPurple, "Znak ofensywny", "Fioletowy — atak znakiem"],
+    ])}
+
+    <h3>Eliksir, alchemia, kości</h3>
+    ${row([
+      [ICO.elixir, "Eliksir (butelka)", "Karta / żeton eliksiru. Masz max 4 na stole. Zużywasz w walce."],
+      [ICO.alchemy, "Alchemia", "Atrybut: w całej walce łącznie ≤ tyle eliksirów ile alchemii. +1 alchemia → dobierz 1 eliksir."],
+      [ICO.dice, "Kości / poker", "Kościany poker: 5 kości, układy jak w pokerze. Vs wiedźmin, miejscowi albo tabela solo."],
+      [ICO.hand, "Ręka", "Karty na ręce. Limit 7 poza walką."],
+    ])}
+    <div class="tip">
+      <strong>Gdy na karcie widać butelkę + kości:</strong> zwykle efekt związany z eliksirem albo z wynikiem kościanego pokera — <em>czytaj tekst karty</em> (ma pierwszeństwo). Alchemia mówi tylko <em>ile</em> eliksirów możesz łącznie wypić w tej walce; sam efekt jest na karcie eliksiru.
+    </div>
+    <details>
+      <summary><strong>Układy kościanego pokera (nagrody solo)</strong></summary>
+      <table class="table">
+        <thead><tr><th>Układ</th><th>Co to jest</th><th>Solo — złoto z banku</th></tr></thead>
+        <tbody>
+          <tr><td>Para</td><td>2 takie same</td><td>0</td></tr>
+          <tr><td>Dwie pary</td><td>2+2</td><td>1</td></tr>
+          <tr><td>Trójka</td><td>3 takie same</td><td>2</td></tr>
+          <tr><td>Mały strit</td><td>4 kolejne</td><td>3</td></tr>
+          <tr><td>Duży strit</td><td>5 kolejnych</td><td>3</td></tr>
+          <tr><td>Full</td><td>3+2</td><td>4</td></tr>
+          <tr><td>Kareta</td><td>4 takie same</td><td>5</td></tr>
+          <tr><td>Poker</td><td>5 takich samych</td><td>6</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Multi: poker z miejscowymi = 1 złoto + 2 z banku (sprawdź obszar). Poker z wiedźminem w fazie I → w tej turze <strong>nie walczysz</strong> z nim w fazie II.</p>
+    </details>
+
+    <h3>Usuwanie kart vs odrzucenie</h3>
+    ${row([
+      [ICO.burn, "Usuń z gry / burn / trash", "Karta wraca do pudełka na stałe (też zmęczenie)."],
+      [ICO.discard, "Odrzuć", "Na Twój stos odrzuconych — wróci przy medytacji / tasowaniu."],
+      [ICO.fatigue, "Zmęczenie", "Przy wejściu na pole reputacji: usuń z gry tyle kart, ile mówi symbol przy polu (1→1, 2→2…)."],
+      [ICO.reputation, "Reputacja", "Tor 0→4. 4. z walki wygrywa; medytacja jako „ostatnie” nie kończy gry."],
     ])}
 
     <h3>Atrybuty i zasoby</h3>
     ${row([
       [ICO.attack, "Atak", "Dobór kart w walce"],
-      [ICO.defense, "Obrona", "Limit tarczy"],
-      [ICO.alchemy, "Alchemia", "Eliksiry w walce"],
-      [ICO.specialty, "Zdolność szkoły", "Raz na walkę"],
-      [ICO.gold, "Złoto", "Bank / koszty"],
-      [ICO.shield, "Tarcza", "Blokuje obrażenia"],
-      [ICO.trophy, "Trofeum", "Droga do 4 reputacji"],
+      [ICO.defense, "Obrona", "Limit tarczy; +1 obrona → +1 tarcza"],
+      [ICO.specialty, "Zdolność szkoły", "Raz na walkę (w swojej szkole / wg karty)"],
+      [ICO.gold, "Złoto", "Bank / koszty / nagrody"],
+      [ICO.shield, "Tarcza", "Blokuje obrażenia; po walce reset do obrony"],
+      [ICO.trophy, "Trofeum", "Potwór / wiedźmin / medytacja → reputacja"],
     ])}
 
     <h3>Inne przy stole</h3>
     ${row([
-      [ICO.move, "Ruch", "Faza I — przesunięcie"],
-      [ICO.dice, "Kościany poker", "Vs wiedźmin / miejscowi / solo"],
-      [ICO.monster, "Potwór", "Walka / trop"],
+      [ICO.move, "Ruch", "Faza I — odrzucasz karty z symbolem terenu i idziesz"],
+      [ICO.monster, "Potwór", "Walka / trop / żeton na mapie"],
       [ICO.quest, "Zadanie", "Eksploracja ze słowem „zadanie”"],
     ])}
 

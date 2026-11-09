@@ -6,10 +6,11 @@ Prowadzi przez:
 
 1. **Wybór liczby graczy** + **imiona i szkoły** wiedźmińskie
 2. **Przygotowanie rozgrywki** — krok po kroku (plansza, talie, potwory, każdy gracz)
-3. **Turę gracza** — faza I → II → III, z gałęziami (ruch, walka, medytacja, eksploracja)
-4. **Wariant solo** — osobny setup i różnice w pokerze, walce, fazie III oraz tabeli wyniku
-5. **Ściągę** + **Leksykon** (atrybuty, zdolności szkół, kroki walki) + **Źródła** (instrukcja, FAQ, skróty YT/forów)
-6. **Nie zastępuje kart** — pełne teksty potworów/eliksirów/eksploracji zostają na stole (prawa CDPR)
+3. **Stół** — uproszczona mapa (obrót, potwory, pozycje wiedźminów), reputacja, licznik kart/złota/eliksirów, „co robi teraz”, wyliczenie zmęczenia i doboru
+4. **Turę gracza** — faza I → II → III, z gałęziami (ruch, walka, medytacja, eksploracja)
+5. **Wariant solo** — osobny setup i różnice w pokerze, walce, fazie III oraz tabeli wyniku
+6. **Ikony / ściąga symboli** — eliksir, kości, burn vs discard, zmęczenie + **Leksykon** + **Źródła**
+7. **Nie zastępuje kart** — pełne teksty potworów/eliksirów/eksploracji zostają na stole (prawa CDPR)
 
 ## Uruchomienie
 
