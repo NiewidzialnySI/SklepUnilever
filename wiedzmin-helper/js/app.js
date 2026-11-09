@@ -40,7 +40,6 @@ import {
   moveCostChooserHtml,
   applyMoveCost,
   locationActionGuideHtml,
-  exploreGuideHtml,
   destinationPreviewHtml,
   mapLocPopupHtml,
 } from "./guide.js";
@@ -1681,13 +1680,11 @@ function renderTurn() {
   }
 
   if (screen === "explore") {
-    const here = locById(p.locationId);
+    // nic nie zaznaczone na starcie — dopiero klik w kartę
+    if (state.turn) state.turn.exploreDeck = null;
     turnShell(
-      "Eksploracja — wybór talii",
-      `
-        ${exploreDeckChooserHtml({ selected: state.turn.exploreDeck })}
-        ${exploreGuideHtml(here, solo)}
-      `
+      "Eksploracja",
+      exploreDeckChooserHtml({ selected: null })
     );
     appEl.querySelectorAll("[data-explore-deck]").forEach((btn) => {
       btn.addEventListener("click", () => {
