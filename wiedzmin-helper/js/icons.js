@@ -41,18 +41,16 @@ export const ICO = {
    */
   wild: () =>
     svg(
-      `<circle cx="12" cy="12" r="10.6" fill="#b7c9d4" stroke="#6f8fa3" stroke-width="1.35"/>
-       <circle cx="12" cy="12" r="9.15" fill="#d2c4ad" stroke="#9a8b74" stroke-width="0.55"/>
-       <path d="M3.55 13.9c1.35-0.15 2.05 0.55 2.55 1.45 0.55-1.35 1.55-2.05 2.85-1.85 0.15 0.85-0.15 1.55-0.85 1.95-0.85 0.5-1.85 0.35-2.45-0.25-0.55 0.95-1.45 1.25-2.45 0.95-0.2-0.7 0-1.45 0.35-2.25z" fill="#5a9abb" stroke="#3f7a96" stroke-width="0.45"/>
-       <path d="M4.15 11.35c1.05-0.1 1.65 0.45 2.05 1.2 0.45-1.1 1.25-1.65 2.25-1.45 0.1 0.65-0.15 1.2-0.7 1.5-0.7 0.4-1.45 0.25-1.9-0.25-0.4 0.7-1.1 0.95-1.9 0.7-0.1-0.55 0-1.15 0.2-1.7z" fill="#7eb6d0" stroke="none"/>
-       <path d="M5.35 9.55c0.55 0.05 0.9 0.4 1.05 0.9 0.35-0.7 0.9-1.05 1.55-0.9-0.05 0.55-0.35 0.9-0.85 1.05-0.55 0.2-1.05 0-1.3-0.4-0.2 0.45-0.6 0.65-1.1 0.45 0.05-0.45 0.25-0.9 0.65-1.1z" fill="#d8eef7" stroke="none"/>
-       <path d="M9.05 17.55 L12 6.85 L14.95 17.55 Z" fill="#2f6b35" stroke="#214a26" stroke-width="0.4"/>
-       <path d="M10.15 13.85 L12 8.55 L13.85 13.85 Z" fill="#3f8644" stroke="none"/>
-       <path d="M10.7 11.35 L12 8.9 L13.3 11.35 Z" fill="#4f9a52" stroke="none"/>
-       <path d="M11.35 17.55 V19.05" stroke="#1d3a20" stroke-width="1.35" stroke-linecap="round"/>
-       <path d="M14.85 17.6 L17.35 8.15 L19.05 11.55 L20.7 17.6 Z" fill="#f4f2ec" stroke="#6a6862" stroke-width="0.45"/>
-       <path d="M17.35 8.15 L18.25 10.35 L16.55 10.55 Z" fill="#ffffff" stroke="none"/>
-       <path d="M18.55 12.85 L19.55 15.55 L17.85 15.7 Z" fill="#cfcbc3" stroke="none" opacity="0.7"/>`,
+      `<circle cx="12" cy="12" r="10.7" fill="#a9c0ce" stroke="#5f8296" stroke-width="1.4"/>
+       <circle cx="12" cy="12" r="9.2" fill="#d6c7ae" stroke="#8f806a" stroke-width="0.5"/>
+       <path d="M3.2 15.2 C4.6 12.4, 6.4 11.2, 8.5 12.4 C7.9 10.6, 6.5 9.5, 4.9 9.2 C5.8 8.1, 7.2 7.7, 8.7 8.3 C9.6 8.7, 10.1 9.5, 10.2 10.5 C10.35 12.2, 9.5 13.7, 8.1 14.6 C6.6 15.55, 4.7 15.7, 3.2 15.2 Z" fill="#4f92b2" stroke="#2f6a86" stroke-width="0.45"/>
+       <path d="M5.1 10.05 C5.85 9.55, 6.85 9.65, 7.45 10.35 C6.55 10.55, 5.7 10.45, 5.1 10.05 Z" fill="#eaf6fb" stroke="none"/>
+       <path d="M9.0 17.7 L12 6.5 L15.0 17.7 Z" fill="#276532" stroke="#1a4222" stroke-width="0.45"/>
+       <path d="M10.15 13.6 L12 8.35 L13.85 13.6 Z" fill="#3a813f" stroke="none"/>
+       <path d="M10.75 11.15 L12 8.7 L13.25 11.15 Z" fill="#4b984f" stroke="none"/>
+       <path d="M11.35 17.7 V19.15" stroke="#16351b" stroke-width="1.4" stroke-linecap="round"/>
+       <path d="M14.75 17.75 L17.2 7.85 L19.15 11.7 L20.85 17.75 Z" fill="#f7f5ef" stroke="#5c5a54" stroke-width="0.5"/>
+       <path d="M17.2 7.85 L18.2 10.2 L16.35 10.4 Z" fill="#ffffff" stroke="none"/>`,
       { className: "ico-wild" }
     ),
   gold: () =>
