@@ -1,4 +1,4 @@
-/** Oryginalne ikony-ściągi (nie assety z pudełka) — ułatwiają rozpoznawanie symboli przy stole. */
+/** Ikony-ściągi przy stole. Teren = PNG z Gemini; reszta = proste SVG (nie assety z pudełka). */
 
 const NS = 'xmlns="http://www.w3.org/2000/svg"';
 
@@ -6,54 +6,20 @@ function svg(inner, { size = 28, className = "", view = "0 0 24 24" } = {}) {
   return `<span class="ico ${className}" aria-hidden="true"><svg ${NS} width="${size}" height="${size}" viewBox="${view}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg></span>`;
 }
 
+/** Żetony terenu / uniwersalny — gotowe PNG (jedna ikona, bez tła). */
+function terrainPng(file, className, size = 28) {
+  return `<span class="ico ico-terrain ${className}" aria-hidden="true"><img class="ico-img" src="./img/terrain/${file}.png" alt="" width="${size}" height="${size}" decoding="async" /></span>`;
+}
+
 export const ICO = {
-  /** Żeton las — styl „pergamin” (3 świerki). */
-  forest: () =>
-    svg(
-      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
-       <path d="M5.1 18.1 L7.85 11.6 L10.6 18.1 Z" fill="#4a6b3d" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
-       <path d="M13.4 18.1 L16.15 11.6 L18.9 18.1 Z" fill="#4a6b3d" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
-       <path d="M8.15 18.35 L12 6.2 L15.85 18.35 Z" fill="#3f6234" stroke="#1a1814" stroke-width="0.85" stroke-linejoin="round"/>
-       <path d="M9.5 13.3 L12 8.55 L14.5 13.3 Z" fill="#557844" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>
-       <path d="M11.35 18.35 V20.05" stroke="#1a1814" stroke-width="1.35" stroke-linecap="round"/>`,
-      { className: "ico-forest" }
-    ),
-  /** Żeton góry — dwa szczyty ze śniegiem. */
-  mountain: () =>
-    svg(
-      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
-       <path d="M3.4 18.55 L8.85 7.15 L12.05 12.35 L14.75 8.35 L20.6 18.55 Z" fill="#7a7a76" stroke="#1a1814" stroke-width="0.85" stroke-linejoin="round"/>
-       <path d="M12.05 12.35 L14.75 8.35 L16.9 12.9 Z" fill="#5e5e5a" stroke="none"/>
-       <path d="M8.85 7.15 L10.55 10.35 L7.75 10.55 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>
-       <path d="M14.75 8.35 L16.2 10.7 L13.7 10.9 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.45" stroke-linejoin="round"/>`,
-      { className: "ico-mountain" }
-    ),
-  /** Żeton woda — zawinięte fale. */
-  water: () =>
-    svg(
-      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
-       <path d="M4.2 16.4 C6.2 13.2, 9.1 12.4, 11.6 14.6 C10.4 12.1, 8.1 10.6, 5.5 10.5 C7.1 8.7, 9.6 8.2, 12.1 9.4 C13.6 10.2, 14.5 11.6, 14.7 13.2 C15.0 15.6, 13.5 17.6, 11.1 18.5 C8.4 19.5, 5.4 18.8, 4.2 16.4 Z" fill="#6fa0b8" stroke="#1a1814" stroke-width="0.8" stroke-linejoin="round"/>
-       <path d="M9.4 11.0 C10.6 10.2, 12.2 10.35, 13.1 11.5 C11.7 11.7, 10.4 11.55, 9.4 11.0 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.4"/>
-       <path d="M5.8 13.7 C7.4 12.0, 9.6 11.7, 11.5 13.4 C10.4 11.8, 8.5 10.9, 6.5 11.0 C7.5 10.0, 9.0 9.7, 10.5 10.3" fill="none" stroke="#3f6f86" stroke-width="0.7"/>
-       <path d="M14.2 10.8 C15.8 9.0, 18.0 8.7, 19.6 10.5 C18.2 8.4, 15.7 7.8, 13.5 8.9 C14.6 8.3, 15.9 8.3, 16.9 8.9" fill="none" stroke="#1a1814" stroke-width="0.75" stroke-linecap="round"/>
-       <path d="M15.05 9.55 C15.85 9.0, 16.9 9.15, 17.45 9.95 C16.5 10.05, 15.65 9.9, 15.05 9.55 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.35"/>`,
-      { className: "ico-water" }
-    ),
-  /** Na karcie: las + góry nad falami (jak żeton AI — warstwy, nie 3 obok siebie). */
-  wild: () =>
-    svg(
-      `<circle cx="12" cy="12" r="10.8" fill="#e6d7bc" stroke="#1a1814" stroke-width="1.55"/>
-       <path d="M5.0 15.6 L7.55 9.4 L10.1 15.6 Z" fill="#4a6b3d" stroke="#1a1814" stroke-width="0.65" stroke-linejoin="round"/>
-       <path d="M7.8 16.0 L11.05 6.5 L14.3 16.0 Z" fill="#3f6234" stroke="#1a1814" stroke-width="0.75" stroke-linejoin="round"/>
-       <path d="M9.15 12.2 L11.05 8.35 L12.95 12.2 Z" fill="#557844" stroke="#1a1814" stroke-width="0.35" stroke-linejoin="round"/>
-       <path d="M13.55 16.2 L16.55 8.0 L18.55 11.7 L20.35 16.2 Z" fill="#7a7a76" stroke="#1a1814" stroke-width="0.7" stroke-linejoin="round"/>
-       <path d="M16.55 8.0 L17.55 10.2 L15.7 10.4 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.35" stroke-linejoin="round"/>
-       <path d="M18.55 11.7 L19.35 13.5 L17.85 13.65 Z" fill="#f4f1ea" stroke="#1a1814" stroke-width="0.3" stroke-linejoin="round"/>
-       <path d="M2.9 19.4 C5.4 16.0, 8.8 15.2, 12.0 17.5 C10.6 14.8, 7.7 13.2, 4.6 13.4 C6.5 11.6, 9.4 11.2, 12.2 12.7 C14.0 13.7, 15.1 15.3, 15.4 17.1 C16.0 15.0, 18.0 14.0, 20.3 14.8 C19.0 16.6, 17.5 18.0, 15.6 19.0 C12.8 20.4, 7.6 21.0, 2.9 19.4 Z" fill="#6fa0b8" stroke="#1a1814" stroke-width="0.75" stroke-linejoin="round"/>
-       <path d="M6.3 14.55 C7.5 13.7, 9.0 13.85, 9.9 15.0 C8.4 15.15, 7.2 14.95, 6.3 14.55 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.3"/>
-       <path d="M12.6 16.2 C13.7 15.4, 15.1 15.55, 15.85 16.6 C14.5 16.75, 13.4 16.55, 12.6 16.2 Z" fill="#f2f7fa" stroke="#1a1814" stroke-width="0.3"/>`,
-      { className: "ico-wild" }
-    ),
+  /** Żeton las — asset Gemini (3 świerki). */
+  forest: () => terrainPng("forest", "ico-forest"),
+  /** Żeton góry — asset Gemini (szczyty ze śniegiem). */
+  mountain: () => terrainPng("mountain", "ico-mountain"),
+  /** Żeton woda — asset Gemini (fale). */
+  water: () => terrainPng("water", "ico-water"),
+  /** Symbol na karcie: las + góry + woda w jednym okręgu (asset Gemini). */
+  wild: () => terrainPng("wild", "ico-wild"),
   gold: () =>
     svg(
       `<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><path d="M12 8.5v7M9.5 10.5c.6-.7 1.5-1 2.5-1s2 .4 2.5 1M9.5 13.5c.6.7 1.5 1 2.5 1s2-.4 2.5-1"/>`,
@@ -222,7 +188,7 @@ export function iconsLegendHtml() {
       .join("")}</div>`;
 
   return `
-    <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> z planszówki (uproszczone, własne SVG — nie grafiki z pudełka). Widzisz na karcie butelkę, kości albo „ogień”? Tu jest co to znaczy.</p>
+    <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> przy stole. Żetony terenu to grafiki wygenerowane pod ten helper; reszta to uproszczone SVG — nie oryginalne assety z pudełka. Widzisz na karcie butelkę, kości albo „ogień”? Tu jest co to znaczy.</p>
     <p class="note">To nadal pomocnik, nie cyfrowa kopia gry. Tekstów i ilustracji kart nie kopiujemy — czytasz je z fizycznych kart.</p>
 
     <h3>Żetony terenu (3 sztuki — jak w pudełku)</h3>

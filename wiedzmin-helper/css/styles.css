@@ -520,7 +520,7 @@ h3 {
   color: #6b4e16;
 }
 
-/* Ikony-ściągi (własne SVG, nie assety z pudełka) */
+/* Ikony-ściągi (teren = PNG Gemini; reszta SVG — nie assety z pudełka) */
 .ico {
   display: inline-flex;
   vertical-align: -0.35em;
@@ -528,8 +528,20 @@ h3 {
   color: #3d4a3f;
 }
 
-.ico svg {
+.ico svg,
+.ico .ico-img {
   display: block;
+}
+
+.ico-terrain .ico-img {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+}
+
+.ico-legend-item .ico-terrain .ico-img {
+  width: 2.35rem;
+  height: 2.35rem;
 }
 
 .ico-chip {
