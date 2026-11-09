@@ -217,118 +217,75 @@ export function chip(iconFn, label) {
 export function iconsLegendHtml() {
   const row = (items, rowClass = "") =>
     `<div class="ico-legend-row${rowClass ? ` ${rowClass}` : ""}">${items
-      .map(
-        ([fn, label, hint]) =>
-          `<div class="ico-legend-item"><div class="ico-legend-ico">${fn()}</div><div class="ico-legend-text"><strong>${label}</strong><span>${hint}</span></div></div>`
-      )
+      .map(([fn, label, hint]) => {
+        const text = hint
+          ? `<div class="ico-legend-text"><strong>${label}</strong><span>${hint}</span></div>`
+          : `<div class="ico-legend-text"><strong>${label}</strong></div>`;
+        return `<div class="ico-legend-item"><div class="ico-legend-ico">${fn()}</div>${text}</div>`;
+      })
       .join("")}</div>`;
 
   return `
-    <p class="lead">Ikony poniżej to <strong>ściąga symboli</strong> przy stole. Żetony terenu to grafiki wygenerowane pod ten helper; reszta to uproszczone SVG — nie oryginalne assety z pudełka. Widzisz na karcie butelkę, kości albo „ogień”? Tu jest co to znaczy.</p>
-    <p class="note">To nadal pomocnik, nie cyfrowa kopia gry. Tekstów i ilustracji kart nie kopiujemy — czytasz je z fizycznych kart.</p>
+    <h3>Teren</h3>
+    ${row(
+      [
+        [ICO.forest, "Las"],
+        [ICO.mountain, "Góry"],
+        [ICO.water, "Woda"],
+        [ICO.wild, "Uniwersalny"],
+      ],
+      "ico-legend-row--terrain"
+    )}
 
-    <h3>Żetony terenu (3 sztuki — jak w pudełku)</h3>
-    <p class="note">Na planszy / w stosach żetonów obszarów są tylko: <strong>las</strong>, <strong>góry</strong>, <strong>woda</strong>. Nie ma osobnego żetonu „wild”.</p>
+    <h3>Znaki lokacji</h3>
+    <p class="note">Akcje fazy I — opcjonalne, raz na turę. Walka z potworem to osobny wybór w fazie II.</p>
     ${row([
-      [ICO.forest, "Las", "Żeton: 3 świerki. Ruch: odrzuć kartę z lasem na sąsiada-las."],
-      [ICO.mountain, "Góry", "Żeton: szczyty. Ruch: karta z górami."],
-      [ICO.water, "Woda", "Żeton: fale. Ruch: karta z wodą (też ścieżki morskie)."],
-    ])}
-    <h3>Symbol na karcie (nie żeton)</h3>
-    ${row([
-      [ICO.wild, "Uniwersalny", "Na karcie: woda + las + góry w jednym okręgu = dowolny teren przy ruchu. To NIE jest 4. żeton z pudełka."],
-    ])}
-
-    <h3>Kolory kart akcji (walka / talia)</h3>
-    ${row([
-      [ICO.cardBlue, "Szybki atak", "Niebieski — często inicjatywa / szybkie uderzenie"],
-      [ICO.cardRed, "Silny atak", "Czerwony — mocniejsze obrażenia"],
-      [ICO.cardGreen, "Unik", "Zielony — unikanie / manewr"],
-      [ICO.cardYellow, "Znak defensywny", "Żółty — obrona znakiem"],
-      [ICO.cardPurple, "Znak ofensywny", "Fioletowy — atak znakiem"],
-    ])}
-
-    <h3>Eliksir, alchemia, kości</h3>
-    ${row([
-      [ICO.elixir, "Eliksir (butelka)", "Karta / żeton eliksiru. Masz max 4 na stole. Zużywasz w walce."],
-      [ICO.alchemy, "Alchemia", "Atrybut: w całej walce łącznie ≤ tyle eliksirów ile alchemii. +1 alchemia → dobierz 1 eliksir."],
-      [ICO.dice, "Kości / poker", "Kościany poker: 5 kości, układy jak w pokerze. Vs wiedźmin, miejscowi albo tabela solo."],
-      [ICO.hand, "Ręka", "Karty na ręce. Limit 7 poza walką."],
-    ])}
-    <div class="tip">
-      <strong>Gdy na karcie widać butelkę + kości:</strong> zwykle efekt związany z eliksirem albo z wynikiem kościanego pokera — <em>czytaj tekst karty</em> (ma pierwszeństwo). Alchemia mówi tylko <em>ile</em> eliksirów możesz łącznie wypić w tej walce; sam efekt jest na karcie eliksiru.
-    </div>
-    <details>
-      <summary><strong>Układy kościanego pokera (nagrody solo)</strong></summary>
-      <table class="table">
-        <thead><tr><th>Układ</th><th>Co to jest</th><th>Solo — złoto z banku</th></tr></thead>
-        <tbody>
-          <tr><td>Para</td><td>2 takie same</td><td>0</td></tr>
-          <tr><td>Dwie pary</td><td>2+2</td><td>1</td></tr>
-          <tr><td>Trójka</td><td>3 takie same</td><td>2</td></tr>
-          <tr><td>Mały strit</td><td>4 kolejne</td><td>3</td></tr>
-          <tr><td>Duży strit</td><td>5 kolejnych</td><td>3</td></tr>
-          <tr><td>Full</td><td>3+2</td><td>4</td></tr>
-          <tr><td>Kareta</td><td>4 takie same</td><td>5</td></tr>
-          <tr><td>Poker</td><td>5 takich samych</td><td>6</td></tr>
-        </tbody>
-      </table>
-      <p class="note">Multi: poker z miejscowymi = 1 złoto + 2 z banku (sprawdź obszar). Poker z wiedźminem w fazie I → w tej turze <strong>nie walczysz</strong> z nim w fazie II.</p>
-    </details>
-
-    <h3>Usuwanie kart vs odrzucenie</h3>
-    ${row([
-      [ICO.burn, "Usuń z gry / burn / trash", "Karta wraca do pudełka na stałe (też zmęczenie)."],
-      [ICO.discard, "Odrzuć", "Na Twój stos odrzuconych. Wraca do talii przy tasowaniu (np. pusta talia poza walką / po walce) — nie przy medytacji."],
-      [ICO.fatigue, "Zmęczenie", "Przy wejściu na pole reputacji: usuń z gry tyle kart, ile mówi symbol przy polu (1→1, 2→2…)."],
-      [ICO.reputation, "Reputacja", "Tor 0→4. 4. z walki wygrywa; medytacja jako „ostatnie” nie kończy gry."],
-    ])}
-
-    <h3>Znaki pod nazwami miejscowości (Gemini)</h3>
-    <p class="note">To akcje <strong>fazy I</strong> — opcjonalne, raz na turę każdy konkretny znak. Wejście na pole z potworem <em>nie</em> wymusza walki.</p>
-    ${row([
-      [ICO.actionSchool, "Szkoła", "Zapłać złoto = poziom docelowy (2–5) → +1 atak/obrona/alchemia; specjalność tylko we własnej szkole."],
-      [ICO.actionAttack, "+ Atak", "Darmowy trening: atak ≤ poziom wiedźmina → +1 atak (Ard Modron)."],
-      [ICO.actionDefense, "+ Obrona", "Obrona ≤ poziom → +1 obrona (+1 tarcza) (Cidaris)."],
-      [ICO.actionAlchemy, "+ Alchemia", "Alchemia ≤ poziom → +1 alchemia i dobierz 1 eliksir (Ban Ard)."],
-      [ICO.actionSpecialty, "+ Specjalność", "Specjalność ≤ poziom → +1 specjalność (Glenmore)."],
-      [ICO.actionElixir, "+ Eliksir", "Dobierz 1 kartę eliksiru (max 4) — Beauclair, Dhuwod, Cintra."],
+      [ICO.actionSchool, "Szkoła", "Złoto = poziom docelowy → +1 atak/obrona/alchemia; specjalność tylko we własnej szkole."],
+      [ICO.actionAttack, "+ Atak", "Atak ≤ poziom → +1 atak (Ard Modron)."],
+      [ICO.actionDefense, "+ Obrona", "Obrona ≤ poziom → +1 obrona (Cidaris)."],
+      [ICO.actionAlchemy, "+ Alchemia", "Alchemia ≤ poziom → +1 alchemia + eliksir (Ban Ard)."],
+      [ICO.actionSpecialty, "+ Specjalność", "Specjalność ≤ poziom → +1 (Glenmore)."],
+      [ICO.actionElixir, "+ Eliksir", "Dobierz 1 eliksir, max 4 (Beauclair, Dhuwod, Cintra)."],
       [ICO.actionDice, "Poker", "Kościany poker z miejscowymi (Novigrad, Loc Ichaer)."],
-      [ICO.actionTrail, "Tropienie", "+1 złoto; opcja: 1 złoto → zadanie tropienia (Hengfors, Doldeth)."],
-      [ICO.actionClean, "Wyzima", "0 złota → +1 złoto; możesz spalić karty z puli na polach z płomieniem."],
-      [ICO.actionTrash, "Vengerberg", "Usuń 1 kartę z ręki → kup 1 z puli (koszt ≤+1 względem usuniętej)."],
+      [ICO.actionTrail, "Tropienie", "+1 złoto; opcja 1 złoto → zadanie tropienia (Hengfors, Doldeth)."],
+      [ICO.actionClean, "Wyzima", "0 złota → +1; możesz spalić karty z puli (płomienie)."],
+      [ICO.actionTrash, "Vengerberg", "Usuń 1 z ręki → kup 1 z puli (koszt ≤+1)."],
     ])}
 
     <h3>Atrybuty i zasoby</h3>
     ${row([
       [ICO.attrAttackPng, "Atak", "Dobór kart w walce"],
-      [ICO.attrDefensePng, "Obrona", "Limit tarczy; +1 obrona → +1 tarcza"],
-      [ICO.attrAlchemyPng, "Alchemia", "Limit eliksirów w walce; +1 alchemia → +1 eliksir"],
-      [ICO.attrSpecialtyPng, "Zdolność szkoły", "Użycie w walce: raz na walkę. Trening zdolności: tylko w swojej szkole."],
-      [ICO.gold, "Złoto", "Bank / koszty / nagrody"],
-      [ICO.shield, "Tarcza", "Blokuje obrażenia; po walce reset do obrony"],
-      [ICO.trophy, "Trofeum", "Potwór / wiedźmin / medytacja → reputacja"],
+      [ICO.attrDefensePng, "Obrona", "+1 obrona → +1 tarcza"],
+      [ICO.attrAlchemyPng, "Alchemia", "Limit eliksirów w walce"],
+      [ICO.attrSpecialtyPng, "Zdolność szkoły", "Raz na walkę; trening tylko w swojej szkole"],
+      [ICO.gold, "Złoto"],
+      [ICO.shield, "Tarcza", "Po walce reset do obrony"],
+      [ICO.trophy, "Trofeum"],
+      [ICO.elixir, "Eliksir", "Max 4"],
+      [ICO.dice, "Kości"],
+      [ICO.hand, "Ręka", "Limit 7"],
     ])}
 
-    <h3>Inne przy stole</h3>
+    <h3>Karty i reputacja</h3>
     ${row([
-      [ICO.move, "Ruch", "Faza I — odrzucasz karty z symbolem terenu i idziesz"],
-      [ICO.monster, "Potwór", "Walka / figurka na mapie"],
-      [ICO.quest, "Zadanie / trop", "Zadanie tropienia = żeton obszaru + złoto; po dojściu → żeton tropu (teren)"],
+      [ICO.burn, "Usuń z gry", "Do pudełka na stałe"],
+      [ICO.discard, "Odrzuć", "Na stos odrzuconych"],
+      [ICO.fatigue, "Zmęczenie", "Usuń karty wg toru reputacji"],
+      [ICO.reputation, "Reputacja", "4 z walki = wygrana"],
+      [ICO.move, "Ruch"],
+      [ICO.monster, "Potwór"],
+      [ICO.quest, "Zadanie"],
     ])}
-    <div class="tip">
-      <strong>Żeton tropu ≠ nowe żetony z pudełka.</strong> To zwykły <em>żeton obszaru</em> (las/góry/woda). Najpierw leży u Ciebie <em>nazwą lokacji do góry</em> (zadanie), potem po wejściu na tę lokację odwracasz go na symbol terenu = masz trop. Szczegóły: Ściąga / Leksykon.
-    </div>
 
-    <h3>Szkoły (medale Gemini)</h3>
+    <h3>Szkoły</h3>
     ${row(
       [
-        [ICO.schoolWilk, "Wilk", "Szermierka · start Kaer Morhen"],
-        [ICO.schoolGryf, "Gryf", "Magia · start Kaer Seren"],
-        [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · start Haern Caduch"],
-        [ICO.schoolKot, "Kot", "Szybkość · start Stygga"],
-        [ICO.schoolZmija, "Żmija", "Zatruta stal · start Gorthur Gvaed"],
-        [ICO.schoolMantikora, "Mantikora", "Start Behelt Nar (#0)"],
+        [ICO.schoolWilk, "Wilk", "Szermierka · Kaer Morhen"],
+        [ICO.schoolGryf, "Gryf", "Magia · Kaer Seren"],
+        [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · Haern Caduch"],
+        [ICO.schoolKot, "Kot", "Szybkość · Stygga"],
+        [ICO.schoolZmija, "Żmija", "Zatruta stal · Gorthur Gvaed"],
+        [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0)"],
       ],
       "ico-legend-row--schools"
     )}

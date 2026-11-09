@@ -1276,6 +1276,11 @@ h3 {
   margin: 0.6rem 0 1.1rem;
 }
 
+.ico-legend-row--terrain {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
 .ico-legend-row--schools {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
@@ -1292,12 +1297,22 @@ h3 {
   min-width: 0;
 }
 
+.ico-legend-row--terrain .ico-legend-item,
 .ico-legend-row--schools .ico-legend-item {
   grid-template-columns: 1fr;
   justify-items: center;
   text-align: center;
   gap: 0.45rem;
   padding: 0.85rem 0.7rem 0.95rem;
+}
+
+.ico-legend-row--terrain .ico-legend-item {
+  padding: 0.75rem 0.5rem;
+}
+
+.ico-legend-row--terrain .ico-terrain .ico-img {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
 }
 
 .ico-legend-ico {
@@ -1352,6 +1367,12 @@ h3 {
   font-size: 0.84rem;
   max-width: 11rem;
   margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .ico-legend-row--terrain {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
