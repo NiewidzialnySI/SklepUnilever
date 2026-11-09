@@ -2,7 +2,21 @@
 <html lang="pl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem("wiedzmin-stary-swiat-ui-scale") || "xl";
+          if (s === "md" || s === "lg" || s === "xl") {
+            document.documentElement.setAttribute("data-ui-scale", s);
+          } else {
+            document.documentElement.setAttribute("data-ui-scale", "xl");
+          }
+        } catch (e) {
+          document.documentElement.setAttribute("data-ui-scale", "xl");
+        }
+      })();
+    </script>
     <meta
       name="description"
       content="Pomocnik do planszówki Wiedźmin: Stary Świat — przygotowanie rozgrywki i prowadzenie tury krok po kroku."

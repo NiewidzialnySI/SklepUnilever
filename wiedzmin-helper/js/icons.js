@@ -2,7 +2,7 @@
 
 const NS = 'xmlns="http://www.w3.org/2000/svg"';
 
-function svg(inner, { size = 22, className = "", view = "0 0 24 24" } = {}) {
+function svg(inner, { size = 28, className = "", view = "0 0 24 24" } = {}) {
   return `<span class="ico ${className}" aria-hidden="true"><svg ${NS} width="${size}" height="${size}" viewBox="${view}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg></span>`;
 }
 

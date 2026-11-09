@@ -52,8 +52,32 @@ import {
 } from "./quests.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
+const UI_SCALE_KEY = "wiedzmin-stary-swiat-ui-scale";
+const UI_SCALES = ["md", "lg", "xl"];
 
 const appEl = document.getElementById("app");
+
+function loadUiScale() {
+  try {
+    const raw = localStorage.getItem(UI_SCALE_KEY) || "xl";
+    return UI_SCALES.includes(raw) ? raw : "xl";
+  } catch {
+    return "xl";
+  }
+}
+
+function applyUiScale(scale) {
+  const next = UI_SCALES.includes(scale) ? scale : "xl";
+  document.documentElement.setAttribute("data-ui-scale", next);
+  try {
+    localStorage.setItem(UI_SCALE_KEY, next);
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+applyUiScale(loadUiScale());
 
 function defaultState() {
   return {
@@ -267,13 +291,26 @@ function playersLabel(n) {
 }
 
 function shell(inner) {
+  const scale = loadUiScale();
   appEl.innerHTML = `
     <header class="topbar">
       <div class="brand">
         Wiedźmin: Stary Świat
-        <small>Pomocnik · podstawka${isSolo() ? " · solo" : ""}</small>
+        <small>Pomocnik · podstawka${isSolo() ? " · solo" : ""} · większy tekst pod stół</small>
       </div>
       <div class="top-actions">
+        <div class="ui-scale" role="group" aria-label="Rozmiar tekstu">
+          ${[
+            ["md", "A−", "Średni"],
+            ["lg", "A", "Duży"],
+            ["xl", "A+", "Bardzo duży"],
+          ]
+            .map(
+              ([id, label, title]) =>
+                `<button type="button" class="btn btn-ghost ${scale === id ? "nav-active" : ""}" data-ui-scale="${id}" title="${title}">${label}</button>`
+            )
+            .join("")}
+        </div>
         ${[
           ["home", "Start"],
           ["roster", "Gracze"],
@@ -295,6 +332,13 @@ function shell(inner) {
     ${inner}
     <p class="footer-note">Fanowski przewodnik (instrukcja + FAQ Rebel). Nie jest produktem CD PROJEKT RED / Go On Board.</p>
   `;
+
+  appEl.querySelectorAll("[data-ui-scale]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyUiScale(btn.getAttribute("data-ui-scale"));
+      render();
+    });
+  });
 
   appEl.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => {
