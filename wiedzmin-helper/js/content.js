@@ -156,7 +156,7 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
-          <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom — potem w fazie II walka opcjonalna po wejściu.</li>
+          <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
         <p class="note">Jeden potwór na teren (las / góry / woda).</p>
@@ -294,10 +294,7 @@ function buildMultiSetupSteps(n, roster = []) {
     {
       id: "help-cards",
       title: "Karty pomocy",
-      body: `
-        <p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>
-        <p class="tip">Pierwszy gracz = nr 1 z ekranu kolejności. Przygotowanie idzie od ostatniego gracza do pierwszego.</p>
-      `,
+      body: `<p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>`,
     },
   ];
 
@@ -399,7 +396,7 @@ export function phase1AfterMove(isSolo) {
     }.</li>
     <li><strong>Zadanie tropienia:</strong> jeśli weszłeś na obszar z nazwy na żetonie → zbierz złoto i odwróć żeton (masz trop). Zapisz dojście jako <em>zadanie u góry</em>.</li>
     <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze.</li>
-    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka (opcjonalna) / medytacja / eksploracja.</li>
+    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka / medytacja / eksploracja.</li>
   </ul>
   ${
     isSolo

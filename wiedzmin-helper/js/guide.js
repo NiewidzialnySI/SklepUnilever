@@ -193,7 +193,7 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
       mon
         ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.monster()} <strong>Potwór</strong>${
             mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
-          } — walka opcjonalna (faza II)</p>`
+          }</p>`
         : ""
     }
     ${

@@ -115,7 +115,7 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   } else if (canMonster && canWitcher) {
     reason = `Możesz walczyć z potworem albo z: ${others.map((o) => o.name).join(", ")}.`;
   } else if (canMonster) {
-    reason = "Na Twoim polu stoi potwór — walka opcjonalna (możesz też medytować / eksplorować).";
+    reason = "Na Twoim polu stoi potwór.";
   } else if (canWitcher) {
     reason = `Brak potwora na polu. Możesz walczyć z: ${others.map((o) => o.name).join(", ")}.`;
   } else {
