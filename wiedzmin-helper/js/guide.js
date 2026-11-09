@@ -203,7 +203,6 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
             .join(", ")}</strong></p>`
         : ""
     }
-    <p class="note map-loc-popup-note">Znika po 3 s albo kliku poza oknem</p>
   `;
 }
 
@@ -266,7 +265,7 @@ export function locationActionSteps(loc) {
   if (!loc) {
     return {
       title: "Brak lokacji",
-      steps: ["Ustaw wiedźmina na mapie, potem wróć tutaj."],
+      steps: ["Wybierz szkołę w zakładce Gracze — pionek staje na szkole startowej."],
       tip: "",
     };
   }
@@ -459,7 +458,7 @@ export function nowDoingGuideHtml(player, { isSolo = false } = {}) {
     return `
       <div class="guide-inline">
         <p class="tip"><strong>Faza I:</strong> najpierw obowiązkowy ruch (albo od razu faza II). Po ruchu możesz zrobić akcję ze znaku na polu.</p>
-        ${loc ? locationActionGuideHtml(loc) : `<p class="warn">Ustaw lokację na mapie, żeby zobaczyć znaki pola.</p>`}
+        ${loc ? locationActionGuideHtml(loc) : `<p class="warn">Brak lokacji — wróć do Graczy i wybierz szkołę (start automatyczny).</p>`}
       </div>`;
   }
   if (now === "poker") {
@@ -469,7 +468,7 @@ export function nowDoingGuideHtml(player, { isSolo = false } = {}) {
     return `
       <div class="guide-inline">
         <div class="guide-box">
-          <p class="tip">Ustaw lokację na mapie. Jeśli pole ma kości — graj poker. Inaczej wykonaj znak obszaru (patrz panel lokacji).</p>
+          <p class="tip">Jeśli pole ma kości — graj poker. Inaczej wykonaj znak obszaru (patrz panel lokacji).</p>
         </div>
       </div>`;
   }
