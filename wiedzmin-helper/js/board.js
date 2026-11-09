@@ -111,6 +111,7 @@ export function ensurePlayerTrack(p, startCards = 5, startGold = 3) {
   if (!p.locationId) p.locationId = null;
   if (!p.nowDoing) p.nowDoing = "czekam";
   if (typeof p.elixirs !== "number") p.elixirs = 0;
+  if (!Array.isArray(p.quests)) p.quests = [];
   return p;
 }
 
@@ -410,6 +411,27 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
           <p class="tip"><strong>Lokalizacja:</strong> ${
             loc ? escapeHtml(loc.name) : "nie ustawiona — kliknij na mapie (narzędzie „Ustaw wiedźmina”)"
           }</p>
+
+          ${
+            (p.quests || []).length
+              ? `<div class="tracker-quests">
+                  <p class="step-kicker" style="margin:0.35rem 0 0.25rem">${ICO.quest()} Zadania (${p.quests.length})</p>
+                  <ul class="checklist">
+                    ${p.quests
+                      .map((q) => {
+                        const ql = q.locationId ? locById(q.locationId) : null;
+                        return `<li>
+                          <strong>${escapeHtml(q.title || "Zadanie")}</strong>
+                          → ${ql ? escapeHtml(ql.name) : "?"}
+                          ${q.eventCard ? ` · Event <strong>#${escapeHtml(String(q.eventCard))}</strong>` : ""}
+                          <button type="button" class="btn btn-secondary" data-quest-done="${escapeHtml(q.id)}" data-idx="${i}">Usuń</button>
+                        </li>`;
+                      })
+                      .join("")}
+                  </ul>
+                </div>`
+              : ""
+          }
 
           <div class="now-row">
             <span class="step-kicker" style="margin:0">Co robi teraz</span>

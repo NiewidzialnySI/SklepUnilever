@@ -761,6 +761,40 @@ h3 {
   margin-top: 0.75rem;
 }
 
+.tracker-quests {
+  margin-top: 0.55rem;
+}
+
+.tracker-quests .checklist {
+  margin: 0.25rem 0 0;
+}
+
+.guide-quest-hit {
+  border-color: var(--brass);
+  background: linear-gradient(135deg, rgba(184, 146, 62, 0.18), rgba(255, 255, 255, 0.35));
+}
+
+.quest-add label,
+.resource-adjust label {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.quest-add input,
+.quest-add select {
+  font: inherit;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink);
+}
+
+.turn-summary .checklist li {
+  margin-bottom: 0.25rem;
+}
+
 .tracker-math summary {
   cursor: pointer;
   font-family: var(--font-display);

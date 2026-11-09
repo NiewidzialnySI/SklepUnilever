@@ -41,6 +41,15 @@ import {
   locationActionGuideHtml,
   exploreGuideHtml,
 } from "./guide.js";
+import {
+  exploreDeckChooserHtml,
+  exploreResolveHtml,
+  resourceAdjustHtml,
+  questArrivalHtml,
+  turnSummaryHtml,
+  ensureQuests,
+  newQuestId,
+} from "./quests.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v4";
 
@@ -53,7 +62,7 @@ function defaultState() {
     roster: [],
     activeIndex: 0,
     setupIndex: 0,
-    turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null },
+    turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null, exploreDeck: null },
     board: defaultBoard(),
   };
 }
@@ -73,6 +82,7 @@ function normalizeState(raw) {
           screen: String(raw.turn.screen || "hub"),
           moveTo: raw.turn.moveTo ? String(raw.turn.moveTo) : null,
           moveCost: raw.turn.moveCost ? String(raw.turn.moveCost) : null,
+          exploreDeck: raw.turn.exploreDeck ? String(raw.turn.exploreDeck) : null,
         }
       : base.turn;
   const board =
@@ -577,11 +587,14 @@ function turnShell(title, body) {
 function setTurn(phase, screen, extra = {}) {
   let moveTo = extra.moveTo !== undefined ? extra.moveTo : state.turn?.moveTo || null;
   let moveCost = extra.moveCost !== undefined ? extra.moveCost : state.turn?.moveCost || null;
+  let exploreDeck =
+    extra.exploreDeck !== undefined ? extra.exploreDeck : state.turn?.exploreDeck || null;
   if (extra.clearMove) {
     moveTo = null;
     moveCost = null;
   }
-  state.turn = { phase, screen, moveTo, moveCost };
+  if (extra.clearExplore) exploreDeck = null;
+  state.turn = { phase, screen, moveTo, moveCost, exploreDeck };
   const p = activePlayer();
   if (p) {
     if (phase === "I") p.nowDoing = "faza1";
@@ -659,7 +672,7 @@ function bindMoveCostTurn() {
   });
 }
 
-/** Po opłaceniu ruchu: potwór na polu → od razu walka. */
+/** Po opłaceniu ruchu: potwór → walka; inaczej po ruchu (+ ewentualne zadanie). */
 function finishMoveTo(p, toId, costId) {
   const mon = monsterAt(state.board, toId);
   if (mon) {
@@ -669,6 +682,56 @@ function finishMoveTo(p, toId, costId) {
   }
   p.nowDoing = "faza1";
   setTurn("I", "after-move", { moveTo: toId, moveCost: costId });
+}
+
+function bindResourceAdjust(player) {
+  appEl.querySelectorAll("[data-adj]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.getAttribute("data-adj");
+      const delta = Number(btn.getAttribute("data-delta"));
+      if (!player || !field) return;
+      if (field === "cards") player.cards = Math.max(0, Math.min(20, (player.cards || 0) + delta));
+      if (field === "gold") player.gold = Math.max(0, Math.min(99, (player.gold || 0) + delta));
+      if (field === "elixirs") player.elixirs = Math.max(0, Math.min(4, (player.elixirs || 0) + delta));
+      saveState();
+      render();
+    });
+  });
+}
+
+function bindQuestForms(player) {
+  const addBtn = appEl.querySelector("#quest-add-btn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      ensureQuests(player);
+      const title = (appEl.querySelector("#quest-title")?.value || "").trim() || "Zadanie";
+      const locationId = appEl.querySelector("#quest-loc")?.value;
+      const eventCard = (appEl.querySelector("#quest-event")?.value || "").trim();
+      const note = (appEl.querySelector("#quest-note")?.value || "").trim();
+      if (!locationId || !locById(locationId)) {
+        window.alert("Wybierz lokację zadania.");
+        return;
+      }
+      player.quests.push({
+        id: newQuestId(),
+        title: title.replace(/[<>]/g, ""),
+        locationId,
+        eventCard: eventCard.replace(/[<>]/g, ""),
+        note: note.replace(/[<>]/g, ""),
+      });
+      saveState();
+      render();
+    });
+  }
+  appEl.querySelectorAll("[data-quest-done]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-quest-done");
+      ensureQuests(player);
+      player.quests = player.quests.filter((q) => q.id !== id);
+      saveState();
+      render();
+    });
+  });
 }
 
 function addTurnButtons(buttons) {
@@ -832,11 +895,11 @@ function renderTurn() {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
     if (mon && here) {
-      // Awaryjnie — jeśli ktoś wrócił na after-move z potworem
       turnShell(
         "Potwór na polu!",
         `
           ${monsterEncounterHtml(here, mon)}
+          ${questArrivalHtml(p, p.locationId)}
           <div class="choice-grid">
             <button class="choice" data-goto="fight-monster"><strong>Zaczynam walkę</strong><span>Faza II — walka z potworem</span></button>
             <button class="choice" data-goto="move"><strong>Uciekam dalej</strong><span>Kolejny ruch (koszt kart)</span></button>
@@ -844,11 +907,13 @@ function renderTurn() {
         `
       );
       bindChoices();
+      bindQuestForms(p);
       return;
     }
     turnShell(
       "Faza I — po ruchu",
       `
+        ${questArrivalHtml(p, p.locationId)}
         <p class="lead">Jesteś na <strong>${here ? escapeHtml(here.name) : "—"}</strong>. Najpierw możesz zrobić <em>akcję ze znaku na tym polu</em>:</p>
         ${locationActionGuideHtml(here)}
         ${phase1AfterMove(solo)}
@@ -860,6 +925,7 @@ function renderTurn() {
       `
     );
     bindChoices();
+    bindQuestForms(p);
     return;
   }
 
@@ -885,6 +951,7 @@ function renderTurn() {
       "Walka z potworem — co teraz?",
       `
         ${mon && here ? monsterEncounterHtml(here, mon) : ""}
+        ${questArrivalHtml(p, p.locationId)}
         ${fightMonster(solo)}
         ${
           mon
@@ -895,6 +962,7 @@ function renderTurn() {
         }
       `
     );
+    bindQuestForms(p);
     const clearBtn = appEl.querySelector("#clear-monster-after-win");
     if (clearBtn) {
       clearBtn.addEventListener("click", () => {
@@ -939,17 +1007,95 @@ function renderTurn() {
 
   if (screen === "explore") {
     const here = locById(p.locationId);
-    turnShell("Eksploracja", exploreGuideHtml(here, solo));
+    turnShell(
+      "Eksploracja — wybór talii",
+      `
+        ${exploreDeckChooserHtml({ selected: state.turn.exploreDeck })}
+        ${exploreGuideHtml(here, solo)}
+      `
+    );
+    appEl.querySelectorAll("[data-explore-deck]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const deck = btn.getAttribute("data-explore-deck");
+        setTurn("II", "explore-resolve", { exploreDeck: deck });
+      });
+    });
     addTurnButtons([
-      { id: "to3", label: "Dalej → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
-      { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
+      { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2", { clearExplore: true }) },
+    ]);
+    return;
+  }
+
+  if (screen === "explore-resolve") {
+    const deck = state.turn.exploreDeck || "city";
+    turnShell(
+      "Eksploracja — po karcie",
+      exploreResolveHtml({ deck, isSolo: solo, player: p })
+    );
+    bindResourceAdjust(p);
+    bindQuestForms(p);
+    addTurnButtons([
+      {
+        id: "to3",
+        label: "Dalej → faza III",
+        primary: true,
+        onClick: () => setTurn("III", "phase3", { clearExplore: true }),
+      },
+      {
+        id: "back-deck",
+        label: "Inna talia",
+        onClick: () => setTurn("II", "explore", { clearExplore: true }),
+      },
     ]);
     return;
   }
 
   if (screen === "phase3") {
-    turnShell("Faza III — dobór i zakup", phase3(solo));
+    const hint = phase3DrawHint(p.cards || 0);
+    turnShell(
+      "Faza III — dobór i zakup",
+      `
+        ${phase3(solo)}
+        ${resourceAdjustHtml(p, { title: "Po doborze / kupnie — ustaw tracker" })}
+        <p class="tip">${escapeHtml(hint.note)}</p>
+        <div class="actions" style="margin:0.5rem 0">
+          <button type="button" class="btn btn-secondary" id="phase3-set-hand">Ustaw rękę na 3 (po doborze)</button>
+        </div>
+      `
+    );
+    bindResourceAdjust(p);
+    const setHand = appEl.querySelector("#phase3-set-hand");
+    if (setHand) {
+      setHand.addEventListener("click", () => {
+        p.cards = 3;
+        saveState();
+        render();
+      });
+    }
+    addTurnButtons([
+      {
+        id: "summary",
+        label: "Podsumowanie tury",
+        primary: true,
+        onClick: () => setTurn("III", "turn-summary"),
+      },
+      {
+        id: "to-board",
+        label: "Stół — mapa / reputacja / karty",
+        onClick: () => go("board"),
+      },
+    ]);
+    return;
+  }
+
+  if (screen === "turn-summary") {
+    const hint = phase3DrawHint(p.cards || 0);
     const next = state.roster[(state.activeIndex + 1) % state.players];
+    turnShell(
+      "Podsumowanie tury",
+      turnSummaryHtml(p, { phase3Hint: hint, schoolName: schoolById(p.schoolId).short })
+    );
+    bindQuestForms(p);
     addTurnButtons([
       {
         id: "next",
@@ -960,9 +1106,9 @@ function renderTurn() {
         onClick: () => nextPlayer(),
       },
       {
-        id: "to-board",
-        label: "Stół — mapa / reputacja / karty",
-        onClick: () => go("board"),
+        id: "back-p3",
+        label: "Wróć do fazy III",
+        onClick: () => setTurn("III", "phase3"),
       },
     ]);
   }
@@ -1254,6 +1400,19 @@ function renderBoard() {
       const p = state.roster[i];
       if (!p) return;
       p.elixirs = Math.max(0, Math.min(4, (p.elixirs || 0) + d));
+      saveState();
+      render();
+    });
+  });
+
+  appEl.querySelectorAll(".tracker-card [data-quest-done]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.idx);
+      const id = btn.getAttribute("data-quest-done");
+      const p = state.roster[i];
+      if (!p || !id) return;
+      ensureQuests(p);
+      p.quests = p.quests.filter((q) => q.id !== id);
       saveState();
       render();
     });
