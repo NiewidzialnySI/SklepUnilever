@@ -24,11 +24,33 @@ export function ensureCombatTrack(p) {
   }
   if (typeof p.shield !== "number") p.shield = p.attrs.defense;
   if (!Array.isArray(p.attrTrophies)) p.attrTrophies = [];
+  if (!Array.isArray(p.quests)) p.quests = [];
   if (!p.trails || typeof p.trails !== "object") {
     p.trails = { forest: null, mountain: null, water: null };
   }
   for (const t of TRAIL_TERRAINS) {
     if (p.trails[t] === undefined) p.trails[t] = null;
+    // Stare „zadanie tropienia” na żetonie → zadanie u góry (quests), żeton czysty
+    const slot = p.trails[t];
+    if (slot && slot.kind === "quest") {
+      const loc = slot.locId ? locById(slot.locId) : null;
+      const label = TERRAIN[t]?.label || t;
+      const already = p.quests.some(
+        (q) => q.locationId === slot.locId && String(q.title || "").includes("tropienia")
+      );
+      if (slot.locId && !already) {
+        p.quests.push({
+          id: `q-trail-${t}-${slot.locId}`,
+          title: `Zadanie tropienia (${label})`,
+          locationId: slot.locId,
+          eventCard: "",
+          note: loc
+            ? `Wejdź na ${loc.name}: zbierz złoto z żetonu i odwróć → żeton tropu.`
+            : "Wejdź na nazwę z żetonu: zbierz złoto i odwróć → żeton tropu.",
+        });
+      }
+      p.trails[t] = null;
+    }
   }
   if (typeof p.resourcesApplied !== "boolean") p.resourcesApplied = false;
   return p;
@@ -121,16 +143,12 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
       const slot = player.trails[t];
       const label = TERRAIN[t]?.label || t;
       const loc = slot?.locId ? locById(slot.locId) : null;
-      const status = !slot
-        ? "brak"
-        : slot.kind === "quest"
-          ? `zadanie → ${loc ? loc.name : "?"}`
-          : `trop${loc ? ` · ${loc.name}` : ""}`;
+      const status = slot?.kind === "trail" ? `trop${loc ? ` · ${loc.name}` : ""}` : "brak";
       return `<li>${TRAIL_ICON[t]?.() || ""} <strong>${label}:</strong> ${status}</li>`;
     }).join("");
     return `
       <div class="guide-box">
-        <p class="step-kicker" style="margin:0">${ICO.quest()} Żetony tropu</p>
+        <p class="step-kicker" style="margin:0">${ICO.monster()} Żetony tropu</p>
         <ul class="checklist">${rows}</ul>
       </div>`;
   }
@@ -160,23 +178,19 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
     }
 
     const loc = primary.loc;
-    const levelTxt = primary.level != null && primary.level !== "" ? `poz. ${escapeHtmlLite(String(primary.level))}` : "poz. ?";
-    const active = Boolean(slot);
-    // klik: brak → zadanie; zadanie → trop; trop → wyczyść
-    let nextKind = "quest";
-    let statusTxt = "weź zadanie";
-    if (slot?.kind === "quest") {
-      nextKind = "trail";
-      statusTxt = "zadanie · klik → trop";
-    } else if (slot?.kind === "trail") {
-      nextKind = "clear";
-      statusTxt = "trop · klik → wyczyść";
-    }
+    const levelTxt =
+      primary.level != null && primary.level !== ""
+        ? `poz. ${escapeHtmlLite(String(primary.level))}`
+        : "poz. ?";
+    const hasTrop = slot?.kind === "trail";
+    // klik: brak → trop (i tylko ten jeden); trop → wyczyść. Bez „zadania” tu.
+    const nextKind = hasTrop ? "clear" : "trail";
+    const statusTxt = hasTrop ? "trop · klik → wyczyść" : "klik → weź trop";
 
     return `
-      <button type="button" class="trail-token-btn ${active ? "active" : ""} ${
-        slot?.kind === "trail" ? "is-trail" : slot?.kind === "quest" ? "is-quest" : ""
-      }" data-trail-monster="${t}" data-loc="${escapeHtmlLite(loc.id)}" data-kind="${nextKind}" title="${escapeHtmlLite(label)}: ${escapeHtmlLite(loc.name)}">
+      <button type="button" class="trail-token-btn ${hasTrop ? "active is-trail" : ""}" data-trail-monster="${t}" data-loc="${escapeHtmlLite(
+        loc.id
+      )}" data-kind="${nextKind}" title="${escapeHtmlLite(label)}: ${escapeHtmlLite(loc.name)}">
         <span class="trail-token-ico">${TRAIL_ICON[t]?.() || ""}</span>
         <strong>${escapeHtmlLite(loc.name)}</strong>
         <span class="trail-token-meta">${levelTxt}</span>
@@ -187,8 +201,8 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
   const anyMon = TRAIL_TERRAINS.some((t) => (monsters[t] || []).length);
   return `
     <div class="guide-box trail-tokens-box">
-      <p class="step-kicker" style="margin:0">${ICO.quest()} Żetony tropu</p>
-      <p class="lead" style="margin:0.3rem 0 0">3 żetony (las / góry / woda) — z potworów na mapie. Klik: zadanie → trop → wyczyść.</p>
+      <p class="step-kicker" style="margin:0">${ICO.monster()} Żetony tropu</p>
+      <p class="lead" style="margin:0.3rem 0 0">Przy <strong>akcji tropienia</strong> wybierasz <strong>tylko 1</strong> potwora (1 z 3). Klik = masz trop tego terenu (zaczynasz walkę). Zadanie dojścia (nazwa z żetonu) zapisuj <strong>u góry</strong> jako zadanie.</p>
       ${anyMon ? "" : `<p class="warn" style="margin:0.45rem 0 0">Brak potworów na mapie — dodaj je na Stole.</p>`}
       <div class="trail-token-grid" role="group" aria-label="Żetony tropu">${buttons}</div>
     </div>`;
