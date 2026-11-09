@@ -897,12 +897,6 @@ h3 {
   font-size: 0.95rem;
 }
 
-.map-loc-popup-note {
-  margin: 0.55rem 0 0;
-  font-size: 0.8rem;
-  opacity: 0.75;
-}
-
 @keyframes map-loc-popup-in {
   from {
     opacity: 0;

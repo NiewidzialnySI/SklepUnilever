@@ -203,7 +203,6 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
             .join(", ")}</strong></p>`
         : ""
     }
-    <p class="note map-loc-popup-note">Znika po 3 s albo kliku poza oknem</p>
   `;
 }
 

@@ -159,7 +159,7 @@ function buildSoloSetupSteps(player) {
           <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom — potem w fazie II walka opcjonalna po wejściu.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
-        <p class="note">Reszta przygotowania potworów jak w multi. Jeden potwór na teren (las / góry / woda).</p>
+        <p class="note">Jeden potwór na teren (las / góry / woda).</p>
       `,
     },
     {

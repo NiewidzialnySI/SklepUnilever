@@ -33,6 +33,9 @@ import {
   monsterAt,
   monsterEncounterHtml,
   monstersPanelHtml,
+  monsterSpawnSlotHtml,
+  monsterFightOutcomePlan,
+  normalizeMonsterLevel,
   cycleMonsterTerrain,
   setMonsterTerrainByNumber,
   setMonsterTerrainLevel,
@@ -123,7 +126,14 @@ function defaultState() {
     roster: [],
     activeIndex: 0,
     setupIndex: 0,
-    turn: { phase: "hub", screen: "hub", moveTo: null, moveCost: null, exploreDeck: null },
+    turn: {
+      phase: "hub",
+      screen: "hub",
+      moveTo: null,
+      moveCost: null,
+      exploreDeck: null,
+      fightResult: null,
+    },
     board: defaultBoard(),
     orderDice: [],
   };
@@ -145,6 +155,9 @@ function normalizeState(raw) {
           moveTo: raw.turn.moveTo ? String(raw.turn.moveTo) : null,
           moveCost: raw.turn.moveCost ? String(raw.turn.moveCost) : null,
           exploreDeck: raw.turn.exploreDeck ? String(raw.turn.exploreDeck) : null,
+          fightResult: raw.turn.fightResult && typeof raw.turn.fightResult === "object"
+            ? raw.turn.fightResult
+            : null,
         }
       : base.turn;
   const board =
@@ -861,16 +874,24 @@ function setTurn(phase, screen, extra = {}) {
   let moveCost = extra.moveCost !== undefined ? extra.moveCost : state.turn?.moveCost || null;
   let exploreDeck =
     extra.exploreDeck !== undefined ? extra.exploreDeck : state.turn?.exploreDeck || null;
+  let fightResult =
+    extra.fightResult !== undefined ? extra.fightResult : state.turn?.fightResult || null;
   if (extra.clearMove) {
     moveTo = null;
     moveCost = null;
   }
   if (extra.clearExplore) exploreDeck = null;
-  state.turn = { phase, screen, moveTo, moveCost, exploreDeck };
+  if (extra.clearFightResult) fightResult = null;
+  state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult };
   const p = activePlayer();
   if (p) {
     if (phase === "I") p.nowDoing = "faza1";
-    else if (screen === "fight" || screen === "fight-monster" || screen === "fight-witcher")
+    else if (
+      screen === "fight" ||
+      screen === "fight-monster" ||
+      screen === "fight-monster-result" ||
+      screen === "fight-witcher"
+    )
       p.nowDoing = "walka";
     else if (screen === "meditate") p.nowDoing = "medytacja";
     else if (screen === "explore") p.nowDoing = "eksploracja";
@@ -1504,7 +1525,12 @@ function renderTurn() {
     const here = locById(p.locationId);
     const mon = monsterAt(state.board, p.locationId);
     if (!here || !mon) {
-      setTurn("II", "phase2");
+      // Nie skacz do eksploracji — po walce jest faza III (albo wynik).
+      if (state.turn?.fightResult) {
+        setTurn("II", "fight-monster-result");
+        return;
+      }
+      setTurn("III", "phase3", { clearFightResult: true });
       return;
     }
     ensureCombatTrack(p);
@@ -1523,8 +1549,14 @@ function renderTurn() {
         ${trailsHtml(p, { editable: true, board: state.board })}
         ${resourceAdjustHtml(p, { title: "Karty / złoto / eliksiry w walce" })}
         ${fightMonster(solo)}
-        <div class="actions" style="margin-top:0.8rem">
-          <button type="button" class="btn btn-secondary" id="clear-monster-after-win">Usuń potwora z mapy (pokonany / odpędzony)</button>
+        <div class="guide-box" style="margin-top:0.85rem">
+          <p class="step-kicker" style="margin:0">Wynik walki</p>
+          <p class="lead" style="margin:0.35rem 0 0">Faza II = <strong>1 wybór</strong> (walka <em>albo</em> medytacja <em>albo</em> eksploracja). Po walce idziesz do <strong>fazy III</strong> — nie eksplorujesz w tej samej turze.</p>
+          <div class="choice-grid" style="margin-top:0.65rem">
+            <button type="button" class="choice" data-fight-outcome="defeat"><strong>Pokonany</strong><span>Talia potwora = 0</span></button>
+            <button type="button" class="choice" data-fight-outcome="drive"><strong>Odpędzony</strong><span>Ty padłeś, u potwora &lt; 2 kart</span></button>
+            <button type="button" class="choice" data-fight-outcome="loss"><strong>Klęska</strong><span>Ty padłeś, u potwora ≥ 2 kart</span></button>
+          </div>
         </div>
       `
     );
@@ -1532,27 +1564,136 @@ function renderTurn() {
     bindResourceAdjust(p);
     bindAttrAdjust(p);
     bindTrailForms(p);
-    const clearBtn = appEl.querySelector("#clear-monster-after-win");
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        if (p.locationId) delete state.board.monsters[p.locationId];
+    appEl.querySelectorAll("[data-fight-outcome]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.getAttribute("data-fight-outcome");
+        const plan = monsterFightOutcomePlan({
+          kind,
+          isSolo: solo,
+          loc: here,
+          monster: mon,
+        });
+        if (plan.removeMonster && p.locationId) {
+          delete state.board.monsters[p.locationId];
+        }
         state.board.placeError = null;
-        saveState();
-        render();
+        setTurn("II", "fight-monster-result", { fightResult: plan });
+      });
+    });
+    addTurnButtons([
+      { id: "back", label: "Wróć", onClick: () => setTurn("II", solo ? "phase2" : "fight") },
+    ]);
+    return;
+  }
+
+  if (screen === "fight-monster-result") {
+    const plan = state.turn?.fightResult;
+    if (!plan) {
+      setTurn("III", "phase3");
+      return;
+    }
+    if (plan.needsSpawn && plan.terrain && plan.spawnLevel) {
+      // Utrzymaj wymagany poziom na slocie, jeśli już wybrano numer
+      const cur = state.board.monsters
+        ? Object.entries(state.board.monsters).find(([id, m]) => {
+            if (!m || !(m.count > 0)) return false;
+            const loc = locById(id);
+            return loc?.terrain === plan.terrain;
+          })
+        : null;
+      if (cur) {
+        const [id] = cur;
+        state.board.monsters[id] = {
+          count: 1,
+          level: normalizeMonsterLevel(plan.spawnLevel),
+          label: `Poz. ${normalizeMonsterLevel(plan.spawnLevel)}`,
+        };
+      }
+    }
+    const spawnReady =
+      !plan.needsSpawn ||
+      Boolean(
+        plan.terrain &&
+          Object.entries(state.board.monsters || {}).some(([id, m]) => {
+            if (!m || !(m.count > 0)) return false;
+            return locById(id)?.terrain === plan.terrain;
+          })
+      );
+    turnShell(
+      `Po walce — ${plan.title}`,
+      `
+        <div class="guide-box">
+          <p class="lead" style="margin:0">${plan.summary}</p>
+          ${
+            plan.spawnHint
+              ? `<p class="tip" style="margin:0.55rem 0 0">${plan.spawnHint}</p>`
+              : ""
+          }
+          <p class="note" style="margin:0.55rem 0 0">Dalej: <strong>faza III</strong> (dobór / kupno). Eksploracja to osobny wybór fazy II — nie robisz jej po walce w tej turze.</p>
+        </div>
+        ${
+          plan.needsSpawn && plan.terrain
+            ? monsterSpawnSlotHtml(state.board, {
+                terrain: plan.terrain,
+                level: plan.spawnLevel,
+              })
+            : ""
+        }
+        ${
+          plan.needsSpawn && !spawnReady
+            ? `<p class="warn" style="margin-top:0.6rem">Ustaw numer obszaru strzałkami (teren „${escapeHtml(
+                plan.terrainLabel || ""
+              )}”), potem przejdź do fazy III.</p>`
+            : ""
+        }
+      `
+    );
+    if (plan.needsSpawn) {
+      // cycle/num with locked level
+      appEl.querySelectorAll("[data-monster-cycle]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const terrain = btn.getAttribute("data-monster-cycle");
+          const delta = Number(btn.getAttribute("data-delta") || 1);
+          const result = cycleMonsterTerrain(state.board, terrain, delta);
+          if (result.ok && plan.spawnLevel) {
+            setMonsterTerrainLevel(state.board, terrain, normalizeMonsterLevel(plan.spawnLevel));
+          }
+          if (!result.ok) state.board.placeError = result.reason;
+          saveState();
+          render();
+        });
+      });
+      appEl.querySelectorAll("[data-monster-num]").forEach((input) => {
+        const apply = () => {
+          const terrain = input.getAttribute("data-monster-num");
+          const raw = String(input.value || "").trim();
+          if (raw === "") return;
+          const result = setMonsterTerrainByNumber(state.board, terrain, raw, {
+            level: normalizeMonsterLevel(plan.spawnLevel),
+          });
+          if (!result.ok) state.board.placeError = result.reason;
+          saveState();
+          render();
+        };
+        input.addEventListener("change", apply);
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            apply();
+          }
+        });
       });
     }
     addTurnButtons([
       {
         id: "to3",
-        label: "Koniec walki → faza III",
+        label: spawnReady ? "Dalej → faza III" : "Pomiń spawn → faza III",
         primary: true,
         onClick: () => {
           p.nowDoing = "faza3";
-          saveState();
-          setTurn("III", "phase3");
+          setTurn("III", "phase3", { clearFightResult: true });
         },
       },
-      { id: "back", label: "Wróć", onClick: () => setTurn("II", solo ? "phase2" : "fight") },
     ]);
     return;
   }

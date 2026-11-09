@@ -194,6 +194,142 @@ export function monsterEncounterHtml(loc, monster) {
   `;
 }
 
+const LEVEL_ORDER = ["I", "II", "III"];
+
+export function normalizeMonsterLevel(level) {
+  const s = String(level || "I").toUpperCase();
+  if (s === "1" || s === "I") return "I";
+  if (s === "2" || s === "II") return "II";
+  if (s === "3" || s === "III") return "III";
+  return LEVEL_ORDER.includes(s) ? s : "I";
+}
+
+/** Po pokonaniu: I→II, II→III, III→III. */
+export function nextMonsterLevelAfterDefeat(level) {
+  const lv = normalizeMonsterLevel(level);
+  if (lv === "I") return "II";
+  return "III";
+}
+
+/**
+ * Wynik walki z potworem → co zrobić z żetonem (instrukcja + solo).
+ * kind: defeat | drive | loss
+ */
+export function monsterFightOutcomePlan({ kind, isSolo, loc, monster }) {
+  const level = normalizeMonsterLevel(monster?.level);
+  const terrain = loc?.terrain || null;
+  const terrainLabel = terrain ? TERRAIN[terrain]?.label || terrain : "?";
+  const locName = loc?.name || "?";
+
+  if (kind === "loss") {
+    return {
+      kind,
+      removeMonster: false,
+      needsSpawn: false,
+      spawnLevel: null,
+      terrain,
+      terrainLabel,
+      oldLevel: level,
+      title: "Klęska",
+      summary: `Potwór zostaje na <strong>${escapeHtml(locName)}</strong> (poz. ${escapeHtml(
+        level
+      )}). Przy następnej walce ma pełną talię. Weź trop terenu „${escapeHtml(
+        terrainLabel
+      )}” (jeśli go nie masz) i 1 kartę kosztu 0 na odrzucone; w tej turze w fazie III dobierasz o 1 mniej.`,
+      spawnHint: null,
+    };
+  }
+
+  if (kind === "drive") {
+    return {
+      kind,
+      removeMonster: true,
+      needsSpawn: true,
+      spawnLevel: level,
+      terrain,
+      terrainLabel,
+      oldLevel: level,
+      title: "Odpędzenie",
+      summary: `Zdejmij żeton z <strong>${escapeHtml(locName)}</strong>. +2 złota; żeton na stos odpędzonych; 1 karta kosztu 0 na odrzucone.`,
+      spawnHint: `Nowy potwór: <strong>poziom ${escapeHtml(
+        level
+      )}</strong> (ten sam), teren <strong>${escapeHtml(
+        terrainLabel
+      )}</strong> — dobierz żeton obszaru tego terenu i wpisz jego numer poniżej.`,
+    };
+  }
+
+  // defeat
+  if (isSolo) {
+    return {
+      kind,
+      removeMonster: true,
+      needsSpawn: false,
+      spawnLevel: null,
+      terrain,
+      terrainLabel,
+      oldLevel: level,
+      title: "Pokonanie (solo)",
+      summary: `Zdejmij żeton z <strong>${escapeHtml(
+        locName
+      )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie. <strong>Solo: nie dobierasz nowego potwora</strong> po pokonaniu.`,
+      spawnHint: null,
+    };
+  }
+
+  const nextLv = nextMonsterLevelAfterDefeat(level);
+  return {
+    kind,
+    removeMonster: true,
+    needsSpawn: true,
+    spawnLevel: nextLv,
+    terrain,
+    terrainLabel,
+    oldLevel: level,
+    title: "Pokonanie",
+    summary: `Zdejmij żeton z <strong>${escapeHtml(
+      locName
+    )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie.`,
+    spawnHint: `Nowy potwór: <strong>poziom ${escapeHtml(
+      nextLv
+    )}</strong> (${escapeHtml(level)}→${escapeHtml(
+      nextLv
+    )}), teren <strong>${escapeHtml(
+      terrainLabel
+    )}</strong> — dobierz żeton obszaru tego samego terenu i wpisz numer poniżej.`,
+  };
+}
+
+/** Jednoslotowy picker numeru dla nowego potwora po walce. */
+export function monsterSpawnSlotHtml(board, { terrain, level }) {
+  if (!terrain || !MONSTER_TERRAINS.includes(terrain)) return "";
+  const t = TERRAIN[terrain];
+  const opts = locationsForTerrain(terrain);
+  const cur = monsterOccupyingTerrain(board, terrain);
+  const num = cur?.loc?.number;
+  const name = cur?.loc?.name || "— ustaw numer z żetonu —";
+  const lv = normalizeMonsterLevel(level || cur?.level || "I");
+  return `
+    <div class="monster-terrain-slot is-filled monster-spawn-slot" data-terrain-slot="${terrain}">
+      <div class="monster-terrain-head">
+        <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
+        <strong>${escapeHtml(t.label)}</strong>
+        <span class="monster-terrain-meta">${escapeHtml(name)} · poz. ${escapeHtml(lv)}</span>
+      </div>
+      <div class="monster-terrain-pick" role="group" aria-label="Numer nowego obszaru">
+        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni">◀</button>
+        <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+          num != null ? escapeHtml(String(num)) : ""
+        }" placeholder="#" aria-label="Numer obszaru" />
+        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny">▶</button>
+      </div>
+      <p class="note monster-terrain-hint">Poziom ustawiony na <strong>${escapeHtml(
+        lv
+      )}</strong> · numery: ${opts.map((l) => l.number).join(", ")}</p>
+    </div>
+  `;
+}
+
 export function monstersPanelHtml(board) {
   const levels = ["I", "II", "III"];
   const slots = MONSTER_TERRAINS.map((terrain) => {
