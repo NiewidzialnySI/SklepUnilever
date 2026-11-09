@@ -70,16 +70,16 @@ export function exploreResolveHtml({ deck, isSolo, player }) {
       </ol>`;
 
   return `
+    ${questAddFormHtml()}
+    ${questsListHtml(player)}
     <div class="guide-box">
       <p class="step-kicker" style="margin:0">Karta przeczytana · ${escapeHtml(deckLabel)}</p>
       <h3 style="margin:0.25rem 0 0.4rem">Zastosuj efekt</h3>
       ${steps}
       <p class="note">Brak złota na opcję = nie możesz jej wybrać. Robisz tyle efektu, ile da się.</p>
-      <p class="tip">Jeśli karta daje <strong>żeton tropu / zadanie tropienia</strong> — zapisz poniżej (nr lokacji z żetonu). Brak żetonów w stosie = ten fragment efektu przepada.</p>
+      <p class="tip">Jeśli karta daje <strong>żeton tropu</strong> — zaznacz 1 trop poniżej. <strong>Zadanie</strong> (lokacja + nr Event) zapisuj <strong>u góry</strong>. Brak żetonów w stosie = ten fragment efektu przepada.</p>
     </div>
     ${resourceAdjustHtml(player, { title: "Po karcie — popraw tracker" })}
-    ${questAddFormHtml()}
-    ${questsListHtml(player)}
   `;
 }
 
@@ -123,8 +123,8 @@ export function questAddFormHtml() {
   ).join("");
   return `
     <div class="guide-box quest-add">
-      <p class="step-kicker" style="margin:0">${ICO.quest()} Nowe zadanie (Quest)</p>
-      <p class="lead" style="margin:0.3rem 0 0">Jeśli rezultat karty to zadanie — zapisz je. Po dojściu na pole helper przypomni o karcie zdarzenia do przeczytania.</p>
+      <p class="step-kicker" style="margin:0">${ICO.quest()} Zadania (u góry)</p>
+      <p class="lead" style="margin:0.3rem 0 0">Tu zapisujesz zadania z kart (lokacja + nr Event) oraz dojście z żetonu tropienia. Po wejściu na pole helper przypomni o karcie zdarzenia.</p>
       <label>Tytuł / skrót z karty
         <input type="text" id="quest-title" maxlength="80" placeholder="np. Quest: Kaer Seren / trop" />
       </label>
@@ -179,7 +179,8 @@ export function questArrivalHtml(player, locId) {
     <div class="guide-box guide-quest-hit" role="alert">
       <p class="step-kicker" style="margin:0">${ICO.quest()} Zadanie na tym polu</p>
       <h3 style="margin:0.25rem 0 0.4rem">Jesteś na <strong>${escapeHtml(loc?.name || "?")}</strong></h3>
-      <p class="lead" style="margin:0">Możesz <em>opcjonalnie</em> rozwiązać zadanie w fazie I (instrukcja).</p>
+      <p class="lead" style="margin:0"><strong>Faza I</strong> — możesz <em>opcjonalnie</em> rozwiązać zadanie teraz (Event z nr poniżej). To <strong>nie</strong> jest faza II.</p>
+      <p class="note" style="margin:0.35rem 0 0">Jeśli na polu jest też potwór: najpierw zadanie (faza I), potem w fazie II wybierasz <strong>tylko 1</strong> rzecz — walka <em>albo</em> medytacja <em>albo</em> eksploracja. Nie robisz walki i potem karty zadania w tej samej fazie II.</p>
       <ul class="checklist">
         ${list
           .map(
@@ -188,7 +189,7 @@ export function questArrivalHtml(player, locId) {
             <strong>${escapeHtml(q.title || "Zadanie")}</strong>
             ${
               q.eventCard
-                ? ` — gracz po prawej dobiera kartę zdarzenia <strong>#${escapeHtml(String(q.eventCard))}</strong> i czyta.`
+                ? ` — gracz po prawej bierze kartę zdarzenia <strong>#${escapeHtml(String(q.eventCard))}</strong> i czyta.`
                 : " — sprawdź kartę zadania (nr zdarzenia)."
             }
             ${q.note ? `<div class="note">${escapeHtml(q.note)}</div>` : ""}

@@ -423,7 +423,8 @@ export function phase1AfterMove(isSolo) {
         ? "z miejscowymi (solo: vs tabela na karcie pomocy)"
         : "z wiedźminem na tym samym obszarze (raz z każdym; oboje ≥1 złoto)"
     }.</li>
-    <li><strong>Zadanie / tropienie:</strong> jeśli weszłeś na obszar z nazwy na żetonie zadania tropienia → zbierz złoto z żetonu i odwróć go (staje się żetonem tropu). Inne zadania z kart eksploracji — wg karty.</li>
+    <li><strong>Zadanie tropienia:</strong> jeśli weszłeś na obszar z nazwy na żetonie → zbierz złoto i odwróć żeton (masz trop). Zapisz dojście jako <em>zadanie u góry</em>.</li>
+    <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze. Jeśli na polu jest też potwór, walka to dopiero <strong>faza II</strong> (wybór 1 z: walka / medytacja / eksploracja).</li>
   </ul>
   ${
     isSolo

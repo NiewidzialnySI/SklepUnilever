@@ -411,8 +411,7 @@ h3 {
   transform: translateY(-1px);
 }
 
-.trail-token-btn.active,
-.trail-token-btn.is-quest {
+.trail-token-btn.active {
   border-color: var(--brass);
   background: rgba(184, 146, 62, 0.16);
 }

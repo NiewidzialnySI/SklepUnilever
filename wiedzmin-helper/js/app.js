@@ -1053,7 +1053,7 @@ function bindTrailForms(player) {
     btn.addEventListener("click", () => {
       const terrain = btn.getAttribute("data-trail-monster");
       const locId = btn.getAttribute("data-loc");
-      const kind = btn.getAttribute("data-kind") || "quest";
+      const kind = btn.getAttribute("data-kind") || "trail";
       if (!terrain) return;
       if (kind === "clear") {
         player.trails[terrain] = null;
@@ -1062,11 +1062,8 @@ function bindTrailForms(player) {
         return;
       }
       if (!locId || !locById(locId)) return;
-      player.trails[terrain] = {
-        kind,
-        locId,
-        goldOnToken: kind === "quest" ? 1 : 0,
-      };
+      // Przy akcji tropienia wybierasz 1 potwora (1 przycisk). Limit zasad: max 1 trop na teren.
+      player.trails[terrain] = { kind: "trail", locId, goldOnToken: 0 };
       saveState();
       render();
     });
@@ -1399,11 +1396,13 @@ function renderTurn() {
       turnShell(
         "Potwór na polu!",
         `
-          ${monsterEncounterHtml(here, mon)}
           ${questArrivalHtml(p, p.locationId)}
+          ${monsterEncounterHtml(here, mon)}
+          <p class="note">Najpierw faza I (zadanie / akcje obszaru). Walka to już <strong>faza II</strong> — wtedy nie czytasz już karty zadania z nr Event.</p>
           <div class="choice-grid">
             <button class="choice" data-goto="fight-monster"><strong>Zaczynam walkę</strong><span>Faza II — walka z potworem</span></button>
             <button class="choice" data-goto="move"><strong>Uciekam dalej</strong><span>Kolejny ruch (koszt kart)</span></button>
+            <button class="choice" data-goto="phase2"><strong>Dalej do fazy II</strong><span>Bez walki teraz</span></button>
           </div>
         `
       );
