@@ -444,6 +444,106 @@ h3 {
   color: #6b4e16;
 }
 
+/* Ikony-ściągi (własne SVG, nie assety z pudełka) */
+.ico {
+  display: inline-flex;
+  vertical-align: -0.35em;
+  margin: 0 0.12rem;
+  color: #3d4a3f;
+}
+
+.ico svg {
+  display: block;
+}
+
+.ico-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin: 0 0.1rem;
+  vertical-align: middle;
+}
+
+.ico-forest { color: #2f6b45; }
+.ico-mountain { color: #6b5b45; }
+.ico-water { color: #2f5f8b; }
+.ico-wild { color: #7a5a9a; }
+.ico-gold { color: #b8923e; }
+.ico-shield { color: #4a6a8b; }
+.ico-attack { color: #8b3a2f; }
+.ico-defense { color: #355f8b; }
+.ico-alchemy { color: #5a7a3a; }
+.ico-specialty { color: #b8923e; }
+.ico-card-blue { color: #2f5f9a; }
+.ico-card-red { color: #a33a2f; }
+.ico-card-green { color: #2f7a45; }
+.ico-card-yellow { color: #a08a2a; }
+.ico-card-purple { color: #6b3a8b; }
+.ico-monster { color: #6b3a2f; }
+.ico-quest { color: #5a4a2f; }
+.ico-dice { color: #4a453c; }
+.ico-move { color: #355f43; }
+.ico-trophy { color: #b8923e; }
+.ico-phase { color: #244833; }
+.ico-school { color: #244833; }
+
+.ico-legend-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.65rem;
+  margin: 0.6rem 0 1.1rem;
+}
+
+.ico-legend-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--line);
+}
+
+.ico-legend-item .ico {
+  margin-top: 0.15rem;
+  color: inherit;
+}
+
+.ico-legend-item .ico-forest { color: #2f6b45; }
+.ico-legend-item .ico-mountain { color: #6b5b45; }
+.ico-legend-item .ico-water { color: #2f5f8b; }
+.ico-legend-item .ico-wild { color: #7a5a9a; }
+.ico-legend-item .ico-gold { color: #b8923e; }
+.ico-legend-item .ico-card-blue { color: #2f5f9a; }
+.ico-legend-item .ico-card-red { color: #a33a2f; }
+.ico-legend-item .ico-card-green { color: #2f7a45; }
+.ico-legend-item .ico-card-yellow { color: #a08a2a; }
+.ico-legend-item .ico-card-purple { color: #6b3a8b; }
+
+.ico-legend-item strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin-bottom: 0.1rem;
+}
+
+.ico-legend-item span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.player-chip .ico {
+  color: #f7efd8;
+  margin: 0;
+}
+
+.phase-tab .ico {
+  margin-right: 0.2rem;
+  vertical-align: -0.3em;
+}
+
 @media (max-width: 640px) {
   .app {
     width: min(100% - 1rem, 920px);

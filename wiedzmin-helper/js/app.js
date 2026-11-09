@@ -16,6 +16,7 @@ import {
 } from "./content.js";
 import { SCHOOLS, sourcesHtml } from "./sources.js";
 import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
+import { ICO, SCHOOL_ICON, iconsLegendHtml } from "./icons.js";
 
 const STORAGE_KEY = "wiedzmin-stary-swiat-helper-v3";
 
@@ -102,9 +103,15 @@ function render() {
   else if (state.view === "setup") renderSetup();
   else if (state.view === "turn") renderTurn();
   else if (state.view === "ref") renderRef();
+  else if (state.view === "icons") renderIcons();
   else if (state.view === "lexicon") renderLexicon();
   else if (state.view === "sources") renderSources();
   else renderHome();
+}
+
+function schoolIcon(schoolId) {
+  const fn = SCHOOL_ICON[schoolId] || ICO.specialty;
+  return fn();
 }
 
 function playersLabel(n) {
@@ -125,6 +132,7 @@ function shell(inner) {
         <button class="btn btn-ghost" data-nav="setup">Przygotowanie</button>
         <button class="btn btn-ghost" data-nav="turn">Tura</button>
         <button class="btn btn-ghost" data-nav="ref">Ściąga</button>
+        <button class="btn btn-ghost" data-nav="icons">Ikony</button>
         <button class="btn btn-ghost" data-nav="lexicon">Leksykon</button>
         <button class="btn btn-ghost" data-nav="sources">Źródła</button>
       </div>
@@ -155,11 +163,12 @@ function renderHome() {
     <section class="panel home-hero">
       <p class="step-kicker">Pomocnik przy stole</p>
       <h1>Prowadzę Cię przez grę</h1>
-      <p class="lead">Wybierz liczbę graczy, przypisz <strong>imiona i szkoły</strong>, potem idziemy przez przygotowanie i tury — zgodnie z instrukcją i FAQ (tylko podstawka).</p>
+      <p class="lead">Wybierz liczbę graczy, przypisz <strong>imiona i szkoły</strong>, potem idziemy przez przygotowanie i tury. Ikony to ściąga symboli przy stole — to <strong>pomocnik</strong>, nie cyfrowa kopia gry.</p>
       <div class="badge-row">
         <span class="badge">Podstawka</span>
         <span class="badge">Solo + 2–5</span>
         <span class="badge">Imiona + szkoły</span>
+        <span class="badge">${ICO.forest()}${ICO.mountain()}${ICO.water()} Ikony</span>
       </div>
       <h3>1. Ile osób gra?</h3>
       <div class="choice-grid">
@@ -281,7 +290,10 @@ function renderSetup() {
   const step = steps[index];
   const pct = Math.round(((index + 1) / steps.length) * 100);
   const rosterHint = state.roster
-    .map((p) => `<span class="player-chip">${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>`)
+    .map(
+      (p) =>
+        `<span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>`
+    )
     .join(" ");
 
   shell(`
@@ -344,10 +356,10 @@ function escapeHtml(s) {
 
 function turnShell(title, body) {
   const tabs = [
-    ["hub", "Start tury"],
-    ["I", "Faza I"],
-    ["II", "Faza II"],
-    ["III", "Faza III"],
+    ["hub", `${ICO.trophy()} Start`],
+    ["I", `${ICO.phase1()}${ICO.move()} Faza I`],
+    ["II", `${ICO.phase2()}${ICO.monster()} Faza II`],
+    ["III", `${ICO.phase3()}${ICO.cardBlue()} Faza III`],
   ];
   const active = state.turn.phase;
   const p = activePlayer();
@@ -356,7 +368,7 @@ function turnShell(title, body) {
   shell(`
     <section class="panel">
       <div class="badge-row">
-        <span class="player-chip">${escapeHtml(p.name)} <span>${school.name}</span></span>
+        <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
       </div>
       <div class="phase-tabs">
         ${tabs
@@ -622,6 +634,24 @@ function renderRef() {
     Object.assign(state, defaultState());
     render();
   });
+}
+
+function renderIcons() {
+  shell(`
+    <section class="panel">
+      <p class="step-kicker">Ściąga symboli</p>
+      <h1>Ikony jak przy stole</h1>
+      ${iconsLegendHtml()}
+      <div class="actions">
+        <button class="btn btn-primary" id="to-turn">Do tury</button>
+        <button class="btn btn-secondary" id="to-lexicon">Leksykon szkół</button>
+      </div>
+    </section>
+  `);
+  appEl.querySelector("#to-turn").addEventListener("click", () =>
+    go("turn", { turn: { phase: "hub", screen: "hub" } })
+  );
+  appEl.querySelector("#to-lexicon").addEventListener("click", () => go("lexicon"));
 }
 
 function renderLexicon() {

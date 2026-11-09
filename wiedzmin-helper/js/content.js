@@ -1,4 +1,5 @@
 /** Treść przewodnika — Wiedźmin: Stary Świat, sama podstawka (PL). */
+import { ICO, chip } from "./icons.js";
 
 export const START_RESOURCES = {
   1: [{ cards: 5, gold: 3 }],
@@ -399,12 +400,12 @@ function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEnt
 }
 
 export const MOVE_HELP = `
-  <h3>Jak się ruszyć?</h3>
+  <h3>${chip(ICO.move, "Jak się ruszyć?")}</h3>
   <ul class="checklist">
-    <li>Odrzuć kartę z <strong>pasującym terenem</strong> do sąsiedniego obszaru.</li>
+    <li>${ICO.forest()}${ICO.mountain()}${ICO.water()} Odrzuć kartę z <strong>pasującym terenem</strong> (las / góry / woda) na sąsiedni obszar.</li>
     <li>Albo <strong>2 dowolne</strong> karty → dowolny sąsiad.</li>
-    <li>Albo <strong>1 karta + 1 złoto</strong> → dowolny sąsiad.</li>
-    <li><strong>Uniwersalny</strong> teren = 1 karta na dowolny sąsiad.</li>
+    <li>Albo <strong>1 karta + ${chip(ICO.gold, "1 złoto")}</strong> → dowolny sąsiad.</li>
+    <li>${chip(ICO.wild, "Uniwersalny")} teren = 1 karta na dowolny sąsiad.</li>
   </ul>
 `;
 
@@ -576,12 +577,12 @@ export function phase3(isSolo) {
 export const LOCATION_ACTIONS = `
   <h3>Szybka ściąga akcji obszarów</h3>
   <ul class="checklist">
-    <li><strong>Szkoły:</strong> koszt w złocie = poziom docelowy (aktualny + 1) → +1 atak/obrona/alchemia; zdolność specjalną tylko w swojej szkole.</li>
+    <li>${ICO.specialty()} <strong>Szkoły:</strong> koszt ${ICO.gold()} = poziom docelowy (aktualny + 1) → +1 ${chip(ICO.attack, "atak")} / ${chip(ICO.defense, "obrona")} / ${chip(ICO.alchemy, "alchemia")}; zdolność tylko w swojej szkole.</li>
     <li><strong>Darmowy trening:</strong> +1 do atrybutu tylko jeśli poziom atrybutu ≤ poziomu wiedźmina.</li>
-    <li><strong>Eliksir:</strong> dobierz 1 (limit 4).</li>
-    <li><strong>Poker z miejscowymi:</strong> 1 złoto + 2 z banku (multi) / w solo: 1 złoto i tabela nagród.</li>
+    <li>${ICO.alchemy()} <strong>Eliksir:</strong> dobierz 1 (limit 4).</li>
+    <li>${ICO.dice()} <strong>Poker z miejscowymi:</strong> 1 złoto + 2 z banku (multi) / solo: 1 złoto + tabela.</li>
     <li><strong>Wymiana:</strong> usuń 1 kartę z ręki, kup z puli o koszcie ≤ usuniętej + 1.</li>
-    <li><strong>Tropienie:</strong> +1 złoto, żeton obszaru terenu potwora jako zadanie tropienia.</li>
+    <li>${ICO.monster()}${ICO.quest()} <strong>Tropienie:</strong> +1 złoto, żeton terenu potwora jako zadanie tropienia.</li>
     <li><strong>Czyszczenie puli:</strong> bez złota → 1 złoto; możesz usunąć 1–2 karty z puli.</li>
   </ul>
 `;
