@@ -892,13 +892,12 @@ h3 {
 
 .roster-card-badge .ico-school-img .ico-img {
   display: block;
-  /* Overscale + lekki lift: PNG wypełnia kółko; rysunek zwierzęcia w assetach siedzi nisko. */
-  width: 118%;
-  height: 118%;
+  /* 100%+ overscale: medalion wypełnia kółko (globalne .ico-school-img to 1.75rem). */
+  width: 112%;
+  height: 112%;
   max-width: none;
   object-fit: cover;
   object-position: center;
-  transform: translateY(-6%);
 }
 
 .roster-card-fields {
@@ -1744,12 +1743,11 @@ h3 {
 
 .order-avatar .ico-school-img .ico-img {
   display: block;
-  width: 118%;
-  height: 118%;
+  width: 112%;
+  height: 112%;
   max-width: none;
   object-fit: cover;
   object-position: center;
-  transform: translateY(-6%);
 }
 
 .order-identity {
