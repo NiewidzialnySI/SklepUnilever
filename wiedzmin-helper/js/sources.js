@@ -3,12 +3,15 @@
  *  więc poniżej: scalone streszczenia z opisów/rozdziałów filmów + oficjalne FAQ.
  */
 
+/** Kolory znaczników / kostek / pierścieni figurek (jak na komponentach przy stole).
+ *  Wilk=brązowy, Gryf=żółty, Niedźwiedź=czerwony, Kot=granat, Żmija=zielony.
+ */
 export const SCHOOLS = [
-  { id: "wilk", name: "Szkoła Wilka", short: "Wilk" },
-  { id: "gryf", name: "Szkoła Gryfa", short: "Gryf" },
-  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedź" },
-  { id: "kot", name: "Szkoła Kota", short: "Kot" },
-  { id: "zmija", name: "Szkoła Żmii", short: "Żmija" },
+  { id: "wilk", name: "Szkoła Wilka", short: "Wilk", color: "#6b4a32" },
+  { id: "gryf", name: "Szkoła Gryfa", short: "Gryf", color: "#c9a227" },
+  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedź", color: "#9a3b2f" },
+  { id: "kot", name: "Szkoła Kota", short: "Kot", color: "#24344a" },
+  { id: "zmija", name: "Szkoła Żmii", short: "Żmija", color: "#3d6b45" },
 ];
 
 export const SOURCES = [
