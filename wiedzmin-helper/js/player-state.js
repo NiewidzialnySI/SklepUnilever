@@ -2,7 +2,14 @@
  * Atrybuty, tropy, medytacja, startowe zasoby.
  */
 import { ICO } from "./icons.js";
-import { locById, LOCATIONS, TERRAIN, actionHintFor, fatigueForReputation } from "./map-data.js";
+import {
+  locById,
+  LOCATIONS,
+  TERRAIN,
+  actionHintFor,
+  fatigueForReputation,
+  isSchoolLocationId,
+} from "./map-data.js";
 import { START_RESOURCES } from "./content.js";
 
 export const ATTR_KEYS = [
@@ -193,7 +200,8 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   const others = (roster || []).filter(
     (r) => r && r !== player && r.locationId && locId && r.locationId === locId
   );
-  const canWitcher = !isSolo && others.length > 0;
+  const onSchool = Boolean(locId && isSchoolLocationId(locId));
+  const canWitcher = !isSolo && others.length > 0 && !onSchool;
   const can = canMonster || canWitcher;
   let reason;
   if (!locId) {
@@ -201,9 +209,13 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   } else if (canMonster && canWitcher) {
     reason = `Możesz walczyć z potworem albo z: ${others.map((o) => o.name).join(", ")}.`;
   } else if (canMonster) {
-    reason = "Na Twoim polu stoi potwór.";
+    reason = onSchool && others.length
+      ? "Na Twoim polu stoi potwór. Walka z wiedźminem na szkole jest zabroniona."
+      : "Na Twoim polu stoi potwór.";
   } else if (canWitcher) {
     reason = `Brak potwora na polu. Możesz walczyć z: ${others.map((o) => o.name).join(", ")}.`;
+  } else if (onSchool && others.length > 0) {
+    reason = "Walka z wiedźminem zabroniona na szkole. Brak potwora na tym polu.";
   } else {
     reason = "Walka zablokowana: na tym polu nie ma potwora (oznacz go na mapie, jeśli stoi na stole).";
   }
@@ -402,10 +414,24 @@ export function fieldChangePrompt(player, loc) {
   };
 
   if (key === "schoolTrain") {
+    const ownSchool = Boolean(loc?.school && loc.school === player.schoolId);
     for (const a of ATTR_KEYS) {
       const cur = player.attrs[a.id] || 1;
       const target = cur + 1;
       const cost = target;
+      if (a.id === "specialty" && !ownSchool) {
+        actions.push({
+          id: `school:${a.id}`,
+          kind: "school",
+          attrId: a.id,
+          goldCost: cost,
+          label: `Szkoła: +1 ${a.label} (−${cost} zł)`,
+          detail: "Specjalność rozwijasz tylko we własnej szkole.",
+          enabled: false,
+          defaultOn: false,
+        });
+        continue;
+      }
       const ok = cur < 5 && (player.gold || 0) >= cost;
       actions.push({
         id: `school:${a.id}`,

@@ -351,8 +351,9 @@ function buildMultiSetupSteps(n, roster = []) {
       title: "Potwory na start",
       body: `
         <ol class="checklist">
-          <li>Odkryjcie żetony potworów i przenieście je na obszary z żetonów obszarów (1 teren = 1 potwór).</li>
-          <li>W helperze poniżej: 3 tereny → numer obszaru + poziom.</li>
+          <li>Dobierzcie <strong>3 żetony poziomu I</strong> i odkryjcie je.</li>
+          <li>Przenieście je na obszary z żetonów obszarów (1 teren = 1 potwór: las + góry + woda).</li>
+          <li>W helperze poniżej: 3 tereny → numer obszaru + poziom <strong>I</strong>.</li>
           <li>Potasujcie karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
       `,
@@ -418,14 +419,16 @@ function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEnt
     id: `player-${turnOrderIndex}`,
     title: `Gracz ${prepNumber}/${playerCount}: ${label}${rosterEntry ? ` — ${escapeLite(rosterEntry.name)}` : ""}`,
     body: `
-      <p class="lead">Teraz przygotowuje się:${named} (${label})${isFirst ? " — wybiera wiedźmina jako ostatni" : ""}.</p>
+      <p class="lead">Teraz przygotowuje się:${named || ` ${label}`} (${label}).</p>
       <ol class="checklist">
         <li><strong>1. Planszetka:</strong> ${
-          rosterEntry
+          rosterEntry?.schoolId
             ? `Weź szkołę przypisaną w helperze (albo zgodnie z wyborem przy stole).`
             : isLastPrep && playerCount === 5
               ? "Bierze ostatnią niewybraną."
-              : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
+              : isFirst
+                ? "Wybiera wiedźmina jako ostatni (kolejność przygotowania odwrotna do tur)."
+                : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
         }</li>
         <li><strong>2.</strong> Żeton reputacji na 0.</li>
         <li><strong>3.</strong> Figurka na obszarze swojej szkoły.</li>

@@ -147,9 +147,9 @@ function defaultState() {
   };
 }
 
-/** Gra rozpoczęta = widok tury albo flaga po starcie pierwszej tury. */
+/** Gra rozpoczęta dopiero po „Prowadź pierwszą turę” — nie po samym kliknięciu nav „Tura”. */
 function isGameStarted() {
-  return state.view === "turn" || state.gameStarted === true;
+  return state.gameStarted === true;
 }
 
 function markGameStarted() {
@@ -288,7 +288,7 @@ function normalizeState(raw) {
   roster.forEach((p) => ensureCombatTrack(ensurePlayerTrack(p)));
   const turnNumber = Math.max(1, Math.min(999, Number(raw.turnNumber) || 1));
   const view = views.has(raw.view) ? raw.view : "home";
-  const gameStarted = raw.gameStarted === true || view === "turn";
+  const gameStarted = raw.gameStarted === true;
   const winner =
     raw.winner && typeof raw.winner === "object"
       ? {
@@ -444,7 +444,6 @@ function setPlayers(n) {
 function go(view, extras = {}) {
   state.view = view;
   Object.assign(state, extras);
-  if (view === "turn") markGameStarted();
   saveState();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -977,7 +976,18 @@ function renderSetup() {
       applyStartResources(state.roster, state.players, { force: true });
       state.activeIndex = 0;
       state.turnNumber = 1;
-      go("turn", { turn: { phase: "hub", screen: "hub" } });
+      markGameStarted();
+      go("turn", {
+        turn: {
+          phase: "hub",
+          screen: "hub",
+          moveTo: null,
+          moveCost: null,
+          exploreDeck: null,
+          fightResult: null,
+          phase2Done: false,
+        },
+      });
     });
   }
 }
@@ -1733,13 +1743,7 @@ function renderTurn() {
     }
     const med = meditationStatus(p, { isSolo: solo });
     const fight = fightOptionsFor(p);
-    // Bez celu walki i bez medytacji → od razu eksploracja
-    if (!fight.can && !med.can) {
-      p.nowDoing = "eksploracja";
-      saveState();
-      setTurn("II", "explore");
-      return;
-    }
+    // Zawsze 3 wybory — bez auto-skoku do eksploracji (Wróć nie wpada w pętlę).
     turnShell(
       "Faza II — wybór",
       `
@@ -1857,6 +1861,12 @@ function renderTurn() {
         });
         if (plan.removeMonster && p.locationId) {
           delete state.board.monsters[p.locationId];
+        }
+        if (kind === "loss" && here?.terrain) {
+          ensureCombatTrack(p);
+          if (!p.trails?.[here.terrain]) {
+            p.trails[here.terrain] = { kind: "trail", locId: here.id };
+          }
         }
         state.board.placeError = null;
         setTurn("II", "fight-monster-result", { fightResult: plan });
@@ -2474,7 +2484,19 @@ function renderBoard() {
       const now = btn.dataset.now;
       if (state.roster[i]) {
         state.roster[i].nowDoing = now;
-        if (now !== "czekam") state.activeIndex = i;
+        if (now !== "czekam" && i !== state.activeIndex) {
+          // Zmiana aktywnego ze stołu = nowa tura helpera (jak nextPlayer / hub picker).
+          state.activeIndex = i;
+          setTurn("hub", "hub", {
+            clearPhase2Done: true,
+            clearMove: true,
+            clearExplore: true,
+            clearFightResult: true,
+          });
+          state.roster[i].nowDoing = now;
+        } else if (now !== "czekam") {
+          state.activeIndex = i;
+        }
         if (now === "faza1") {
           if (!state.roster[i].locationId) placeAtSchool(state.roster[i], { force: true });
           state.board.highlightFrom = state.roster[i].locationId;

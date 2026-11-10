@@ -241,7 +241,7 @@ export function neighborPickerHtml(fromId, { player, monsters } = {}) {
             <span>Teren celu: ${terrainChip(n.terrain)}</span>
             ${
               mon
-                ? `<span class="warn" style="margin:0.25rem 0 0">Wejście → helper odpala walkę</span>`
+                ? `<span class="warn" style="margin:0.25rem 0 0">Potwór na polu — walka opcjonalna w fazie II</span>`
                 : ""
             }
             <span class="move-cost-lines">
