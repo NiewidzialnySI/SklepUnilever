@@ -35,5 +35,10 @@
 - Victory screen + gameOver lock tur
 - Hub nie omija `phase2Done`
 
-## Re-audyt
-Kolejne krytyczne/high z zasadami: **brak**. Pozostałe MED z research/01 (skróty FIGHT_WITCHER/poker) częściowo doprecyzowane; helper nadal upraszcza pełną walkę przy stole.
+## Re-audyt + follow-up (explore agent)
+Naprawione po drugim audycie:
+- CRITICAL: usunięty auto-skok phase2→explore (pętla Wróć)
+- HIGH: specialty tylko własna szkoła; copy „walka opcjonalna”; clear phase2Done przy zmianie gracza ze stołu; gameStarted dopiero z setupu; multi 3× I
+- MED: trop po klęsce; bez zbędnego „wybiera wiedźmina”; witcher fight zablokowany na szkole
+
+Pozostałe MED/LOW (level-up draw, penalty doboru po klęsce, closed inn tracking, CSS nav mobile) — świadome uproszczenia / backlog.
