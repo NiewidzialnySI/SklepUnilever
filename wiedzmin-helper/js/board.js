@@ -292,7 +292,9 @@ export function monsterFightOutcomePlan({ kind, isSolo, loc, monster }) {
       title: "Pokonanie (solo)",
       summary: `Zdejmij żeton z <strong>${escapeHtml(
         locName
-      )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie. <strong>Solo: nie dobierasz nowego potwora</strong> po pokonaniu.`,
+      )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie. Tropy terenu „${escapeHtml(
+        terrainLabel
+      )}” wracają do puli. <strong>Solo: nie dobierasz nowego potwora</strong> po pokonaniu.`,
       spawnHint: null,
     };
   }
@@ -309,7 +311,9 @@ export function monsterFightOutcomePlan({ kind, isSolo, loc, monster }) {
     title: "Pokonanie",
     summary: `Zdejmij żeton z <strong>${escapeHtml(
       locName
-    )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie.`,
+    )}</strong>. +2 złota, trofeum, +reputacja, zmęczenie. Żetony tropu i zadania tropienia „${escapeHtml(
+      terrainLabel
+    )}” u <strong>wszystkich graczy</strong> → z powrotem do puli.`,
     spawnHint: `Nowy potwór: <strong>poziom ${escapeHtml(
       nextLv
     )}</strong> (${escapeHtml(level)}→${escapeHtml(

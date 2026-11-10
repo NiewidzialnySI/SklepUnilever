@@ -112,7 +112,7 @@ export const RULE_CORRECTIONS = [
   },
   {
     title: "Tropy / żeton tropu",
-    body: "Żeton tropu = żeton obszaru odwrócony na symbol terenu (po wykonaniu zadania tropienia). Zadanie: najpierw żeton nazwą do góry + złoto na nim; po wejściu na lokację bierzesz złoto i odwracasz. Trop → często Ty zaczynasz walkę z tym potworem. Max 1 na rodzaj terenu; konflikt → stare znika bez złota (FAQ #10).",
+    body: "Żeton tropu = żeton obszaru odwrócony na symbol terenu (po zadaniu tropienia). Limit per gracz: max 1 na rodzaj terenu (FAQ #10 — nowy tego samego typu usuwa stary bez złota). Kilku graczy może mieć trop tego samego potwora naraz. Po pokonaniu: tropy/zadania tego terenu u wszystkich wracają do puli.",
   },
   {
     title: "Koszt karty z eksploracji",

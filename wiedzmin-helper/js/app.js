@@ -69,6 +69,7 @@ import {
   trailsHtml,
   attrsAdjustHtml,
   hasTrailForMonster,
+  clearTrailsForTerrain,
   fieldChangeModalHtml,
   applyFieldChange,
   ATTR_KEYS,
@@ -367,6 +368,11 @@ function playersLabel(n) {
 
 function shell(inner) {
   const scale = loadUiScale();
+  try {
+    document.documentElement.setAttribute("data-view", state.view || "home");
+  } catch (_) {
+    /* ignore */
+  }
   appEl.innerHTML = `
     <header class="topbar">
       <div class="brand">
@@ -1612,6 +1618,11 @@ function renderTurn() {
         if (plan.removeMonster && p.locationId) {
           delete state.board.monsters[p.locationId];
         }
+        // Pokonanie: tropy/zadania tropienia tego terenu u wszystkich graczy → z powrotem do puli.
+        if (kind === "defeat" && here?.terrain) {
+          const cleared = clearTrailsForTerrain(state.roster, here.terrain);
+          plan.trailsCleared = cleared;
+        }
         state.board.placeError = null;
         setTurn("II", "fight-monster-result", { fightResult: plan });
       });
@@ -1663,6 +1674,13 @@ function renderTurn() {
           ${
             plan.spawnHint
               ? `<p class="tip" style="margin:0.55rem 0 0">${plan.spawnHint}</p>`
+              : ""
+          }
+          ${
+            plan.kind === "defeat"
+              ? `<p class="tip" style="margin:0.55rem 0 0"><strong>Tropy:</strong> żetony tropu i zadania tropienia terenu „${escapeHtml(
+                  plan.terrainLabel || ""
+                )}” wracają do puli <em>u wszystkich graczy</em> (helper wyczyścił tracker). Kilku graczy mogło mieć ten trop naraz — limit 1/teren jest na osobę.</p>`
               : ""
           }
           <p class="note" style="margin:0.55rem 0 0">Dalej: <strong>faza III</strong> (dobór / kupno). Eksploracja to osobny wybór fazy II — nie robisz jej po walce w tej turze.</p>

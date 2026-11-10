@@ -671,7 +671,8 @@ export const TRAIL_HELP = `
       </div>
     </li>
     <li><strong>Po co żeton tropu?</strong> Gdy walczysz z potworem, do którego masz trop (ten sam rodzaj terenu / ten trop) — <strong>Ty zaczynasz walkę</strong> (zamiast potwora). To duża przewaga.</li>
-    <li><strong>Limit:</strong> możesz mieć najwyżej <strong>1 żeton tropu na każdy rodzaj terenu</strong> (1 las, 1 góry, 1 woda). FAQ: nowy trop tego samego terenu → odrzucasz stare zadanie/trop <em>bez</em> zbierania złota z żetonu.</li>
+    <li><strong>Limit (per gracz):</strong> Ty możesz mieć najwyżej <strong>1 żeton tropu na każdy rodzaj terenu</strong> (1 las, 1 góry, 1 woda). FAQ #10: nowy trop tego samego terenu → odrzucasz stare zadanie/trop <em>bez</em> zbierania złota z żetonu.</li>
+    <li><strong>Wielu graczy:</strong> <em>kilka osób naraz</em> może mieć trop tego samego potwora/terenu — to normalne. Po <strong>pokonaniu</strong> potwora tropy i zadania tropienia tego terenu wracają do puli u wszystkich (przy odpędzeniu zostają).</li>
     <li><strong>Pusty stos:</strong> brak żetonów danego terenu = nie startujesz zadania tropienia na ten teren.</li>
     <li><strong>„Weź dowolny żeton tropu” na karcie:</strong> bierzesz żeton obszaru (jako trop) wg tekstu karty — zwykle zakryty / wg instrukcji efektu; nie myl z zadaniem tropienia z akcji obszaru.</li>
   </ol>

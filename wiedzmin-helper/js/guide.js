@@ -298,7 +298,7 @@ export function locationActionSteps(loc) {
           "Dobierz żeton obszaru o terenie takim, jak teren POTWORA, którego tropisz (las/góry/woda).",
           "Połóż żeton nazwą do góry na planszy gracza i połóż na nim 1 złoto z banku.",
           "Gdy wejdziesz później na tę nazwę: zbierz złoto z żetonu i odwróć go → masz żeton tropu.",
-          "Limit: max 1 trop na każdy rodzaj terenu.",
+          "Limit per gracz: max 1 trop na każdy rodzaj terenu (inni mogą mieć ten sam).",
         ],
       };
     case "dicePoker":

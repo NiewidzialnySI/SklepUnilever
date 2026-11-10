@@ -195,7 +195,7 @@ export function trailsHtml(player, { editable = false, board = null } = {}) {
   return `
     <div class="guide-box trail-tokens-box">
       <p class="step-kicker" style="margin:0">${ICO.monster()} Żetony tropu</p>
-      <p class="lead" style="margin:0.3rem 0 0">Przy <strong>akcji tropienia</strong> wybierasz <strong>1</strong> teren potwora ze stołu. Klik = masz trop (zaczynasz walkę). Dojście z żetonu zapisuj jako zadanie u góry.</p>
+      <p class="lead" style="margin:0.3rem 0 0">Przy <strong>akcji tropienia</strong> wybierasz <strong>1</strong> teren potwora. Klik = masz trop (zaczynasz walkę). Limit: <strong>1 trop na teren na osobę</strong> — inni gracze mogą mieć ten sam trop jednocześnie. Dojście z żetonu → zadanie u góry.</p>
       <div class="trail-token-grid" role="group" aria-label="Żetony tropu">${buttons}</div>
     </div>`;
 }
@@ -242,6 +242,44 @@ export function hasTrailForMonster(player, monsterLoc) {
   const terrain = monsterLoc.terrain;
   const slot = player.trails?.[terrain];
   return Boolean(slot && slot.kind === "trail");
+}
+
+/**
+ * Po pokonaniu potwora: tropy i zadania tropienia tego terenu wracają do puli
+ * u WSZYSTKICH graczy (instrukcja). Kilku graczy może jednocześnie mieć trop
+ * tego samego terenu — limit „1 na teren” jest per gracz (FAQ #10).
+ */
+export function clearTrailsForTerrain(roster, terrain) {
+  if (!terrain || !TRAIL_TERRAINS.includes(terrain)) {
+    return { clearedTrails: 0, clearedQuests: 0 };
+  }
+  let clearedTrails = 0;
+  let clearedQuests = 0;
+  const label = TERRAIN[terrain]?.label || terrain;
+  for (const p of roster || []) {
+    if (!p) continue;
+    ensureCombatTrack(p);
+    if (p.trails?.[terrain]) {
+      p.trails[terrain] = null;
+      clearedTrails += 1;
+    }
+    if (!Array.isArray(p.quests)) continue;
+    const before = p.quests.length;
+    p.quests = p.quests.filter((q) => {
+      if (!q) return false;
+      if (String(q.terrain || "") === terrain) return false;
+      const title = String(q.title || "");
+      if (!/tropieni/i.test(title)) return true;
+      if (new RegExp(label, "i").test(title)) return false;
+      if (q.locationId) {
+        const loc = locById(q.locationId);
+        if (loc?.terrain === terrain) return false;
+      }
+      return true;
+    });
+    clearedQuests += before - p.quests.length;
+  }
+  return { clearedTrails, clearedQuests };
 }
 
 /** Potwory z mapy → możliwe tereny tropu (+ lokacje). */
