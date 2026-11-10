@@ -333,24 +333,28 @@ export function monsterSpawnSlotHtml(board, { terrain, level }) {
     <div class="monster-terrain-slot is-filled monster-spawn-slot" data-terrain-slot="${terrain}">
       <div class="monster-terrain-head">
         <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
-        <strong>${escapeHtml(t.label)}</strong>
-        <span class="monster-terrain-meta">${escapeHtml(name)} · poz. ${escapeHtml(lv)}</span>
+        <div class="monster-terrain-titles">
+          <strong>${escapeHtml(t.label)}</strong>
+          <span class="monster-terrain-meta">${escapeHtml(name)} · poz. ${escapeHtml(lv)}</span>
+        </div>
       </div>
       <div class="monster-terrain-pick" role="group" aria-label="Numer nowego obszaru">
-        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni">◀</button>
-        <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
-          num != null ? escapeHtml(String(num)) : ""
-        }" placeholder="#" aria-label="Numer obszaru" />
-        <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny">▶</button>
+        <div class="monster-stepper">
+          <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni" aria-label="Poprzedni obszar">◀</button>
+          <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+            num != null ? escapeHtml(String(num)) : ""
+          }" placeholder="#" aria-label="Numer obszaru" />
+          <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny" aria-label="Następny obszar">▶</button>
+        </div>
       </div>
-      <p class="note monster-terrain-hint">Poziom ustawiony na <strong>${escapeHtml(
+      <p class="monster-terrain-hint">Poziom ustawiony na <strong>${escapeHtml(
         lv
       )}</strong> · numery: ${opts.map((l) => l.number).join(", ")}</p>
     </div>
   `;
 }
 
-export function monstersPanelHtml(board) {
+export function monstersPanelHtml(board, { editable = true } = {}) {
   const levels = ["I", "II", "III"];
   const slots = MONSTER_TERRAINS.map((terrain) => {
     const t = TERRAIN[terrain];
@@ -360,20 +364,39 @@ export function monstersPanelHtml(board) {
     const name = cur?.loc?.name || "— wybierz numer —";
     const level = cur?.level || "I";
     const filled = Boolean(cur);
+    if (!editable) {
+      const summary = filled
+        ? `#${escapeHtml(String(num))} · ${escapeHtml(name)} · Poz. ${escapeHtml(level)}`
+        : "brak żetonu";
+      return `
+      <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"} is-locked" data-terrain-slot="${terrain}">
+        <div class="monster-terrain-head">
+          <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
+          <div class="monster-terrain-titles">
+            <strong>${escapeHtml(t.label)}</strong>
+            <span class="monster-terrain-meta">${summary}</span>
+          </div>
+        </div>
+      </div>`;
+    }
     return `
       <div class="monster-terrain-slot ${filled ? "is-filled" : "is-empty"}" data-terrain-slot="${terrain}">
         <div class="monster-terrain-head">
           <span class="monster-terrain-ico">${terrainIcon(terrain)}</span>
-          <strong>${escapeHtml(t.label)}</strong>
-          <span class="monster-terrain-meta">${filled ? escapeHtml(name) : "brak żetonu"}</span>
+          <div class="monster-terrain-titles">
+            <strong>${escapeHtml(t.label)}</strong>
+            <span class="monster-terrain-meta">${filled ? escapeHtml(name) : "brak żetonu"}</span>
+          </div>
         </div>
         <div class="monster-terrain-pick" role="group" aria-label="Numer obszaru: ${escapeHtml(t.label)}">
-          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni obszar">◀</button>
-          <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
-            num != null ? escapeHtml(String(num)) : ""
-          }" placeholder="#" aria-label="Numer obszaru ${escapeHtml(t.label)}" />
-          <button type="button" class="btn btn-secondary monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny obszar">▶</button>
-          <button type="button" class="btn btn-secondary" data-monster-terrain-clear="${terrain}" ${
+          <div class="monster-stepper">
+            <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="-1" title="Poprzedni obszar" aria-label="Poprzedni obszar ${escapeHtml(t.label)}">◀</button>
+            <input type="number" class="monster-num-input" data-monster-num="${terrain}" min="0" max="18" inputmode="numeric" value="${
+              num != null ? escapeHtml(String(num)) : ""
+            }" placeholder="#" aria-label="Numer obszaru ${escapeHtml(t.label)}" />
+            <button type="button" class="monster-num-btn" data-monster-cycle="${terrain}" data-delta="1" title="Następny obszar" aria-label="Następny obszar ${escapeHtml(t.label)}">▶</button>
+          </div>
+          <button type="button" class="monster-clear-btn" data-monster-terrain-clear="${terrain}" ${
             filled ? "" : "disabled"
           }>Usuń</button>
         </div>
@@ -381,31 +404,36 @@ export function monstersPanelHtml(board) {
           ${levels
             .map(
               (lv) =>
-                `<button type="button" class="btn ${
-                  filled && level === lv ? "btn-primary" : "btn-secondary"
+                `<button type="button" class="monster-level-btn${
+                  filled && level === lv ? " is-active" : ""
                 }" data-monster-terrain-level="${terrain}" data-level="${lv}" ${
                   filled ? "" : "disabled"
                 }>Poz. ${lv}</button>`
             )
             .join("")}
         </div>
-        <p class="note monster-terrain-hint">Numery ${opts
+        <p class="monster-terrain-hint">Numery ${opts
           .map((l) => l.number)
           .join(", ")}</p>
       </div>`;
   }).join("");
 
+  const lead = editable
+    ? `Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy. Szkoła (np. Kaer Seren) jest OK, jeśli tak wyszło na żetonie; <strong>Behelt Nar (0)</strong> nie ma żetonu.`
+    : `Aktualne żetony na mapie (tylko podgląd). Zmiany w trakcie gry — przez wynik walki / spawn, nie ręczną edycję.`;
+
   return `
-    <div class="monsters-panel">
-      <h3>${ICO.monster()} Potwory na mapie</h3>
-      <p class="lead" style="margin:0">Trzy żetony obszarów = <strong>3 różne tereny</strong>. Podaj <strong>numer</strong> z żetonu (strzałki albo wpisz) — drugi potwór na ten sam teren jest niemożliwy. Szkoła (np. Kaer Seren) jest OK, jeśli tak wyszło na żetonie; <strong>Behelt Nar (0)</strong> nie ma żetonu.</p>
+    <div class="monsters-panel${editable ? "" : " is-locked"}">
+      <div class="monsters-panel-head">
+        <h3>${ICO.monster()} Potwory na mapie</h3>
+        <p class="monsters-panel-lead">${lead}</p>
+      </div>
       ${
-        board.placeError
-          ? `<p class="warn" style="margin:0.45rem 0 0" role="alert">${escapeHtml(board.placeError)}</p>`
+        board.placeError && editable
+          ? `<p class="monsters-panel-error" role="alert">${escapeHtml(board.placeError)}</p>`
           : ""
       }
       <div class="monster-terrain-grid">${slots}</div>
-      <p class="note" style="margin:0.45rem 0 0">Walka w fazie II jest <strong>opcjonalna</strong> — tylko gdy żeton stoi na Twoim polu.</p>
     </div>
   `;
 }
@@ -480,53 +508,64 @@ export function mapSvgHtml(
     if (!A || !B) return "";
     const lit =
       fromId && ((a === fromId && reachable.has(b)) || (b === fromId && reachable.has(a)));
-    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road${lit ? " map-road-lit" : ""}" />`;
+    return `<g class="map-road-group${lit ? " map-road-group-lit" : ""}">
+      <line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road-glow${lit ? " map-road-glow-lit" : ""}" />
+      <line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" class="map-road${lit ? " map-road-lit" : ""}" />
+    </g>`;
   }).join("");
 
   const rot = board.rotation || 0;
   const labelUpright = -rot;
 
-  const nodes = LOCATIONS.map((loc) => {
+  const nodes = LOCATIONS.map((loc, nodeIdx) => {
     const t = TERRAIN[loc.terrain] || TERRAIN.forest;
-    const fill = loc.school ? TERRAIN.school.color : t.color;
+    const isSchool = Boolean(loc.school);
+    const fill = isSchool ? "url(#mapSchoolFill)" : t.color;
     const selected = board.selectedLoc === loc.id ? " map-node-selected" : "";
     const here = fromId === loc.id ? " map-node-here" : "";
     const reach = reachable.has(loc.id) ? " map-node-reach" : "";
+    const schoolCls = isSchool ? " map-node-school" : "";
     const monsters = board.monsters[loc.id];
     const witches = roster
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => p.locationId === loc.id);
     const numLabel =
       typeof loc.number === "number" ? String(loc.number) : "";
+    const enterDelay = `${(nodeIdx % 6) * 0.045}s`;
 
     const monsterBadge = monsters
-      ? `<g class="map-monster-badge" transform="translate(${loc.x + 3.2},${loc.y - 3.8}) rotate(${labelUpright})">
-           <circle r="2.2" fill="#6b3a2f" stroke="#f0e6d2" stroke-width="0.35"/>
-           <text y="0.85" text-anchor="middle" class="map-badge-text">${escapeXml(String(monsters.count || 1))}</text>
+      ? `<g class="map-monster-badge" transform="translate(${loc.x + 3.35},${loc.y - 3.9}) rotate(${labelUpright})">
+           <circle r="2.35" fill="#6b3a2f" stroke="#f0e6d2" stroke-width="0.42"/>
+           <text y="0.9" text-anchor="middle" class="map-badge-text map-badge-text--monster">${escapeXml(String(monsters.count || 1))}</text>
          </g>`
       : "";
 
     const witchBadges = witches
       .map(({ i }, idx) => {
-        const ox = -3.2 + idx * 2.4;
-        return `<g transform="translate(${loc.x + ox},${loc.y + 4.2}) rotate(${labelUpright})">
-          <circle r="1.7" fill="#244833" stroke="#d4b05a" stroke-width="0.35"/>
-          <text y="0.7" text-anchor="middle" class="map-badge-text">${i + 1}</text>
+        const ox = -3.35 + idx * 2.55;
+        return `<g class="map-player-badge" transform="translate(${loc.x + ox},${loc.y + 4.35}) rotate(${labelUpright})">
+          <circle r="1.9" fill="#e8d9b0" stroke="#b8923e" stroke-width="0.45"/>
+          <text y="0.75" text-anchor="middle" class="map-badge-text map-badge-text--player">${i + 1}</text>
         </g>`;
       })
       .join("");
 
     return `
-      <g class="map-node${selected}${here}${reach}" data-loc="${loc.id}" style="cursor:pointer">
+      <g class="map-node${selected}${here}${reach}${schoolCls}" data-loc="${loc.id}" style="cursor:pointer;--map-enter-delay:${enterDelay}">
         ${
-          reach
-            ? `<circle cx="${loc.x}" cy="${loc.y}" r="4.6" fill="none" stroke="#d4b05a" stroke-width="0.55" stroke-dasharray="1.2 0.8" opacity="0.95"/>`
+          here
+            ? `<circle class="map-here-halo" cx="${loc.x}" cy="${loc.y}" r="5.35" fill="none" />`
             : ""
         }
-        <circle cx="${loc.x}" cy="${loc.y}" r="3.4" fill="${fill}" stroke="#f0e6d2" stroke-width="0.45"/>
-        <circle cx="${loc.x}" cy="${loc.y}" r="2.35" fill="none" stroke="${t.color}" stroke-width="0.55"/>
-        <text x="${loc.x}" y="${loc.y + 1.05}" text-anchor="middle" class="map-badge-text">${escapeXml(numLabel)}</text>
-        <text x="${loc.x}" y="${loc.y - 4.8}" text-anchor="middle" class="map-label" transform="rotate(${labelUpright} ${loc.x} ${loc.y - 4.8})">${escapeXml(loc.name)}</text>
+        ${
+          reach
+            ? `<circle class="map-reach-ring" cx="${loc.x}" cy="${loc.y}" r="4.75" fill="none" />`
+            : ""
+        }
+        <circle class="map-node-disk" cx="${loc.x}" cy="${loc.y}" r="3.45" fill="${fill}" stroke="#f0e6d2" stroke-width="0.48"/>
+        <circle class="map-node-ring" cx="${loc.x}" cy="${loc.y}" r="2.4" fill="none" stroke="${isSchool ? "#f0e6d2" : t.color}" stroke-width="0.5" opacity="0.55"/>
+        <text x="${loc.x}" y="${loc.y + 1.1}" text-anchor="middle" class="map-node-num">${escapeXml(numLabel)}</text>
+        <text x="${loc.x}" y="${loc.y - 5.05}" text-anchor="middle" class="map-label" transform="rotate(${labelUpright} ${loc.x} ${loc.y - 5.05})">${escapeXml(loc.name)}</text>
         ${monsterBadge}
         ${witchBadges}
       </g>`;
@@ -537,12 +576,29 @@ export function mapSvgHtml(
       <div class="map-wrap" style="--map-rot:${rot}deg">
         <svg class="map-svg" viewBox="0 0 100 85" role="img" aria-label="Mapa obszarów">
           <defs>
-            <radialGradient id="mapGlow" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stop-color="#2a4032"/>
-              <stop offset="100%" stop-color="#152018"/>
+            <radialGradient id="mapGlow" cx="48%" cy="38%" r="68%">
+              <stop offset="0%" stop-color="#314a3a"/>
+              <stop offset="55%" stop-color="#1a2a20"/>
+              <stop offset="100%" stop-color="#0d1510"/>
             </radialGradient>
+            <radialGradient id="mapVignette" cx="50%" cy="50%" r="72%">
+              <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#000" stop-opacity="0.42"/>
+            </radialGradient>
+            <linearGradient id="mapSchoolFill" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#d4b05a"/>
+              <stop offset="45%" stop-color="#b8923e"/>
+              <stop offset="100%" stop-color="#8a6a28"/>
+            </linearGradient>
+            <filter id="mapNodeShadow" x="-40%" y="-40%" width="180%" height="180%">
+              <feDropShadow dx="0" dy="0.45" stdDeviation="0.35" flood-color="#000" flood-opacity="0.45"/>
+            </filter>
+            <filter id="mapBrassGlow" x="-80%" y="-80%" width="260%" height="260%">
+              <feDropShadow dx="0" dy="0" stdDeviation="0.55" flood-color="#d4b05a" flood-opacity="0.55"/>
+            </filter>
           </defs>
-          <rect x="0" y="0" width="100" height="85" rx="2" fill="url(#mapGlow)"/>
+          <rect class="map-svg-bg" x="0" y="0" width="100" height="85" rx="2.2" fill="url(#mapGlow)"/>
+          <rect class="map-svg-vignette" x="0" y="0" width="100" height="85" rx="2.2" fill="url(#mapVignette)" pointer-events="none"/>
           <g class="map-roads">${roads}</g>
           <g class="map-nodes">${nodes}</g>
         </svg>
@@ -620,10 +676,12 @@ function terrainIcon(id) {
   return "";
 }
 
-export function selectedLocPanel(board, roster) {
+export function selectedLocPanel(board, roster, { monstersEditable = true } = {}) {
   const loc = locById(board.selectedLoc);
   if (!loc) {
-    return `<p class="lead">Kliknij lokację na mapie. Potwory ustawiasz numerami w panelu (1 na teren).</p>`;
+    return monstersEditable
+      ? `<p class="lead">Kliknij lokację na mapie. Potwory ustawiasz numerami w panelu (1 na teren).</p>`
+      : `<p class="lead">Kliknij lokację na mapie. Potwory zmieniają się przez wynik walki / spawn — panel jest zablokowany po starcie gry.</p>`;
   }
   const t = TERRAIN[loc.terrain];
   const m = monsterAt(board, loc.id);
@@ -670,7 +728,9 @@ export function selectedLocPanel(board, roster) {
               )}” zajęty przez <strong>${escapeHtml(otherSame.loc.name)}</strong> (#${
                 otherSame.loc.number
               }).</p>`
-            : `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — ustaw numer w panelu poniżej.</p>`
+            : monstersEditable
+              ? `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — ustaw numer w panelu poniżej.</p>`
+              : `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — nowy pojawia się po walce (spawn), nie przez ręczną edycję.</p>`
       }
       <p>Wiedźmini:
         ${
@@ -717,7 +777,9 @@ export function playerTrackerHtml(roster, { schoolById, activeIndex, START_RESOU
       return `
         <article class="tracker-card ${i === activeIndex ? "tracker-active" : ""}" data-track="${i}">
           <header>
-            <span class="player-chip">${iconFn()}${escapeHtml(p.name)} <span>${school.short}</span></span>
+            <span class="player-chip" style="background:${escapeHtml(
+              school.color || "#244833"
+            )}">${iconFn()}${escapeHtml(p.name)} <span>${school.short}</span></span>
             ${i === activeIndex ? `<span class="badge">Teraz gra</span>` : ""}
           </header>
 

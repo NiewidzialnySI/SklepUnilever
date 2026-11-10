@@ -2,7 +2,14 @@
  * Atrybuty, tropy, medytacja, startowe zasoby.
  */
 import { ICO } from "./icons.js";
-import { locById, LOCATIONS, TERRAIN, actionHintFor } from "./map-data.js";
+import {
+  locById,
+  LOCATIONS,
+  TERRAIN,
+  actionHintFor,
+  fatigueForReputation,
+  isSchoolLocationId,
+} from "./map-data.js";
 import { START_RESOURCES } from "./content.js";
 
 export const ATTR_KEYS = [
@@ -53,7 +60,93 @@ export function ensureCombatTrack(p) {
     }
   }
   if (typeof p.resourcesApplied !== "boolean") p.resourcesApplied = false;
+  if (typeof p.monsterTrophies !== "number") p.monsterTrophies = 0;
+  if (typeof p.witcherTrophies !== "number") p.witcherTrophies = 0;
   return p;
+}
+
+/**
+ * Ocena zwycięstwa (podstawka).
+ * source: monster | witcher | meditate | manual
+ * Multi: 4 reputacji z trofeum walki (potwór / wiedźmin). Medytacja NIE kończy gry.
+ * Solo: 3 trofea potworów + trofeum atrybutu; 4. reputacja z walki z potworem (nie z medytacji).
+ */
+export function checkVictory(player, { isSolo = false, source = "manual" } = {}) {
+  ensureCombatTrack(player);
+  const rep = Number(player.reputation) || 0;
+  const monsters = Number(player.monsterTrophies) || 0;
+  const hasAttr = (player.attrTrophies || []).length > 0;
+
+  if (source === "meditate") {
+    return {
+      won: false,
+      blocked: true,
+      reason:
+        "Medytacja nie kończy gry. Przy reputacji ≥ 3 bierzesz trofeum atrybutu bez +reputacji / zmęczenia.",
+    };
+  }
+
+  if (rep < 4) {
+    return { won: false, blocked: false, reason: null };
+  }
+
+  if (isSolo) {
+    if (monsters >= 3 && hasAttr && (source === "monster" || source === "manual")) {
+      return {
+        won: true,
+        kind: "solo",
+        reason: "3 pokonane potwory + trofeum atrybutu",
+      };
+    }
+    let reason;
+    if (!hasAttr) {
+      reason = "Solo: najpierw trofeum atrybutu (medytacja), potem 3. potwór.";
+    } else if (monsters < 3) {
+      reason = `Solo: masz ${monsters}/3 trofeów potworów — wygrana po 3. pokonanym.`;
+    } else {
+      reason = "Solo: 4. reputacja musi pochodzić z walki z potworem (nie z medytacji).";
+    }
+    return { won: false, blocked: true, reason };
+  }
+
+  if (source === "monster" || source === "witcher" || source === "manual") {
+    return {
+      won: true,
+      kind: "multi",
+      reason: "4 reputacji z trofeum walki",
+    };
+  }
+
+  return {
+    won: false,
+    blocked: true,
+    reason: "4. reputacja musi pochodzić z walki (potwór lub wiedźmin).",
+  };
+}
+
+/**
+ * Nagroda za trofeum walki: +1 reputacja (max 4), zmęczenie z ręki, licznik trofeów.
+ * Medytacja ma osobną ścieżkę (bez 4. reputacji).
+ */
+export function applyFightTrophy(player, { source, applyFatigueToHand = true } = {}) {
+  ensureCombatTrack(player);
+  if (source !== "monster" && source !== "witcher") {
+    return { ok: false, reason: "Nieznane źródło trofeum." };
+  }
+  if (source === "monster") player.monsterTrophies = (player.monsterTrophies || 0) + 1;
+  if (source === "witcher") player.witcherTrophies = (player.witcherTrophies || 0) + 1;
+
+  const before = Number(player.reputation) || 0;
+  if (before >= 4) {
+    return { ok: true, reputation: before, lose: 0, alreadyMax: true };
+  }
+  const next = Math.min(4, before + 1);
+  const lose = fatigueForReputation(next);
+  player.reputation = next;
+  if (applyFatigueToHand) {
+    player.cards = Math.max(0, (player.cards || 0) - lose);
+  }
+  return { ok: true, reputation: next, lose, alreadyMax: false };
 }
 
 export function applyStartResources(roster, players, { force = false } = {}) {
@@ -107,7 +200,8 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   const others = (roster || []).filter(
     (r) => r && r !== player && r.locationId && locId && r.locationId === locId
   );
-  const canWitcher = !isSolo && others.length > 0;
+  const onSchool = Boolean(locId && isSchoolLocationId(locId));
+  const canWitcher = !isSolo && others.length > 0 && !onSchool;
   const can = canMonster || canWitcher;
   let reason;
   if (!locId) {
@@ -115,9 +209,13 @@ export function phase2FightOptions(player, { board, roster = [], isSolo = false 
   } else if (canMonster && canWitcher) {
     reason = `Możesz walczyć z potworem albo z: ${others.map((o) => o.name).join(", ")}.`;
   } else if (canMonster) {
-    reason = "Na Twoim polu stoi potwór — walka opcjonalna (możesz też medytować / eksplorować).";
+    reason = onSchool && others.length
+      ? "Na Twoim polu stoi potwór. Walka z wiedźminem na szkole jest zabroniona."
+      : "Na Twoim polu stoi potwór.";
   } else if (canWitcher) {
     reason = `Brak potwora na polu. Możesz walczyć z: ${others.map((o) => o.name).join(", ")}.`;
+  } else if (onSchool && others.length > 0) {
+    reason = "Walka z wiedźminem zabroniona na szkole. Brak potwora na tym polu.";
   } else {
     reason = "Walka zablokowana: na tym polu nie ma potwora (oznacz go na mapie, jeśli stoi na stole).";
   }
@@ -316,10 +414,24 @@ export function fieldChangePrompt(player, loc) {
   };
 
   if (key === "schoolTrain") {
+    const ownSchool = Boolean(loc?.school && loc.school === player.schoolId);
     for (const a of ATTR_KEYS) {
       const cur = player.attrs[a.id] || 1;
       const target = cur + 1;
       const cost = target;
+      if (a.id === "specialty" && !ownSchool) {
+        actions.push({
+          id: `school:${a.id}`,
+          kind: "school",
+          attrId: a.id,
+          goldCost: cost,
+          label: `Szkoła: +1 ${a.label} (−${cost} zł)`,
+          detail: "Specjalność rozwijasz tylko we własnej szkole.",
+          enabled: false,
+          defaultOn: false,
+        });
+        continue;
+      }
       const ok = cur < 5 && (player.gold || 0) >= cost;
       actions.push({
         id: `school:${a.id}`,

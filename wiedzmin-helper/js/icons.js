@@ -278,16 +278,23 @@ export function iconsLegendHtml() {
     ])}
 
     <h3>Szkoły</h3>
-    ${row(
-      [
-        [ICO.schoolWilk, "Wilk", "Szermierka · Kaer Morhen"],
-        [ICO.schoolGryf, "Gryf", "Magia · Kaer Seren"],
-        [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · Haern Caduch"],
-        [ICO.schoolKot, "Kot", "Szybkość · Stygga"],
-        [ICO.schoolZmija, "Żmija", "Zatruta stal · Gorthur Gvaed"],
-        [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0)"],
-      ],
-      "ico-legend-row--schools"
-    )}
+    <div class="ico-legend-row ico-legend-row--schools">
+      ${[
+        ["wilk", ICO.schoolWilk, "Wilk", "Szermierka · Kaer Morhen", "#6b4a32"],
+        ["gryf", ICO.schoolGryf, "Gryf", "Magia · Kaer Seren", "#c9a227"],
+        ["niedzwiedz", ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · Haern Caduch", "#9a3b2f"],
+        ["kot", ICO.schoolKot, "Kot", "Szybkość · Stygga", "#24344a"],
+        ["zmija", ICO.schoolZmija, "Żmija", "Zatruta stal · Gorthur Gvaed", "#3d6b45"],
+        ["mantikora", ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0)", "#a06040"],
+      ]
+        .map(
+          ([id, fn, label, hint, color]) => `
+        <div class="ico-legend-item ico-legend-item--school" data-school="${id}" style="--school-color:${color}">
+          <div class="ico-legend-ico ico-legend-school-badge" style="background:${color}">${fn()}</div>
+          <div class="ico-legend-text"><strong>${label}</strong><span>${hint}</span></div>
+        </div>`
+        )
+        .join("")}
+    </div>
   `;
 }

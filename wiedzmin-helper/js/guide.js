@@ -193,7 +193,7 @@ export function mapLocPopupHtml(toId, { player, roster = [], monsters = {} } = {
       mon
         ? `<p class="warn" style="margin:0.45rem 0 0">${ICO.monster()} <strong>Potwór</strong>${
             mon.level ? ` (poz. ${escapeHtml(String(mon.level))})` : ""
-          } — walka opcjonalna (faza II)</p>`
+          }</p>`
         : ""
     }
     ${
@@ -241,7 +241,7 @@ export function neighborPickerHtml(fromId, { player, monsters } = {}) {
             <span>Teren celu: ${terrainChip(n.terrain)}</span>
             ${
               mon
-                ? `<span class="warn" style="margin:0.25rem 0 0">Wejście → helper odpala walkę</span>`
+                ? `<span class="warn" style="margin:0.25rem 0 0">Potwór na polu — walka opcjonalna w fazie II</span>`
                 : ""
             }
             <span class="move-cost-lines">
@@ -479,7 +479,7 @@ export function nowDoingGuideHtml(player, { isSolo = false } = {}) {
     return `<div class="guide-inline"><p class="tip">Idź do zakładki <strong>Tura → Faza II → Walka</strong> — tam jest rozpisane krok po kroku (tarcza ≠ śmierć).</p></div>`;
   }
   if (now === "medytacja") {
-    return `<div class="guide-inline"><p class="tip">Medytacja tylko przy atrybucie na <strong>V</strong> + wolne trofeum. Potem zwykle +reputacja i zmęczenie.</p></div>`;
+    return `<div class="guide-inline"><p class="tip">Medytacja tylko przy atrybucie na <strong>V</strong> + wolne trofeum. +reputacja i zmęczenie tylko gdy masz &lt; 3 reputacji — medytacja nigdy nie daje 4. i nie kończy gry.</p></div>`;
   }
   if (now === "faza3") {
     return `<div class="guide-inline"><p class="tip">Faza III: odrzuć ile chcesz → dobierz do <strong>3</strong> → kup 1 z puli (płacisz odrzuceniem kart, nie złotem).</p></div>`;

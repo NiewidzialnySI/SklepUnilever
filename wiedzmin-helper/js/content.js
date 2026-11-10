@@ -64,6 +64,61 @@ export const SOLO_SCORE_TABLE = `
   </table>
 `;
 
+
+export function soloScoreLabel(turnNumber) {
+  const n = Math.max(1, Number(turnNumber) || 1);
+  if (n <= 6) return "Żywa legenda!";
+  if (n <= 8) return "Na drodze do legendy.";
+  if (n <= 10) return "Profesjonalista — świat Cię potrzebuje.";
+  if (n <= 12) return "Można na Tobie polegać.";
+  return "Nieźle jak na żółtodzioba…";
+}
+
+/** Panel zwycięstwa — multi (4 rep z walki) albo solo (3 potwory + atrybut). */
+export function victoryPanelHtml({
+  playerName,
+  schoolName,
+  isSolo,
+  turnNumber,
+  reason,
+  monsterTrophies = 0,
+  attrTrophyCount = 0,
+} = {}) {
+  const who = escapeLite(playerName || "Wiedźmin");
+  const school = escapeLite(schoolName || "");
+  if (isSolo) {
+    const score = soloScoreLabel(turnNumber);
+    return `
+      <section class="victory-panel" role="status" aria-live="polite">
+        <p class="step-kicker">Koniec gry · solo</p>
+        <h2 class="victory-title">Wygrana!</h2>
+        <p class="lead victory-lead"><strong>${who}</strong>${
+          school ? ` · ${school}` : ""
+        } — 4 reputacji po legalnej ścieżce.</p>
+        <ul class="checklist">
+          <li>Trofea potworów: <strong>${monsterTrophies}</strong> / 3</li>
+          <li>Trofeum atrybutu: <strong>${attrTrophyCount > 0 ? "tak" : "brak"}</strong></li>
+          <li>Tury: <strong>${Math.max(1, Number(turnNumber) || 1)}</strong> → ${escapeLite(score)}</li>
+        </ul>
+        ${reason ? `<p class="tip">${escapeLite(reason)}</p>` : ""}
+        <p class="note">Medytacja nigdy nie domyka wygranej jako ostatnie trofeum. Dalsze tury są zablokowane — możesz tylko przeglądać stół / ściągi.</p>
+        ${SOLO_SCORE_TABLE}
+      </section>
+    `;
+  }
+  return `
+    <section class="victory-panel" role="status" aria-live="polite">
+      <p class="step-kicker">Koniec gry</p>
+      <h2 class="victory-title">Zwycięstwo!</h2>
+      <p class="lead victory-lead"><strong>${who}</strong>${
+        school ? ` · ${school}` : ""
+      } osiąga <strong>4 reputacji</strong>.</p>
+      ${reason ? `<p class="tip">${escapeLite(reason)}</p>` : ""}
+      <p class="note">Wygrana natychmiast po trofeum z walki (potwór lub wiedźmin). Medytacja <em>nie kończy</em> gry przy 4. reputacji. Zwykły przebieg tur jest zatrzymany.</p>
+    </section>
+  `;
+}
+
 export function buildSetupSteps(playerCount, roster = []) {
   if (playerCount === 1) return buildSoloSetupSteps(roster[0]);
   return buildMultiSetupSteps(playerCount, roster);
@@ -156,7 +211,7 @@ function buildSoloSetupSteps(player) {
           <li>Żetony: 3 zakryte stosy I / II / III.</li>
           <li><strong>Zamiast 3× poziom I:</strong> dobierz <strong>po 1 żetonie</strong> z wierzchu stosów <strong>I, II i III</strong>.</li>
           <li>Odkryj żetony → przenieś na obszary z żetonów obszarów → dopasuj karty potworów.</li>
-          <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom — potem w fazie II walka opcjonalna po wejściu.</li>
+          <li><strong>W helperze:</strong> przy 3 ikonach terenu podaj <strong>numer obszaru</strong> z żetonu (strzałki albo wpisz) i ustaw poziom.</li>
           <li>Potasuj karty walki potworów — zakryty stos obok planszy.</li>
         </ol>
         <p class="note">Jeden potwór na teren (las / góry / woda).</p>
@@ -227,13 +282,11 @@ function buildMultiSetupSteps(n, roster = []) {
       id: "intro",
       title: "Zaczynamy przygotowanie",
       body: `
-        <p class="lead">Prowadzę Was krok po kroku przez przygotowanie <strong>podstawki</strong> (bez dodatków).</p>
         <div class="badge-row">
           <span class="badge">${n} graczy</span>
           <span class="badge">Tylko podstawka</span>
           <span class="badge">Cel: 4 reputacji</span>
         </div>
-        <p class="tip"><strong>Wskazówka:</strong> pierwsza partia najlepiej w max. 3 osoby.</p>
       `,
     },
     {
@@ -296,16 +349,19 @@ function buildMultiSetupSteps(n, roster = []) {
     {
       id: "monsters",
       title: "Potwory na start",
-      body: buildMonsterSetupHtml(n),
+      body: `
+        <ol class="checklist">
+          <li>Dobierzcie <strong>3 żetony poziomu I</strong> i odkryjcie je.</li>
+          <li>Przenieście je na obszary z żetonów obszarów (1 teren = 1 potwór: las + góry + woda).</li>
+          <li>W helperze poniżej: 3 tereny → numer obszaru + poziom <strong>I</strong>.</li>
+          <li>Potasujcie karty walki potworów — zakryty stos obok planszy.</li>
+        </ol>
+      `,
     },
     {
-      id: "first-player",
-      title: "Pierwszy gracz i karty pomocy",
-      body: `
-        <p>Pierwszy gracz: kto <strong>ostatnio czytał książkę o wiedźminie</strong> (albo inaczej).</p>
-        <p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>
-        <p class="tip">Przygotowanie: od osoby <strong>po prawej</strong> pierwszego, <strong>przeciwnie do zegara</strong>. Pierwszy wybiera wiedźmina jako <strong>ostatni</strong>.</p>
-      `,
+      id: "help-cards",
+      title: "Karty pomocy",
+      body: `<p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>`,
     },
   ];
 
@@ -332,7 +388,7 @@ function buildMultiSetupSteps(n, roster = []) {
     title: "Schować nadmiar",
     body: `
       <p>Niewykorzystane zestawy → do pudełka.</p>
-      <p class="tip"><strong>Cel:</strong> 4 reputacji. Trofea: potwór / walka z wiedźminem / medytacja. Medytacja <em>nie kończy</em> gry przy 4. reputacji.</p>
+      <p class="tip"><strong>Cel:</strong> 4 reputacji z trofeum walki (potwór lub wiedźmin). Medytacja daje trofeum atrybutu i +reputację tylko gdy masz &lt; 3 — <em>nie kończy</em> gry i nie daje 4. reputacji.</p>
     `,
   });
 
@@ -349,24 +405,6 @@ function buildMultiSetupSteps(n, roster = []) {
   return steps;
 }
 
-function buildMonsterSetupHtml(n) {
-  const special2 =
-    n === 2
-      ? `<li><strong>3.</strong> <strong>2× poziom I</strong> + <strong>1× poziom II</strong>. Pierwszy gracz wybiera miejsce dla II.</li>`
-      : `<li><strong>3.</strong> <strong>3 żetony poziomu I</strong> — po 1 przy każdym żetonie obszaru.</li>`;
-
-  return `
-    <ol class="checklist">
-      <li><strong>1.</strong> Karty potworów: stosy I / II / III (odkryte).</li>
-      <li><strong>2.</strong> Żetony: stosy I / II / III (zakryte, pomieszane).</li>
-      ${special2}
-      <li><strong>4–6.</strong> Odkryj → przenieś na obszary → dopasuj karty.</li>
-      <li><strong>W helperze:</strong> 3 ikony terenu → numer obszaru z żetonu + poziom (<strong>max 1 na teren</strong>).</li>
-      <li><strong>7.</strong> Potasuj karty walki potworów.</li>
-    </ol>
-  `;
-}
-
 function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEntry) {
   const label = PLAYER_LABELS[turnOrderIndex];
   const res = START_RESOURCES[playerCount][turnOrderIndex];
@@ -381,14 +419,16 @@ function buildPlayerSetupStep(playerCount, turnOrderIndex, prepNumber, rosterEnt
     id: `player-${turnOrderIndex}`,
     title: `Gracz ${prepNumber}/${playerCount}: ${label}${rosterEntry ? ` — ${escapeLite(rosterEntry.name)}` : ""}`,
     body: `
-      <p class="lead">Teraz przygotowuje się:${named} (${label})${isFirst ? " — wybiera wiedźmina jako ostatni" : ""}.</p>
+      <p class="lead">Teraz przygotowuje się:${named || ` ${label}`} (${label}).</p>
       <ol class="checklist">
         <li><strong>1. Planszetka:</strong> ${
-          rosterEntry
+          rosterEntry?.schoolId
             ? `Weź szkołę przypisaną w helperze (albo zgodnie z wyborem przy stole).`
             : isLastPrep && playerCount === 5
               ? "Bierze ostatnią niewybraną."
-              : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
+              : isFirst
+                ? "Wybiera wiedźmina jako ostatni (kolejność przygotowania odwrotna do tur)."
+                : "Wybiera; potem los 2 z niewybranych, zatrzymuje 1."
         }</li>
         <li><strong>2.</strong> Żeton reputacji na 0.</li>
         <li><strong>3.</strong> Figurka na obszarze swojej szkoły.</li>
@@ -425,7 +465,7 @@ export function phase1AfterMove(isSolo) {
     }.</li>
     <li><strong>Zadanie tropienia:</strong> jeśli weszłeś na obszar z nazwy na żetonie → zbierz złoto i odwróć żeton (masz trop). Zapisz dojście jako <em>zadanie u góry</em>.</li>
     <li><strong>Zadanie z eksploracji</strong> (Event #): opcjonalnie w fazie I — przeczytaj kartę zdarzenia o danym numerze.</li>
-    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka (opcjonalna) / medytacja / eksploracja.</li>
+    <li><strong>Potwór na polu:</strong> wejście <em>nie</em> wymusza walki. W fazie II wybierasz 1 z: walka / medytacja / eksploracja.</li>
   </ul>
   ${
     isSolo
@@ -467,7 +507,6 @@ export function phase2Choices(
         <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
         <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Sam czytasz kartę ostrożnie</span></button>
       </div>
-      <p class="note">Walka jest <strong>opcjonalna</strong> (instrukcja: „możesz walczyć”). W solo nie ma walki z innymi wiedźminami. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
     `;
   }
   return `
@@ -477,7 +516,6 @@ export function phase2Choices(
       <button class="${medClass}" data-goto="meditate" ${meditateEnabled ? "" : "disabled"}><strong>Medytacja</strong><span>${medSpan}</span></button>
       <button class="choice" data-goto="explore"><strong>Eksploracja</strong><span>Miasto albo dzikie ostępy</span></button>
     </div>
-    <p class="note">Walka jest <strong>opcjonalna</strong> — nawet z potworem na polu możesz wybrać medytację albo eksplorację. Bez celu walki i bez medytacji helper idzie do eksploracji.</p>
   `;
 }
 
@@ -575,12 +613,12 @@ export function fightMonster(isSolo) {
 export const FIGHT_WITCHER = `
   <ol class="checklist">
     <li>Obaj: talie wytrzymałości (talia + odrzucone; ręka zostaje).</li>
-    <li>Pozostali mogą obstawić (1 złoto).</li>
-    <li>Atakujący zaczyna; naprzemiennie aż ktoś padnie.</li>
-    <li>Zwycięzca: trofeum szkoły, złoto wg reputacji, +reputacja, zmęczenie.</li>
+    <li>Przy ≥3 graczach pozostali mogą obstawić (1 złoto) — w 2-osobowej bez obstawy.</li>
+    <li>Atakujący zaczyna; naprzemiennie aż ktoś padnie. Obrażenia: tarcza → talia → ręka.</li>
+    <li>Zwycięzca: max <strong>1 trofeum na szkołę</strong> przeciwnika, złoto z toru reputacji, +reputacja, zmęczenie.</li>
     <li>Przegrany: karta kosztu 0 na odrzucone.</li>
-    <li>Obaj: tarcza = obrona, nowa talia; dobór wg wyniku.</li>
-    <li>Żeton <strong>zamkniętej karczmy</strong> na obszarze.</li>
+    <li>Obaj: tarcza = obrona, nowa talia. Dobór: zwykle 3 albo 4 karty wg atakujący/broniący i wyniku; <strong>przegrany atakujący</strong> w fazie III dobiera tylko do 2.</li>
+    <li>Żeton <strong>zamkniętej karczmy</strong> na obszarze (zostaje, aż kolejny pojedynek go przeniesie).</li>
   </ol>
 `;
 

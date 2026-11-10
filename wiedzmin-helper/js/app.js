@@ -11,6 +11,7 @@ import {
   phase3,
   LOCATION_ACTIONS,
   quickRef,
+  victoryPanelHtml,
 } from "./content.js";
 import { SCHOOLS, sourcesHtml } from "./sources.js";
 import { lexiconHtml, SCHOOL_SPECIALTIES } from "./lexicon.js";
@@ -71,6 +72,8 @@ import {
   hasTrailForMonster,
   fieldChangeModalHtml,
   applyFieldChange,
+  checkVictory,
+  applyFightTrophy,
   ATTR_KEYS,
 } from "./player-state.js";
 
@@ -127,6 +130,9 @@ function defaultState() {
     activeIndex: 0,
     setupIndex: 0,
     turnNumber: 1,
+    gameStarted: false,
+    gameOver: false,
+    winner: null,
     turn: {
       phase: "hub",
       screen: "hub",
@@ -134,10 +140,75 @@ function defaultState() {
       moveCost: null,
       exploreDeck: null,
       fightResult: null,
+      phase2Done: false,
     },
     board: defaultBoard(),
     orderDice: [],
   };
+}
+
+/** Gra rozpoczęta dopiero po „Prowadź pierwszą turę” — nie po samym kliknięciu nav „Tura”. */
+function isGameStarted() {
+  return state.gameStarted === true;
+}
+
+function markGameStarted() {
+  if (state.gameStarted) return;
+  state.gameStarted = true;
+}
+
+function clearVictory() {
+  state.gameOver = false;
+  state.winner = null;
+}
+
+function isGameOver() {
+  return state.gameOver === true && Boolean(state.winner);
+}
+
+function declareVictory(playerIndex, { kind, reason, source } = {}) {
+  const p = state.roster[playerIndex];
+  if (!p) return false;
+  state.gameOver = true;
+  state.winner = {
+    index: playerIndex,
+    name: p.name || "",
+    schoolId: p.schoolId || null,
+    kind: kind === "solo" ? "solo" : "multi",
+    reason: reason || "",
+    source: source || "manual",
+  };
+  state.activeIndex = playerIndex;
+  return true;
+}
+
+function tryDeclareVictory(playerIndex, source) {
+  if (isGameOver()) return false;
+  const p = state.roster[playerIndex];
+  if (!p) return false;
+  const verdict = checkVictory(p, { isSolo: isSolo(), source });
+  if (!verdict.won) return false;
+  return declareVictory(playerIndex, {
+    kind: verdict.kind,
+    reason: verdict.reason,
+    source,
+  });
+}
+
+function victoryBannerHtml() {
+  if (!isGameOver()) return "";
+  const w = state.winner;
+  const p = state.roster[w.index] || {};
+  const school = schoolById(w.schoolId || p.schoolId);
+  return victoryPanelHtml({
+    playerName: w.name || p.name,
+    schoolName: school?.short || school?.name || "",
+    isSolo: isSolo() || w.kind === "solo",
+    turnNumber: state.turnNumber || 1,
+    reason: w.reason,
+    monsterTrophies: p.monsterTrophies || 0,
+    attrTrophyCount: (p.attrTrophies || []).length,
+  });
 }
 
 function isSolo() {
@@ -159,6 +230,7 @@ function normalizeState(raw) {
           fightResult: raw.turn.fightResult && typeof raw.turn.fightResult === "object"
             ? raw.turn.fightResult
             : null,
+          phase2Done: Boolean(raw.turn.phase2Done),
         }
       : base.turn;
   const board =
@@ -215,14 +287,30 @@ function normalizeState(raw) {
   ]);
   roster.forEach((p) => ensureCombatTrack(ensurePlayerTrack(p)));
   const turnNumber = Math.max(1, Math.min(999, Number(raw.turnNumber) || 1));
+  const view = views.has(raw.view) ? raw.view : "home";
+  const gameStarted = raw.gameStarted === true;
+  const winner =
+    raw.winner && typeof raw.winner === "object"
+      ? {
+          index: Math.max(0, Number(raw.winner.index) || 0),
+          name: String(raw.winner.name || ""),
+          schoolId: raw.winner.schoolId ? String(raw.winner.schoolId) : null,
+          kind: raw.winner.kind === "solo" ? "solo" : "multi",
+          reason: raw.winner.reason ? String(raw.winner.reason) : "",
+          source: raw.winner.source ? String(raw.winner.source) : "manual",
+        }
+      : null;
   return {
     ...base,
-    view: views.has(raw.view) ? raw.view : "home",
+    view,
     players,
     roster,
     activeIndex: Math.max(0, Number(raw.activeIndex) || 0),
     setupIndex: Math.max(0, Number(raw.setupIndex) || 0),
     turnNumber,
+    gameStarted,
+    gameOver: raw.gameOver === true && Boolean(winner),
+    winner: raw.gameOver === true ? winner : null,
     turn,
     board,
     orderDice: Array.isArray(raw.orderDice) ? raw.orderDice.map(Number) : [],
@@ -285,6 +373,25 @@ function ensureRoster() {
       p._prevSchoolId = p.schoolId;
     }
   });
+  // Multi: rozdziel zduplikowane szkoły (stare zapisy) — bez twardego błędu.
+  if (n > 1) {
+    const seen = new Set();
+    const free = SCHOOLS.map((s) => s.id).filter(
+      (id) => !state.roster.some((p) => p.schoolId === id)
+    );
+    state.roster.forEach((p) => {
+      if (!seen.has(p.schoolId)) {
+        seen.add(p.schoolId);
+        return;
+      }
+      const nextId = free.shift() || SCHOOLS.find((s) => !seen.has(s.id))?.id;
+      if (!nextId) return;
+      p.schoolId = nextId;
+      placeAtSchool(p, { force: true });
+      p._prevSchoolId = nextId;
+      seen.add(nextId);
+    });
+  }
   if (state.activeIndex >= n) state.activeIndex = 0;
   if (state.board.placePlayer >= n) state.board.placePlayer = 0;
 }
@@ -327,6 +434,8 @@ function setPlayers(n) {
   state.players = n;
   state.setupIndex = 0;
   state.activeIndex = 0;
+  state.gameStarted = false;
+  clearVictory();
   ensureRoster();
   saveState();
   render();
@@ -468,41 +577,78 @@ function renderHome() {
   appEl.querySelector("#to-roster").addEventListener("click", () => go("roster"));
 }
 
+function schoolOptionsHtml(forIdx) {
+  const mine = state.roster[forIdx]?.schoolId;
+  const taken = new Set(
+    state.roster.map((p, i) => (i === forIdx ? null : p.schoolId)).filter(Boolean)
+  );
+  return SCHOOLS.map((s) => {
+    const occupied = taken.has(s.id) && s.id !== mine;
+    // Zajęte szkoły zostają na liście — wybór = zamiana ze współgraczem (wygodniej przy 5 osobach).
+    const label = occupied
+      ? `${s.short} · zajęta (zamiana)`
+      : s.name;
+    return `<option value="${s.id}" ${s.id === mine ? "selected" : ""} data-color="${escapeAttr(
+      s.color || ""
+    )}">${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
+function applyRosterSchoolChoice(idx, newSchoolId) {
+  const me = state.roster[idx];
+  if (!me) return;
+  const prevSchool = me.schoolId;
+  if (prevSchool === newSchoolId) return;
+  const otherIdx = state.roster.findIndex((p, i) => i !== idx && p.schoolId === newSchoolId);
+  if (otherIdx >= 0) {
+    const other = state.roster[otherIdx];
+    other.schoolId = prevSchool;
+    placeAtSchool(other, { force: true });
+    other._prevSchoolId = other.schoolId;
+  }
+  me.schoolId = newSchoolId;
+  placeAtSchool(me, { force: true });
+  me._prevSchoolId = newSchoolId;
+}
+
 function renderRoster() {
   ensureRoster();
-  const used = new Set();
 
   shell(`
     <section class="panel">
       <p class="step-kicker">Skład stołu · ${playersLabel(state.players)}</p>
       <h1>Imiona i szkoły</h1>
-      <p class="lead">Wpisz imię i wybierz szkołę — <strong>pionek od razu staje na szkole startowej</strong> (Wilk→Kaer Morhen, Gryf→Kaer Seren, Niedźwiedź→Haern Caduch, Kot→Stygga, Żmija→Gorthur Gvaed).</p>
-      <div id="roster-forms">
+      <div id="roster-forms" class="roster-grid roster-grid--${state.players}">
         ${state.roster
           .map((p, i) => {
             const orderHint = state.players === 1 ? "Ty" : `Gracz ${i + 1}`;
+            const school = schoolById(p.schoolId);
+            const color = school.color || "#244833";
             return `
-            <div class="roster-card" data-idx="${i}">
-              <strong>${orderHint}</strong>
-              <label>Imię
-                <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
-              </label>
-              <label>Szkoła
-                <select data-field="schoolId">
-                  ${SCHOOLS.map(
-                    (s) =>
-                      `<option value="${s.id}" ${p.schoolId === s.id ? "selected" : ""}>${s.name}</option>`
-                  ).join("")}
-                </select>
-              </label>
-              <p class="note school-start-hint">Start: <strong>${escapeHtml(
-                locById(schoolStartId(p.schoolId))?.name || "—"
-              )}</strong></p>
+            <div class="roster-card" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+              <header class="roster-card-head">
+                <span class="roster-card-badge" style="background:${escapeAttr(color)}">${schoolIcon(
+                  p.schoolId
+                )}</span>
+                <div class="roster-card-title">
+                  <strong>${orderHint}</strong>
+                  <span class="school-start-hint">Start: <strong>${escapeHtml(
+                    locById(schoolStartId(p.schoolId))?.name || "—"
+                  )}</strong></span>
+                </div>
+              </header>
+              <div class="roster-card-fields">
+                <label>Imię
+                  <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
+                </label>
+                <label>Szkoła
+                  <select data-field="schoolId">${schoolOptionsHtml(i)}</select>
+                </label>
+              </div>
             </div>`;
           })
           .join("")}
       </div>
-      <p class="warn" id="roster-warn" hidden>Każda szkoła może być tylko raz (w multi). Popraw wybór.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-home">Wstecz</button>
         <button class="btn btn-primary" id="to-order">${isSolo() ? "Dalej — przygotowanie" : "Dalej — kolejność"}</button>
@@ -510,9 +656,7 @@ function renderRoster() {
     </section>
   `);
 
-  const warn = appEl.querySelector("#roster-warn");
-
-  function syncFromDom() {
+  function syncNamesFromDom() {
     appEl.querySelectorAll(".roster-card").forEach((card) => {
       const i = Number(card.dataset.idx);
       const name =
@@ -520,47 +664,44 @@ function renderRoster() {
           .querySelector('[data-field="name"]')
           .value.replace(/[<>]/g, "")
           .trim() || `Gracz ${i + 1}`;
-      const schoolId = card.querySelector('[data-field="schoolId"]').value;
       const prev = state.roster[i] || {};
       const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
       const next = ensurePlayerTrack(
-        { ...prev, name, schoolId, _prevSchoolId: prev.schoolId || prev._prevSchoolId },
+        { ...prev, name, schoolId: prev.schoolId, _prevSchoolId: prev.schoolId },
         start.cards,
         start.gold
       );
       ensureCombatTrack(next);
-      if (!prev.locationId || prev.schoolId !== schoolId) {
-        placeAtSchool(next, { force: true });
-      }
-      next._prevSchoolId = schoolId;
       state.roster[i] = next;
-      const hintStrong = card.querySelector(".school-start-hint strong");
-      if (hintStrong) {
-        hintStrong.textContent = locById(schoolStartId(schoolId))?.name || "—";
-      }
     });
-    used.clear();
-    let dup = false;
-    if (!isSolo()) {
-      for (const p of state.roster) {
-        if (used.has(p.schoolId)) dup = true;
-        used.add(p.schoolId);
-      }
-    }
-    warn.hidden = !dup;
     applySchoolStarts();
     saveState();
-    return !dup;
   }
 
-  appEl.querySelectorAll(".roster-card input, .roster-card select").forEach((el) => {
-    el.addEventListener("change", syncFromDom);
-    el.addEventListener("input", syncFromDom);
+  appEl.querySelectorAll('.roster-card [data-field="name"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      syncNamesFromDom();
+    });
+    el.addEventListener("input", () => {
+      syncNamesFromDom();
+    });
+  });
+
+  appEl.querySelectorAll('.roster-card [data-field="schoolId"]').forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const card = sel.closest(".roster-card");
+      const i = Number(card?.dataset.idx);
+      syncNamesFromDom();
+      applyRosterSchoolChoice(i, sel.value);
+      applySchoolStarts();
+      saveState();
+      render();
+    });
   });
 
   appEl.querySelector("#back-home").addEventListener("click", () => go("home"));
   appEl.querySelector("#to-order").addEventListener("click", () => {
-    if (!syncFromDom()) return;
+    syncNamesFromDom();
     applySchoolStarts();
     if (isSolo()) {
       applyStartResources(state.roster, state.players, { force: true });
@@ -586,32 +727,46 @@ function renderOrder() {
   const remaining = state.roster.length - diceDone;
 
   shell(`
-    <section class="panel">
+    <section class="panel order-panel">
       <p class="step-kicker">Kolejność przy stole</p>
       <h1>Kto pierwszy?</h1>
-      <p class="lead">Kolejność ustala startowe <strong>karty i złoto</strong> — ustaw ją teraz, zanim rozdamy zasoby. Domyślnie: jak wpisywaliście. Przeciągnij kafelki albo rzuć kością.</p>
-      <ul class="order-list" id="order-list">
-        ${state.roster
-          .map((p, i) => {
-            const res = startResourcesFor(state.players, i);
-            return `
-            <li class="order-item" draggable="true" data-idx="${i}">
-              <span class="order-pos">${i + 1}.</span>
-              <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
-              <span class="tip" style="margin:0">→ ${res.cards} kart · ${res.gold} złota</span>
-              <button type="button" class="btn btn-secondary" data-order-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
-              <button type="button" class="btn btn-secondary" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""}>↓</button>
-            </li>`;
-          })
-          .join("")}
-      </ul>
-      <div class="actions">
-        <button type="button" class="btn btn-secondary" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
+      <div class="order-box">
+        <div class="order-box-head">
+          <span>Gracz</span>
+          <span class="order-box-head-meta">Start</span>
+          <span class="order-box-head-actions" aria-hidden="true"></span>
+        </div>
+        <ul class="order-list" id="order-list">
+          ${state.roster
+            .map((p, i) => {
+              const res = startResourcesFor(state.players, i);
+              const school = schoolById(p.schoolId);
+              const color = school.color || "#244833";
+              return `
+              <li class="order-item" draggable="true" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+                <span class="order-handle" aria-hidden="true" title="Przeciągnij">⋮⋮</span>
+                <span class="order-pos">${i + 1}</span>
+                <span class="order-avatar" style="background:${escapeAttr(color)}">${schoolIcon(p.schoolId)}</span>
+                <div class="order-identity">
+                  <strong class="order-name">${escapeHtml(p.name)}</strong>
+                  <span class="order-school">${escapeHtml(school.short)}</span>
+                </div>
+                <span class="order-meta">${res.cards} kart · ${res.gold} złota</span>
+                <div class="order-move">
+                  <button type="button" class="order-icon-btn" data-order-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Wyżej">↑</button>
+                  <button type="button" class="order-icon-btn" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""} aria-label="Niżej">↓</button>
+                </div>
+              </li>`;
+            })
+            .join("")}
+        </ul>
+      </div>
+      <div class="order-toolbar">
+        <button type="button" class="btn btn-secondary btn-compact" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
           ${ICO.dice()} Kość — wylosuj ${diceDone === 0 ? "1. gracza" : diceDone === 1 ? "2. gracza" : "kolejnego"}
         </button>
-        <button type="button" class="btn btn-secondary" id="order-reset">Reset kolejności / kości</button>
+        <button type="button" class="btn btn-secondary btn-compact" id="order-reset">Reset</button>
       </div>
-      <p class="note">Po 1. i 2. rzucie reszta ustawia się sama (przy 3 graczach). Przy więcej — rzucaj dalej albo przeciągnij.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-roster">Wstecz</button>
         <button class="btn btn-primary" id="confirm-order">Zatwierdź i rozdaj karty/złoto</button>
@@ -723,7 +878,9 @@ function renderSetup() {
   const rosterHint = state.roster
     .map((p, i) => {
       const res = startResourcesFor(state.players, i);
-      return `<span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span> · ${res.cards}k/${res.gold}zł</span>`;
+      return `<span class="player-chip" style="background:${escapeAttr(
+        schoolById(p.schoolId).color || "#244833"
+      )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span> · ${res.cards}k/${res.gold}zł</span>`;
     })
     .join(" ");
 
@@ -753,7 +910,7 @@ function renderSetup() {
       <div class="setup-map-embed">
         <h3>Oznacz potwory (numery z żetonów)</h3>
         <p class="lead">Dla lasu, gór i wody podaj numer obszaru z odkrytego żetonu — strzałkami albo wpisz. Potem ustaw poziom.</p>
-        ${monstersPanelHtml(state.board)}
+        ${monstersPanelHtml(state.board, { editable: !isGameStarted() })}
         ${mapSvgHtml(state.board, state.roster, { schoolById })}
       </div>`
       : "";
@@ -784,7 +941,7 @@ function renderSetup() {
   `);
 
   if (step.id === "monsters") {
-    bindMonsterPanelControls();
+    if (!isGameStarted()) bindMonsterPanelControls();
     appEl.querySelectorAll(".map-node").forEach((g) => {
       g.addEventListener("click", () => {
         state.board.selectedLoc = g.getAttribute("data-loc");
@@ -819,7 +976,18 @@ function renderSetup() {
       applyStartResources(state.roster, state.players, { force: true });
       state.activeIndex = 0;
       state.turnNumber = 1;
-      go("turn", { turn: { phase: "hub", screen: "hub" } });
+      markGameStarted();
+      go("turn", {
+        turn: {
+          phase: "hub",
+          screen: "hub",
+          moveTo: null,
+          moveCost: null,
+          exploreDeck: null,
+          fightResult: null,
+          phase2Done: false,
+        },
+      });
     });
   }
 }
@@ -845,21 +1013,32 @@ function turnShell(title, body) {
   shell(`
     <section class="panel">
       <div class="badge-row">
-        <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
+        <span class="player-chip" style="background:${escapeAttr(
+          school.color || "#244833"
+        )}">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${school.name}</span></span>
         ${isSolo() ? `<span class="badge">Tura ${state.turnNumber || 1}</span>` : ""}
       </div>
       ${soloTurnBadgeHtml()}
-      <div class="phase-tabs">
+      ${victoryBannerHtml()}
+      ${
+        isGameOver()
+          ? ""
+          : `<div class="phase-tabs">
         ${tabs
           .map(
             ([id, label]) =>
               `<button class="phase-tab ${active === id ? "active" : ""}" data-phase="${id}">${label}</button>`
           )
           .join("")}
-      </div>
+      </div>`
+      }
       <p class="step-kicker">Przewodnik tury${isSolo() ? " · solo" : ""}</p>
-      <h1>${title}</h1>
-      <div class="step-body">${body}</div>
+      <h1>${isGameOver() ? "Koniec gry" : title}</h1>
+      <div class="step-body">${
+        isGameOver()
+          ? `<p class="lead">Zwykły przebieg tur jest zatrzymany. Możesz przeglądać stół i ściągi.</p>`
+          : body
+      }</div>
       <div class="actions" id="turn-actions"></div>
     </section>
   `);
@@ -867,11 +1046,24 @@ function turnShell(title, body) {
   bindSoloTurnCounter();
   appEl.querySelectorAll("[data-phase]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const id = btn.getAttribute("data-phase");
+      const phase2Done = Boolean(state.turn?.phase2Done);
       if (id === "hub") setTurn("hub", "hub");
-      else if (id === "I") setTurn("I", "phase1-start");
-      else if (id === "II") setTurn("II", "phase2");
-      else if (id === "III") setTurn("III", "phase3");
+      else if (id === "I") {
+        if (phase2Done) {
+          window.alert("Faza I tej tury jest zamknięta — po wyborze w fazie II idziesz do fazy III.");
+          return;
+        }
+        setTurn("I", "phase1-start");
+      } else if (id === "II") {
+        if (phase2Done) {
+          window.alert("Faza II już zrobiona w tej turze (1 wybór). Przejdź do fazy III.");
+          setTurn("III", "phase3");
+          return;
+        }
+        setTurn("II", "phase2");
+      } else if (id === "III") setTurn("III", "phase3");
     });
   });
 }
@@ -883,13 +1075,18 @@ function setTurn(phase, screen, extra = {}) {
     extra.exploreDeck !== undefined ? extra.exploreDeck : state.turn?.exploreDeck || null;
   let fightResult =
     extra.fightResult !== undefined ? extra.fightResult : state.turn?.fightResult || null;
+  let phase2Done =
+    extra.phase2Done !== undefined ? extra.phase2Done : Boolean(state.turn?.phase2Done);
   if (extra.clearMove) {
     moveTo = null;
     moveCost = null;
   }
   if (extra.clearExplore) exploreDeck = null;
   if (extra.clearFightResult) fightResult = null;
-  state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult };
+  // Nie czyść phase2Done przy hub/fazie I — inaczej zakładka „hub” omija blokadę fazy II.
+  if (extra.clearPhase2Done) phase2Done = false;
+  if (extra.markPhase2Done || screen === "fight-monster-result") phase2Done = true;
+  state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult, phase2Done };
   const p = activePlayer();
   if (p) {
     if (phase === "I") p.nowDoing = "faza1";
@@ -911,6 +1108,15 @@ function setTurn(phase, screen, extra = {}) {
 }
 
 function nextPlayer() {
+  if (isGameOver()) {
+    setTurn("hub", "hub", {
+      clearPhase2Done: true,
+      clearMove: true,
+      clearExplore: true,
+      clearFightResult: true,
+    });
+    return;
+  }
   if (isSolo()) {
     state.activeIndex = 0;
     state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
@@ -920,7 +1126,12 @@ function nextPlayer() {
     if (next === 0) state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
     state.activeIndex = next;
   }
-  setTurn("hub", "hub");
+  setTurn("hub", "hub", {
+    clearPhase2Done: true,
+    clearMove: true,
+    clearExplore: true,
+    clearFightResult: true,
+  });
 }
 
 function soloTurnBadgeHtml() {
@@ -1218,6 +1429,15 @@ function renderTurn() {
   const solo = isSolo();
   const p = activePlayer();
 
+  if (isGameOver()) {
+    turnShell("Zwycięstwo", "");
+    addTurnButtons([
+      { id: "to-board", label: "Podgląd stołu", onClick: () => go("board") },
+      { id: "to-ref", label: "Ściąga", onClick: () => go("ref") },
+    ]);
+    return;
+  }
+
   if (screen === "hub") {
     const picker = solo
       ? ""
@@ -1250,24 +1470,39 @@ function renderTurn() {
     if (!solo) {
       appEl.querySelectorAll("[data-active]").forEach((btn) => {
         btn.addEventListener("click", () => {
-          state.activeIndex = Number(btn.dataset.active);
-          saveState();
-          render();
+          const next = Number(btn.dataset.active);
+          if (next === state.activeIndex) return;
+          // Ręczna zmiana aktywnego = nowa tura helpera dla tej osoby.
+          state.activeIndex = next;
+          setTurn("hub", "hub", {
+            clearPhase2Done: true,
+            clearMove: true,
+            clearExplore: true,
+            clearFightResult: true,
+          });
         });
       });
     }
 
+    const phase2Done = Boolean(state.turn?.phase2Done);
     addTurnButtons([
-      {
-        id: "go-i",
-        label: `Zaczynam fazę I (${escapeHtml(p.name)})`,
-        primary: true,
-        onClick: () => {
-          p.nowDoing = "faza1";
-          saveState();
-          setTurn("I", "phase1-start");
-        },
-      },
+      phase2Done
+        ? {
+            id: "go-iii",
+            label: "Faza II zużyta → idź do fazy III",
+            primary: true,
+            onClick: () => setTurn("III", "phase3"),
+          }
+        : {
+            id: "go-i",
+            label: `Zaczynam fazę I (${escapeHtml(p.name)})`,
+            primary: true,
+            onClick: () => {
+              p.nowDoing = "faza1";
+              saveState();
+              setTurn("I", "phase1-start");
+            },
+          },
       {
         id: "to-board",
         label: "Stół — mapa / reputacja / karty",
@@ -1278,6 +1513,10 @@ function renderTurn() {
   }
 
   if (screen === "phase1-start") {
+    if (state.turn?.phase2Done) {
+      setTurn("III", "phase3");
+      return;
+    }
     turnShell(
       "Faza I — start",
       `
@@ -1485,15 +1724,26 @@ function renderTurn() {
 
   if (screen === "phase2") {
     ensureCombatTrack(p);
-    const med = meditationStatus(p, { isSolo: solo });
-    const fight = fightOptionsFor(p);
-    // Bez celu walki i bez medytacji → od razu eksploracja
-    if (!fight.can && !med.can) {
-      p.nowDoing = "eksploracja";
-      saveState();
-      setTurn("II", "explore");
+    if (state.turn?.phase2Done) {
+      turnShell(
+        "Faza II — już zrobiona",
+        `
+          <p class="warn">W tej turze wybór fazy II jest zużyty (walka / medytacja / eksploracja — dokładnie 1). Przejdź do fazy III.</p>
+        `
+      );
+      addTurnButtons([
+        {
+          id: "to3",
+          label: "Dalej → faza III",
+          primary: true,
+          onClick: () => setTurn("III", "phase3"),
+        },
+      ]);
       return;
     }
+    const med = meditationStatus(p, { isSolo: solo });
+    const fight = fightOptionsFor(p);
+    // Zawsze 3 wybory — bez auto-skoku do eksploracji (Wróć nie wpada w pętlę).
     turnShell(
       "Faza II — wybór",
       `
@@ -1566,7 +1816,7 @@ function renderTurn() {
         setTurn("II", "fight-monster-result");
         return;
       }
-      setTurn("III", "phase3", { clearFightResult: true });
+      setTurn("III", "phase3", { clearFightResult: true, markPhase2Done: true });
       return;
     }
     ensureCombatTrack(p);
@@ -1612,6 +1862,12 @@ function renderTurn() {
         if (plan.removeMonster && p.locationId) {
           delete state.board.monsters[p.locationId];
         }
+        if (kind === "loss" && here?.terrain) {
+          ensureCombatTrack(p);
+          if (!p.trails?.[here.terrain]) {
+            p.trails[here.terrain] = { kind: "trail", locId: here.id };
+          }
+        }
         state.board.placeError = null;
         setTurn("II", "fight-monster-result", { fightResult: plan });
       });
@@ -1627,6 +1883,28 @@ function renderTurn() {
     if (!plan) {
       setTurn("III", "phase3");
       return;
+    }
+    if (plan.kind === "defeat" && !plan.rewardsApplied) {
+      ensureCombatTrack(p);
+      p.gold = Math.min(99, (p.gold || 0) + 2);
+      const award = applyFightTrophy(p, { source: "monster", applyFatigueToHand: true });
+      plan.rewardsApplied = true;
+      plan.rewardNote = award.alreadyMax
+        ? "Trofeum potwora zapisane (reputacja już 4)."
+        : `+2 złota, +1 reputacja → ${award.reputation}, zmęczenie −${award.lose} z ręki, trofea potworów: ${p.monsterTrophies}.`;
+      const idx = state.roster.indexOf(p);
+      tryDeclareVictory(idx >= 0 ? idx : state.activeIndex, "monster");
+      saveState();
+      if (isGameOver()) {
+        setTurn("hub", "hub");
+        return;
+      }
+    }
+    if (plan.kind === "drive" && !plan.rewardsApplied) {
+      p.gold = Math.min(99, (p.gold || 0) + 2);
+      plan.rewardsApplied = true;
+      plan.rewardNote = "+2 złota (odpędzenie — bez +reputacji).";
+      saveState();
     }
     if (plan.needsSpawn && plan.terrain && plan.spawnLevel) {
       // Utrzymaj wymagany poziom na slocie, jeśli już wybrano numer
@@ -1660,6 +1938,11 @@ function renderTurn() {
       `
         <div class="guide-box">
           <p class="lead" style="margin:0">${plan.summary}</p>
+          ${
+            plan.rewardNote
+              ? `<p class="tip" style="margin:0.55rem 0 0"><strong>Tracker:</strong> ${escapeHtml(plan.rewardNote)}</p>`
+              : ""
+          }
           ${
             plan.spawnHint
               ? `<p class="tip" style="margin:0.55rem 0 0">${plan.spawnHint}</p>`
@@ -1720,17 +2003,32 @@ function renderTurn() {
         });
       });
     }
-    addTurnButtons([
-      {
-        id: "to3",
-        label: spawnReady ? "Dalej → faza III" : "Pomiń spawn → faza III",
-        primary: true,
-        onClick: () => {
-          p.nowDoing = "faza3";
-          setTurn("III", "phase3", { clearFightResult: true });
-        },
-      },
-    ]);
+    addTurnButtons(
+      spawnReady
+        ? [
+            {
+              id: "to3",
+              label: "Dalej → faza III",
+              primary: true,
+              onClick: () => {
+                p.nowDoing = "faza3";
+                setTurn("III", "phase3", { clearFightResult: true, markPhase2Done: true });
+              },
+            },
+          ]
+        : [
+            {
+              id: "spawn-needed",
+              label: "Ustaw spawn potwora (wymagane)",
+              primary: false,
+              onClick: () => {
+                window.alert(
+                  "Po pokonaniu / odpędzeniu trzeba ustawić nowego potwora na ten teren (numer obszaru + poziom), zanim przejdziesz do fazy III."
+                );
+              },
+            },
+          ]
+    );
     return;
   }
 
@@ -1747,12 +2045,45 @@ function renderTurn() {
         ${attrsAdjustHtml(p)}
         ${resourceAdjustHtml(p, { title: "Karty / złoto" })}
         ${FIGHT_WITCHER}
+        <div class="guide-box" style="margin-top:0.85rem">
+          <p class="step-kicker" style="margin:0">Wynik walki</p>
+          <p class="lead" style="margin:0.35rem 0 0">Zwycięzca: trofeum szkoły, złoto wg reputacji, +reputacja, zmęczenie — może domknąć wygraną (4. reputacja).</p>
+          <div class="choice-grid" style="margin-top:0.65rem">
+            <button type="button" class="choice" data-witcher-outcome="win"><strong>Wygrana</strong><span>+reputacja, trofeum szkoły, zmęczenie</span></button>
+            <button type="button" class="choice" data-witcher-outcome="loss"><strong>Porażka</strong><span>Bez +reputacji — dalej faza III</span></button>
+          </div>
+        </div>
       `
     );
     bindResourceAdjust(p);
     bindAttrAdjust(p);
+    appEl.querySelectorAll("[data-witcher-outcome]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const kind = btn.getAttribute("data-witcher-outcome");
+        if (kind === "win") {
+          const award = applyFightTrophy(p, { source: "witcher", applyFatigueToHand: true });
+          const idx = state.roster.indexOf(p);
+          tryDeclareVictory(idx >= 0 ? idx : state.activeIndex, "witcher");
+          saveState();
+          if (isGameOver()) {
+            setTurn("hub", "hub");
+            return;
+          }
+          window.alert(
+            award.alreadyMax
+              ? "Trofeum szkoły zapisane (reputacja już 4)."
+              : `+1 reputacja → ${award.reputation}, zmęczenie −${award.lose} z ręki.`
+          );
+        }
+        setTurn("III", "phase3", { markPhase2Done: true });
+      });
+    });
     addTurnButtons([
-      { id: "to3", label: "Koniec walki → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
+      {
+        id: "to3",
+        label: "Bez wyniku → faza III",
+        onClick: () => setTurn("III", "phase3", { markPhase2Done: true }),
+      },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "fight") },
     ]);
     return;
@@ -1798,16 +2129,31 @@ function renderTurn() {
         const id = btn.getAttribute("data-take-trophy");
         ensureCombatTrack(p);
         if (!p.attrTrophies.includes(id)) p.attrTrophies.push(id);
-        if ((p.reputation || 0) < 3) {
-          p.reputation = Math.min(4, (p.reputation || 0) + 1);
+        const before = p.reputation || 0;
+        // Medytacja: +reputacja tylko gdy < 3 — nigdy 4. i nigdy koniec gry
+        if (before < 3) {
+          p.reputation = before + 1;
+          const lose = fatigueForReputation(p.reputation);
+          p.cards = Math.max(0, (p.cards || 0) - lose);
         }
+        // Trofeum wzięte = wybór fazy II zużyty (nie wracasz do walki/eksploracji).
+        if (state.turn) state.turn.phase2Done = true;
+        tryDeclareVictory(state.activeIndex, "meditate");
         saveState();
         render();
       });
     });
+    const medDone = Boolean(state.turn?.phase2Done);
     addTurnButtons([
-      { id: "to3", label: "Dalej → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
-      { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
+      {
+        id: "to3",
+        label: "Dalej → faza III",
+        primary: true,
+        onClick: () => setTurn("III", "phase3", { markPhase2Done: true }),
+      },
+      ...(medDone
+        ? []
+        : [{ id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") }]),
     ]);
     return;
   }
@@ -1822,7 +2168,7 @@ function renderTurn() {
     appEl.querySelectorAll("[data-explore-deck]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const deck = btn.getAttribute("data-explore-deck");
-        setTurn("II", "explore-resolve", { exploreDeck: deck });
+        setTurn("II", "explore-resolve", { exploreDeck: deck, markPhase2Done: true });
       });
     });
     addTurnButtons([
@@ -1848,7 +2194,7 @@ function renderTurn() {
         id: "to3",
         label: "Dalej → faza III",
         primary: true,
-        onClick: () => setTurn("III", "phase3", { clearExplore: true }),
+        onClick: () => setTurn("III", "phase3", { clearExplore: true, markPhase2Done: true }),
       },
       {
         id: "back-deck",
@@ -1934,6 +2280,7 @@ function renderBoard() {
     <section class="panel board-panel">
       <p class="step-kicker">Przy stole · mapa i status</p>
       <h1>Stół</h1>
+      ${victoryBannerHtml()}
       <p class="lead">Schemat mapy do oznaczania potworów i wiedźminów (możesz obracać). Jak przesuniesz wiedźmina na sąsiada — wyskoczy wybór kosztu ruchu (1 karta / 2 karty / 1+złoto). Przyciski „co robi teraz” prowadzą za rękę (m.in. eksploracja wg znaków pola).</p>
 
       <h2>Mapa (schemat)</h2>
@@ -1945,7 +2292,7 @@ function renderBoard() {
           board.movePrompt?.fromId ||
           (activePlayer()?.nowDoing === "faza1" ? activePlayer()?.locationId : null),
       })}
-      ${selectedLocPanel(board, state.roster)}
+      ${selectedLocPanel(board, state.roster, { monstersEditable: !isGameStarted() })}
       ${
         (board.highlightFrom || activePlayer()?.nowDoing === "faza1") && activePlayer()?.locationId
           ? neighborPickerHtml(board.highlightFrom || activePlayer().locationId, {
@@ -1963,7 +2310,7 @@ function renderBoard() {
           : ""
       }
 
-      ${monstersPanelHtml(board)}
+      ${monstersPanelHtml(board, { editable: !isGameStarted() })}
 
       <h2>Gracze — reputacja i karty</h2>
       <div class="tracker-list">
@@ -1984,7 +2331,7 @@ function renderBoard() {
     </section>
   `);
 
-  bindMonsterPanelControls();
+  if (!isGameStarted()) bindMonsterPanelControls();
 
   appEl.querySelectorAll(".map-node").forEach((g) => {
     g.addEventListener("click", () => {
@@ -2061,9 +2408,22 @@ function renderBoard() {
 
   appEl.querySelectorAll("[data-rep]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const i = Number(btn.dataset.idx);
       const n = Number(btn.dataset.rep);
-      if (state.roster[i]) state.roster[i].reputation = n;
+      const pl = state.roster[i];
+      if (!pl) return;
+      if (n === 4) {
+        const ok = window.confirm(
+          "Ustawić reputację na 4 w trackerze (księgowość)? Wygraną helper ogłasza dopiero po trofeum z walki w przewodniku tury — nie z tego przycisku."
+        );
+        if (!ok) return;
+        pl.reputation = 4;
+        // Tracker nie kończy gry — unikamy „fake win” bez trofeum walki.
+      } else {
+        pl.reputation = n;
+        if (n < 4 && state.gameOver && state.winner?.index === i) clearVictory();
+      }
       saveState();
       render();
     });
@@ -2124,7 +2484,19 @@ function renderBoard() {
       const now = btn.dataset.now;
       if (state.roster[i]) {
         state.roster[i].nowDoing = now;
-        if (now !== "czekam") state.activeIndex = i;
+        if (now !== "czekam" && i !== state.activeIndex) {
+          // Zmiana aktywnego ze stołu = nowa tura helpera (jak nextPlayer / hub picker).
+          state.activeIndex = i;
+          setTurn("hub", "hub", {
+            clearPhase2Done: true,
+            clearMove: true,
+            clearExplore: true,
+            clearFightResult: true,
+          });
+          state.roster[i].nowDoing = now;
+        } else if (now !== "czekam") {
+          state.activeIndex = i;
+        }
         if (now === "faza1") {
           if (!state.roster[i].locationId) placeAtSchool(state.roster[i], { force: true });
           state.board.highlightFrom = state.roster[i].locationId;
@@ -2139,20 +2511,26 @@ function renderBoard() {
 
   appEl.querySelectorAll("[data-apply-fatigue]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const i = Number(btn.dataset.idx);
-      const p = state.roster[i];
-      if (!p || p.reputation >= 4) return;
-      const next = p.reputation + 1;
+      const pl = state.roster[i];
+      if (!pl || pl.reputation >= 4) return;
+      const next = pl.reputation + 1;
       const lose = fatigueForReputation(next);
+      const fightAsk =
+        next === 4
+          ? " To tylko księgowość trackera — wygraną helper ogłasza po trofeum z walki w przewodniku tury, nie z tego przycisku."
+          : "";
       if (
         !window.confirm(
-          `+1 reputacja → ${next}. Usunąć z gry ${lose} kart(y) z ręki (uproszczenie trackera)? Na stole możesz brać też z talii/odrzuconych.`
+          `+1 reputacja → ${next}. Usunąć z gry ${lose} kart(y) z ręki (uproszczenie trackera)? Na stole możesz brać też z talii/odrzuconych.${fightAsk}`
         )
       ) {
         return;
       }
-      p.reputation = next;
-      p.cards = Math.max(0, (p.cards || 0) - lose);
+      pl.reputation = next;
+      pl.cards = Math.max(0, (pl.cards || 0) - lose);
+      // Tracker nie wywołuje declareVictory — unikamy fake-win bez trofeum walki.
       saveState();
       render();
     });
@@ -2217,6 +2595,7 @@ function renderRef() {
     if (!window.confirm("Wyczyścić cały zapis helpera (gracze, mapa, reputacja)?")) return;
     localStorage.removeItem(STORAGE_KEY);
     Object.assign(state, defaultState());
+    clearVictory();
     render();
   });
 }
