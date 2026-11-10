@@ -233,7 +233,6 @@ function buildMultiSetupSteps(n, roster = []) {
           <span class="badge">Tylko podstawka</span>
           <span class="badge">Cel: 4 reputacji</span>
         </div>
-        <p class="tip"><strong>Wskazówka:</strong> pierwsza partia najlepiej w max. 3 osoby.</p>
       `,
     },
     {

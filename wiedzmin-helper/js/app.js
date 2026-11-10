@@ -628,7 +628,7 @@ function renderOrder() {
   }
 
   const diceDone = (state.orderDice || []).length;
-  const remaining = state.roster.length - diceDone;
+  const allOrdered = diceDone >= state.roster.length && state.roster.length > 1;
 
   shell(`
     <section class="panel order-panel">
@@ -666,8 +666,8 @@ function renderOrder() {
         </ul>
       </div>
       <div class="order-toolbar">
-        <button type="button" class="btn btn-secondary btn-compact" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
-          ${ICO.dice()} Kość — wylosuj ${diceDone === 0 ? "1. gracza" : diceDone === 1 ? "2. gracza" : "kolejnego"}
+        <button type="button" class="btn btn-secondary btn-compact" id="order-dice">
+          ${ICO.dice()} Kość — ${allOrdered ? "wylosuj ponownie" : "wylosuj kolejność"}
         </button>
         <button type="button" class="btn btn-secondary btn-compact" id="order-reset">Reset</button>
       </div>
@@ -727,23 +727,14 @@ function renderOrder() {
   });
 
   appEl.querySelector("#order-dice")?.addEventListener("click", () => {
-    const pool = state.roster
-      .map((_, i) => i)
-      .filter((i) => !(state.orderDice || []).includes(i));
-    if (pool.length <= 1) return;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const assigned = [...(state.orderDice || []), pick];
-    state.orderDice = assigned;
-    // Rebuild order: assigned first, then remaining in original relative order
-    const rest = state.roster
-      .map((p, i) => ({ p, i }))
-      .filter(({ i }) => !assigned.includes(i))
-      .map(({ p }) => p);
-    const head = assigned.map((i) => state.roster[i]).filter(Boolean);
-    // When only one left after 2 picks for 3p, rest auto-fills
-    state.roster = [...head, ...rest];
-    // Remap dice indices to new positions 0..k-1
-    state.orderDice = head.map((_, i) => i);
+    // Pełna permutacja — każdy gracz dostaje miejsce (nie stop po 2. losowaniu).
+    const next = [...state.roster];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+    state.roster = next;
+    state.orderDice = next.map((_, i) => i);
     saveState();
     render();
   });
