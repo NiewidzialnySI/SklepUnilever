@@ -2096,11 +2096,14 @@ function renderTurn() {
           const lose = fatigueForReputation(p.reputation);
           p.cards = Math.max(0, (p.cards || 0) - lose);
         }
+        // Trofeum wzięte = wybór fazy II zużyty (nie wracasz do walki/eksploracji).
+        if (state.turn) state.turn.phase2Done = true;
         tryDeclareVictory(state.activeIndex, "meditate");
         saveState();
         render();
       });
     });
+    const medDone = Boolean(state.turn?.phase2Done);
     addTurnButtons([
       {
         id: "to3",
@@ -2108,7 +2111,9 @@ function renderTurn() {
         primary: true,
         onClick: () => setTurn("III", "phase3", { markPhase2Done: true }),
       },
-      { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
+      ...(medDone
+        ? []
+        : [{ id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") }]),
     ]);
     return;
   }
@@ -2123,7 +2128,7 @@ function renderTurn() {
     appEl.querySelectorAll("[data-explore-deck]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const deck = btn.getAttribute("data-explore-deck");
-        setTurn("II", "explore-resolve", { exploreDeck: deck });
+        setTurn("II", "explore-resolve", { exploreDeck: deck, markPhase2Done: true });
       });
     });
     addTurnButtons([
