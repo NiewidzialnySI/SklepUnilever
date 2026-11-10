@@ -495,15 +495,10 @@ function renderHome() {
 
 function schoolOptionsHtml(forIdx) {
   const mine = state.roster[forIdx]?.schoolId;
-  const taken = new Set(
-    state.roster.map((p, i) => (i === forIdx ? null : p.schoolId)).filter(Boolean)
-  );
   return SCHOOLS.map((s) => {
-    const occupied = taken.has(s.id) && s.id !== mine;
-    const label = occupied ? `${s.short} · zajęta (zamiana)` : s.name;
     return `<option value="${s.id}" ${s.id === mine ? "selected" : ""} data-color="${escapeAttr(
       s.color || ""
-    )}">${escapeHtml(label)}</option>`;
+    )}">${escapeHtml(s.short)}</option>`;
   }).join("");
 }
 

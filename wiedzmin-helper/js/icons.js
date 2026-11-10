@@ -285,7 +285,7 @@ export function iconsLegendHtml() {
         [ICO.schoolNiedzwiedz, "Niedźwiedź", "Zbroja · Haern Caduch"],
         [ICO.schoolKot, "Kot", "Szybkość · Stygga"],
         [ICO.schoolZmija, "Żmija", "Zatruta stal · Gorthur Gvaed"],
-        [ICO.schoolMantikora, "Mantikora", "Behelt Nar (#0)"],
+        [ICO.schoolMantikora, "Mantikory", "Behelt Nar (#0)"],
       ],
       "ico-legend-row--schools"
     )}
