@@ -676,10 +676,12 @@ function terrainIcon(id) {
   return "";
 }
 
-export function selectedLocPanel(board, roster) {
+export function selectedLocPanel(board, roster, { monstersEditable = true } = {}) {
   const loc = locById(board.selectedLoc);
   if (!loc) {
-    return `<p class="lead">Kliknij lokację na mapie. Potwory ustawiasz numerami w panelu (1 na teren).</p>`;
+    return monstersEditable
+      ? `<p class="lead">Kliknij lokację na mapie. Potwory ustawiasz numerami w panelu (1 na teren).</p>`
+      : `<p class="lead">Kliknij lokację na mapie. Potwory zmieniają się przez wynik walki / spawn — panel jest zablokowany po starcie gry.</p>`;
   }
   const t = TERRAIN[loc.terrain];
   const m = monsterAt(board, loc.id);
@@ -726,7 +728,9 @@ export function selectedLocPanel(board, roster) {
               )}” zajęty przez <strong>${escapeHtml(otherSame.loc.name)}</strong> (#${
                 otherSame.loc.number
               }).</p>`
-            : `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — ustaw numer w panelu poniżej.</p>`
+            : monstersEditable
+              ? `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — ustaw numer w panelu poniżej.</p>`
+              : `<p class="note" style="margin:0.45rem 0 0">${ICO.monster()} Brak potwora na tym polu — nowy pojawia się po walce (spawn), nie przez ręczną edycję.</p>`
       }
       <p>Wiedźmini:
         ${

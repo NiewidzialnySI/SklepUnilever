@@ -347,6 +347,17 @@ function buildMultiSetupSteps(n, roster = []) {
       `,
     },
     {
+      id: "monsters",
+      title: "Potwory na start",
+      body: `
+        <ol class="checklist">
+          <li>Odkryjcie żetony potworów i przenieście je na obszary z żetonów obszarów (1 teren = 1 potwór).</li>
+          <li>W helperze poniżej: 3 tereny → numer obszaru + poziom.</li>
+          <li>Potasujcie karty walki potworów — zakryty stos obok planszy.</li>
+        </ol>
+      `,
+    },
+    {
       id: "help-cards",
       title: "Karty pomocy",
       body: `<p>Każdy bierze <strong>po 1 karcie pomocy każdego rodzaju</strong>.</p>`,
@@ -376,7 +387,7 @@ function buildMultiSetupSteps(n, roster = []) {
     title: "Schować nadmiar",
     body: `
       <p>Niewykorzystane zestawy → do pudełka.</p>
-      <p class="tip"><strong>Cel:</strong> 4 reputacji. Trofea: potwór / walka z wiedźminem / medytacja. Medytacja <em>nie kończy</em> gry przy 4. reputacji.</p>
+      <p class="tip"><strong>Cel:</strong> 4 reputacji z trofeum walki (potwór lub wiedźmin). Medytacja daje trofeum atrybutu i +reputację tylko gdy masz &lt; 3 — <em>nie kończy</em> gry i nie daje 4. reputacji.</p>
     `,
   });
 
@@ -599,12 +610,12 @@ export function fightMonster(isSolo) {
 export const FIGHT_WITCHER = `
   <ol class="checklist">
     <li>Obaj: talie wytrzymałości (talia + odrzucone; ręka zostaje).</li>
-    <li>Pozostali mogą obstawić (1 złoto).</li>
-    <li>Atakujący zaczyna; naprzemiennie aż ktoś padnie.</li>
-    <li>Zwycięzca: trofeum szkoły, złoto wg reputacji, +reputacja, zmęczenie.</li>
+    <li>Przy ≥3 graczach pozostali mogą obstawić (1 złoto) — w 2-osobowej bez obstawy.</li>
+    <li>Atakujący zaczyna; naprzemiennie aż ktoś padnie. Obrażenia: tarcza → talia → ręka.</li>
+    <li>Zwycięzca: max <strong>1 trofeum na szkołę</strong> przeciwnika, złoto z toru reputacji, +reputacja, zmęczenie.</li>
     <li>Przegrany: karta kosztu 0 na odrzucone.</li>
-    <li>Obaj: tarcza = obrona, nowa talia; dobór wg wyniku.</li>
-    <li>Żeton <strong>zamkniętej karczmy</strong> na obszarze.</li>
+    <li>Obaj: tarcza = obrona, nowa talia. Dobór: zwykle 3 albo 4 karty wg atakujący/broniący i wyniku; <strong>przegrany atakujący</strong> w fazie III dobiera tylko do 2.</li>
+    <li>Żeton <strong>zamkniętej karczmy</strong> na obszarze (zostaje, aż kolejny pojedynek go przeniesie).</li>
   </ol>
 `;
 

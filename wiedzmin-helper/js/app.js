@@ -140,6 +140,7 @@ function defaultState() {
       moveCost: null,
       exploreDeck: null,
       fightResult: null,
+      phase2Done: false,
     },
     board: defaultBoard(),
     orderDice: [],
@@ -229,6 +230,7 @@ function normalizeState(raw) {
           fightResult: raw.turn.fightResult && typeof raw.turn.fightResult === "object"
             ? raw.turn.fightResult
             : null,
+          phase2Done: Boolean(raw.turn.phase2Done),
         }
       : base.turn;
   const board =
@@ -909,7 +911,7 @@ function renderSetup() {
       <div class="setup-map-embed">
         <h3>Oznacz potwory (numery z żetonów)</h3>
         <p class="lead">Dla lasu, gór i wody podaj numer obszaru z odkrytego żetonu — strzałkami albo wpisz. Potem ustaw poziom.</p>
-        ${monstersPanelHtml(state.board, { editable: true })}
+        ${monstersPanelHtml(state.board, { editable: !isGameStarted() })}
         ${mapSvgHtml(state.board, state.roster, { schoolById })}
       </div>`
       : "";
@@ -940,7 +942,7 @@ function renderSetup() {
   `);
 
   if (step.id === "monsters") {
-    bindMonsterPanelControls();
+    if (!isGameStarted()) bindMonsterPanelControls();
     appEl.querySelectorAll(".map-node").forEach((g) => {
       g.addEventListener("click", () => {
         state.board.selectedLoc = g.getAttribute("data-loc");
@@ -1034,11 +1036,24 @@ function turnShell(title, body) {
   bindSoloTurnCounter();
   appEl.querySelectorAll("[data-phase]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isGameOver()) return;
       const id = btn.getAttribute("data-phase");
+      const phase2Done = Boolean(state.turn?.phase2Done);
       if (id === "hub") setTurn("hub", "hub");
-      else if (id === "I") setTurn("I", "phase1-start");
-      else if (id === "II") setTurn("II", "phase2");
-      else if (id === "III") setTurn("III", "phase3");
+      else if (id === "I") {
+        if (phase2Done) {
+          window.alert("Faza I tej tury jest zamknięta — po wyborze w fazie II idziesz do fazy III.");
+          return;
+        }
+        setTurn("I", "phase1-start");
+      } else if (id === "II") {
+        if (phase2Done) {
+          window.alert("Faza II już zrobiona w tej turze (1 wybór). Przejdź do fazy III.");
+          setTurn("III", "phase3");
+          return;
+        }
+        setTurn("II", "phase2");
+      } else if (id === "III") setTurn("III", "phase3");
     });
   });
 }
@@ -1050,13 +1065,17 @@ function setTurn(phase, screen, extra = {}) {
     extra.exploreDeck !== undefined ? extra.exploreDeck : state.turn?.exploreDeck || null;
   let fightResult =
     extra.fightResult !== undefined ? extra.fightResult : state.turn?.fightResult || null;
+  let phase2Done =
+    extra.phase2Done !== undefined ? extra.phase2Done : Boolean(state.turn?.phase2Done);
   if (extra.clearMove) {
     moveTo = null;
     moveCost = null;
   }
   if (extra.clearExplore) exploreDeck = null;
   if (extra.clearFightResult) fightResult = null;
-  state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult };
+  if (extra.clearPhase2Done || screen === "hub" || screen === "phase1-start") phase2Done = false;
+  if (extra.markPhase2Done || screen === "fight-monster-result") phase2Done = true;
+  state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult, phase2Done };
   const p = activePlayer();
   if (p) {
     if (phase === "I") p.nowDoing = "faza1";
@@ -1665,6 +1684,23 @@ function renderTurn() {
 
   if (screen === "phase2") {
     ensureCombatTrack(p);
+    if (state.turn?.phase2Done) {
+      turnShell(
+        "Faza II — już zrobiona",
+        `
+          <p class="warn">W tej turze wybór fazy II jest zużyty (walka / medytacja / eksploracja — dokładnie 1). Przejdź do fazy III.</p>
+        `
+      );
+      addTurnButtons([
+        {
+          id: "to3",
+          label: "Dalej → faza III",
+          primary: true,
+          onClick: () => setTurn("III", "phase3"),
+        },
+      ]);
+      return;
+    }
     const med = meditationStatus(p, { isSolo: solo });
     const fight = fightOptionsFor(p);
     // Bez celu walki i bez medytacji → od razu eksploracja
@@ -1746,7 +1782,7 @@ function renderTurn() {
         setTurn("II", "fight-monster-result");
         return;
       }
-      setTurn("III", "phase3", { clearFightResult: true });
+      setTurn("III", "phase3", { clearFightResult: true, markPhase2Done: true });
       return;
     }
     ensureCombatTrack(p);
@@ -1927,17 +1963,32 @@ function renderTurn() {
         });
       });
     }
-    addTurnButtons([
-      {
-        id: "to3",
-        label: spawnReady ? "Dalej → faza III" : "Pomiń spawn → faza III",
-        primary: true,
-        onClick: () => {
-          p.nowDoing = "faza3";
-          setTurn("III", "phase3", { clearFightResult: true });
-        },
-      },
-    ]);
+    addTurnButtons(
+      spawnReady
+        ? [
+            {
+              id: "to3",
+              label: "Dalej → faza III",
+              primary: true,
+              onClick: () => {
+                p.nowDoing = "faza3";
+                setTurn("III", "phase3", { clearFightResult: true, markPhase2Done: true });
+              },
+            },
+          ]
+        : [
+            {
+              id: "spawn-needed",
+              label: "Ustaw spawn potwora (wymagane)",
+              primary: false,
+              onClick: () => {
+                window.alert(
+                  "Po pokonaniu / odpędzeniu trzeba ustawić nowego potwora na ten teren (numer obszaru + poziom), zanim przejdziesz do fazy III."
+                );
+              },
+            },
+          ]
+    );
     return;
   }
 
@@ -1984,11 +2035,15 @@ function renderTurn() {
               : `+1 reputacja → ${award.reputation}, zmęczenie −${award.lose} z ręki.`
           );
         }
-        setTurn("III", "phase3");
+        setTurn("III", "phase3", { markPhase2Done: true });
       });
     });
     addTurnButtons([
-      { id: "to3", label: "Bez wyniku → faza III", onClick: () => setTurn("III", "phase3") },
+      {
+        id: "to3",
+        label: "Bez wyniku → faza III",
+        onClick: () => setTurn("III", "phase3", { markPhase2Done: true }),
+      },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "fight") },
     ]);
     return;
@@ -2047,7 +2102,12 @@ function renderTurn() {
       });
     });
     addTurnButtons([
-      { id: "to3", label: "Dalej → faza III", primary: true, onClick: () => setTurn("III", "phase3") },
+      {
+        id: "to3",
+        label: "Dalej → faza III",
+        primary: true,
+        onClick: () => setTurn("III", "phase3", { markPhase2Done: true }),
+      },
       { id: "back", label: "Wróć", onClick: () => setTurn("II", "phase2") },
     ]);
     return;
@@ -2089,7 +2149,7 @@ function renderTurn() {
         id: "to3",
         label: "Dalej → faza III",
         primary: true,
-        onClick: () => setTurn("III", "phase3", { clearExplore: true }),
+        onClick: () => setTurn("III", "phase3", { clearExplore: true, markPhase2Done: true }),
       },
       {
         id: "back-deck",
@@ -2187,7 +2247,7 @@ function renderBoard() {
           board.movePrompt?.fromId ||
           (activePlayer()?.nowDoing === "faza1" ? activePlayer()?.locationId : null),
       })}
-      ${selectedLocPanel(board, state.roster)}
+      ${selectedLocPanel(board, state.roster, { monstersEditable: !isGameStarted() })}
       ${
         (board.highlightFrom || activePlayer()?.nowDoing === "faza1") && activePlayer()?.locationId
           ? neighborPickerHtml(board.highlightFrom || activePlayer().locationId, {
@@ -2310,19 +2370,11 @@ function renderBoard() {
       if (!pl) return;
       if (n === 4) {
         const ok = window.confirm(
-          isSolo()
-            ? "Ustawić reputację na 4? Solo wygrywa tylko przy 3 trofeach potworów + trofeum atrybutu (4. z walki z potworem — nie z medytacji)."
-            : "Ustawić reputację na 4 z trofeum walki? (Medytacja nie kończy gry — potwierdź tylko jeśli to walka.)"
+          "Ustawić reputację na 4 w trackerze (księgowość)? Wygraną helper ogłasza dopiero po trofeum z walki w przewodniku tury — nie z tego przycisku."
         );
         if (!ok) return;
         pl.reputation = 4;
-        const source = isSolo() ? "monster" : "manual";
-        const verdict = checkVictory(pl, { isSolo: isSolo(), source });
-        if (verdict.won) {
-          declareVictory(i, { kind: verdict.kind, reason: verdict.reason, source });
-        } else if (verdict.reason) {
-          window.alert(verdict.reason);
-        }
+        // Tracker nie kończy gry — unikamy „fake win” bez trofeum walki.
       } else {
         pl.reputation = n;
         if (n < 4 && state.gameOver && state.winner?.index === i) clearVictory();
