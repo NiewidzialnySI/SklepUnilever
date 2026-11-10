@@ -69,6 +69,7 @@ import {
   trailsHtml,
   attrsAdjustHtml,
   hasTrailForMonster,
+  clearTrailsForTerrain,
   fieldChangeModalHtml,
   applyFieldChange,
   ATTR_KEYS,
@@ -285,6 +286,25 @@ function ensureRoster() {
       p._prevSchoolId = p.schoolId;
     }
   });
+  // Multi: rozdziel zduplikowane szkoły (stare zapisy) — bez twardego błędu.
+  if (n > 1) {
+    const seen = new Set();
+    const free = SCHOOLS.map((s) => s.id).filter(
+      (id) => !state.roster.some((p) => p.schoolId === id)
+    );
+    state.roster.forEach((p) => {
+      if (!seen.has(p.schoolId)) {
+        seen.add(p.schoolId);
+        return;
+      }
+      const nextId = free.shift() || SCHOOLS.find((s) => !seen.has(s.id))?.id;
+      if (!nextId) return;
+      p.schoolId = nextId;
+      placeAtSchool(p, { force: true });
+      p._prevSchoolId = nextId;
+      seen.add(nextId);
+    });
+  }
   if (state.activeIndex >= n) state.activeIndex = 0;
   if (state.board.placePlayer >= n) state.board.placePlayer = 0;
 }
@@ -367,6 +387,11 @@ function playersLabel(n) {
 
 function shell(inner) {
   const scale = loadUiScale();
+  try {
+    document.documentElement.setAttribute("data-view", state.view || "home");
+  } catch (_) {
+    /* ignore */
+  }
   appEl.innerHTML = `
     <header class="topbar">
       <div class="brand">
@@ -468,41 +493,70 @@ function renderHome() {
   appEl.querySelector("#to-roster").addEventListener("click", () => go("roster"));
 }
 
+function schoolOptionsHtml(forIdx) {
+  const mine = state.roster[forIdx]?.schoolId;
+  return SCHOOLS.map((s) => {
+    return `<option value="${s.id}" ${s.id === mine ? "selected" : ""} data-color="${escapeAttr(
+      s.color || ""
+    )}">${escapeHtml(s.short)}</option>`;
+  }).join("");
+}
+
+function applyRosterSchoolChoice(idx, newSchoolId) {
+  const me = state.roster[idx];
+  if (!me) return;
+  const prevSchool = me.schoolId;
+  if (prevSchool === newSchoolId) return;
+  const otherIdx = state.roster.findIndex((p, i) => i !== idx && p.schoolId === newSchoolId);
+  if (otherIdx >= 0) {
+    const other = state.roster[otherIdx];
+    other.schoolId = prevSchool;
+    placeAtSchool(other, { force: true });
+    other._prevSchoolId = other.schoolId;
+  }
+  me.schoolId = newSchoolId;
+  placeAtSchool(me, { force: true });
+  me._prevSchoolId = newSchoolId;
+}
+
 function renderRoster() {
   ensureRoster();
-  const used = new Set();
 
   shell(`
     <section class="panel">
       <p class="step-kicker">Skład stołu · ${playersLabel(state.players)}</p>
       <h1>Imiona i szkoły</h1>
-      <p class="lead">Wpisz imię i wybierz szkołę — <strong>pionek od razu staje na szkole startowej</strong> (Wilk→Kaer Morhen, Gryf→Kaer Seren, Niedźwiedź→Haern Caduch, Kot→Stygga, Żmija→Gorthur Gvaed).</p>
-      <div id="roster-forms">
+      <div id="roster-forms" class="roster-grid roster-grid--${state.players}">
         ${state.roster
           .map((p, i) => {
             const orderHint = state.players === 1 ? "Ty" : `Gracz ${i + 1}`;
+            const school = schoolById(p.schoolId);
+            const color = school.color || "#244833";
             return `
-            <div class="roster-card" data-idx="${i}">
-              <strong>${orderHint}</strong>
-              <label>Imię
-                <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
-              </label>
-              <label>Szkoła
-                <select data-field="schoolId">
-                  ${SCHOOLS.map(
-                    (s) =>
-                      `<option value="${s.id}" ${p.schoolId === s.id ? "selected" : ""}>${s.name}</option>`
-                  ).join("")}
-                </select>
-              </label>
-              <p class="note school-start-hint">Start: <strong>${escapeHtml(
-                locById(schoolStartId(p.schoolId))?.name || "—"
-              )}</strong></p>
+            <div class="roster-card" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+              <header class="roster-card-head">
+                <span class="roster-card-badge" style="background:${escapeAttr(color)}">${schoolIcon(
+                  p.schoolId
+                )}</span>
+                <div class="roster-card-title">
+                  <strong>${orderHint}</strong>
+                  <span class="school-start-hint">Start: <strong>${escapeHtml(
+                    locById(schoolStartId(p.schoolId))?.name || "—"
+                  )}</strong></span>
+                </div>
+              </header>
+              <div class="roster-card-fields">
+                <label>Imię
+                  <input type="text" data-field="name" value="${escapeAttr(p.name)}" maxlength="24" />
+                </label>
+                <label>Szkoła
+                  <select data-field="schoolId">${schoolOptionsHtml(i)}</select>
+                </label>
+              </div>
             </div>`;
           })
           .join("")}
       </div>
-      <p class="warn" id="roster-warn" hidden>Każda szkoła może być tylko raz (w multi). Popraw wybór.</p>
       <div class="actions">
         <button class="btn btn-secondary" id="back-home">Wstecz</button>
         <button class="btn btn-primary" id="to-order">${isSolo() ? "Dalej — przygotowanie" : "Dalej — kolejność"}</button>
@@ -510,9 +564,7 @@ function renderRoster() {
     </section>
   `);
 
-  const warn = appEl.querySelector("#roster-warn");
-
-  function syncFromDom() {
+  function syncNamesFromDom() {
     appEl.querySelectorAll(".roster-card").forEach((card) => {
       const i = Number(card.dataset.idx);
       const name =
@@ -520,47 +572,40 @@ function renderRoster() {
           .querySelector('[data-field="name"]')
           .value.replace(/[<>]/g, "")
           .trim() || `Gracz ${i + 1}`;
-      const schoolId = card.querySelector('[data-field="schoolId"]').value;
       const prev = state.roster[i] || {};
       const start = START_RESOURCES[state.players]?.[i] || { cards: 5, gold: 3 };
       const next = ensurePlayerTrack(
-        { ...prev, name, schoolId, _prevSchoolId: prev.schoolId || prev._prevSchoolId },
+        { ...prev, name, schoolId: prev.schoolId, _prevSchoolId: prev.schoolId },
         start.cards,
         start.gold
       );
       ensureCombatTrack(next);
-      if (!prev.locationId || prev.schoolId !== schoolId) {
-        placeAtSchool(next, { force: true });
-      }
-      next._prevSchoolId = schoolId;
       state.roster[i] = next;
-      const hintStrong = card.querySelector(".school-start-hint strong");
-      if (hintStrong) {
-        hintStrong.textContent = locById(schoolStartId(schoolId))?.name || "—";
-      }
     });
-    used.clear();
-    let dup = false;
-    if (!isSolo()) {
-      for (const p of state.roster) {
-        if (used.has(p.schoolId)) dup = true;
-        used.add(p.schoolId);
-      }
-    }
-    warn.hidden = !dup;
     applySchoolStarts();
     saveState();
-    return !dup;
   }
 
-  appEl.querySelectorAll(".roster-card input, .roster-card select").forEach((el) => {
-    el.addEventListener("change", syncFromDom);
-    el.addEventListener("input", syncFromDom);
+  appEl.querySelectorAll('.roster-card [data-field="name"]').forEach((el) => {
+    el.addEventListener("change", () => syncNamesFromDom());
+    el.addEventListener("input", () => syncNamesFromDom());
+  });
+
+  appEl.querySelectorAll('.roster-card [data-field="schoolId"]').forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const card = sel.closest(".roster-card");
+      const i = Number(card?.dataset.idx);
+      syncNamesFromDom();
+      applyRosterSchoolChoice(i, sel.value);
+      applySchoolStarts();
+      saveState();
+      render();
+    });
   });
 
   appEl.querySelector("#back-home").addEventListener("click", () => go("home"));
   appEl.querySelector("#to-order").addEventListener("click", () => {
-    if (!syncFromDom()) return;
+    syncNamesFromDom();
     applySchoolStarts();
     if (isSolo()) {
       applyStartResources(state.roster, state.players, { force: true });
@@ -583,35 +628,49 @@ function renderOrder() {
   }
 
   const diceDone = (state.orderDice || []).length;
-  const remaining = state.roster.length - diceDone;
+  const allOrdered = diceDone >= state.roster.length && state.roster.length > 1;
 
   shell(`
-    <section class="panel">
+    <section class="panel order-panel">
       <p class="step-kicker">Kolejność przy stole</p>
       <h1>Kto pierwszy?</h1>
-      <p class="lead">Kolejność ustala startowe <strong>karty i złoto</strong> — ustaw ją teraz, zanim rozdamy zasoby. Domyślnie: jak wpisywaliście. Przeciągnij kafelki albo rzuć kością.</p>
-      <ul class="order-list" id="order-list">
-        ${state.roster
-          .map((p, i) => {
-            const res = startResourcesFor(state.players, i);
-            return `
-            <li class="order-item" draggable="true" data-idx="${i}">
-              <span class="order-pos">${i + 1}.</span>
-              <span class="player-chip">${schoolIcon(p.schoolId)}${escapeHtml(p.name)} <span>${schoolById(p.schoolId).short}</span></span>
-              <span class="tip" style="margin:0">→ ${res.cards} kart · ${res.gold} złota</span>
-              <button type="button" class="btn btn-secondary" data-order-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
-              <button type="button" class="btn btn-secondary" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""}>↓</button>
-            </li>`;
-          })
-          .join("")}
-      </ul>
-      <div class="actions">
-        <button type="button" class="btn btn-secondary" id="order-dice" ${remaining <= 1 ? "disabled" : ""}>
-          ${ICO.dice()} Kość — wylosuj ${diceDone === 0 ? "1. gracza" : diceDone === 1 ? "2. gracza" : "kolejnego"}
-        </button>
-        <button type="button" class="btn btn-secondary" id="order-reset">Reset kolejności / kości</button>
+      <div class="order-box">
+        <div class="order-box-head">
+          <span>Gracz</span>
+          <span class="order-box-head-meta">Start</span>
+          <span class="order-box-head-actions" aria-hidden="true"></span>
+        </div>
+        <ul class="order-list" id="order-list">
+          ${state.roster
+            .map((p, i) => {
+              const res = startResourcesFor(state.players, i);
+              const school = schoolById(p.schoolId);
+              const color = school.color || "#244833";
+              return `
+              <li class="order-item" draggable="true" data-idx="${i}" style="--school-color:${escapeAttr(color)}">
+                <span class="order-handle" aria-hidden="true" title="Przeciągnij">⋮⋮</span>
+                <span class="order-pos">${i + 1}</span>
+                <span class="order-avatar" style="background:${escapeAttr(color)}">${schoolIcon(p.schoolId)}</span>
+                <div class="order-identity">
+                  <strong class="order-name">${escapeHtml(p.name)}</strong>
+                  <span class="order-school">${escapeHtml(school.short)}</span>
+                </div>
+                <span class="order-meta">${res.cards} kart · ${res.gold} złota</span>
+                <div class="order-move">
+                  <button type="button" class="order-icon-btn" data-order-up="${i}" ${i === 0 ? "disabled" : ""} aria-label="Wyżej">↑</button>
+                  <button type="button" class="order-icon-btn" data-order-down="${i}" ${i === state.roster.length - 1 ? "disabled" : ""} aria-label="Niżej">↓</button>
+                </div>
+              </li>`;
+            })
+            .join("")}
+        </ul>
       </div>
-      <p class="note">Po 1. i 2. rzucie reszta ustawia się sama (przy 3 graczach). Przy więcej — rzucaj dalej albo przeciągnij.</p>
+      <div class="order-toolbar">
+        <button type="button" class="btn btn-secondary btn-compact" id="order-dice">
+          ${ICO.dice()} Kość — ${allOrdered ? "wylosuj ponownie" : "wylosuj kolejność"}
+        </button>
+        <button type="button" class="btn btn-secondary btn-compact" id="order-reset">Reset</button>
+      </div>
       <div class="actions">
         <button class="btn btn-secondary" id="back-roster">Wstecz</button>
         <button class="btn btn-primary" id="confirm-order">Zatwierdź i rozdaj karty/złoto</button>
@@ -668,23 +727,14 @@ function renderOrder() {
   });
 
   appEl.querySelector("#order-dice")?.addEventListener("click", () => {
-    const pool = state.roster
-      .map((_, i) => i)
-      .filter((i) => !(state.orderDice || []).includes(i));
-    if (pool.length <= 1) return;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const assigned = [...(state.orderDice || []), pick];
-    state.orderDice = assigned;
-    // Rebuild order: assigned first, then remaining in original relative order
-    const rest = state.roster
-      .map((p, i) => ({ p, i }))
-      .filter(({ i }) => !assigned.includes(i))
-      .map(({ p }) => p);
-    const head = assigned.map((i) => state.roster[i]).filter(Boolean);
-    // When only one left after 2 picks for 3p, rest auto-fills
-    state.roster = [...head, ...rest];
-    // Remap dice indices to new positions 0..k-1
-    state.orderDice = head.map((_, i) => i);
+    // Pełna permutacja — każdy gracz dostaje miejsce (nie stop po 2. losowaniu).
+    const next = [...state.roster];
+    for (let i = next.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [next[i], next[j]] = [next[j], next[i]];
+    }
+    state.roster = next;
+    state.orderDice = next.map((_, i) => i);
     saveState();
     render();
   });
@@ -1612,6 +1662,11 @@ function renderTurn() {
         if (plan.removeMonster && p.locationId) {
           delete state.board.monsters[p.locationId];
         }
+        // Pokonanie: tropy/zadania tropienia tego terenu u wszystkich graczy → z powrotem do puli.
+        if (kind === "defeat" && here?.terrain) {
+          const cleared = clearTrailsForTerrain(state.roster, here.terrain);
+          plan.trailsCleared = cleared;
+        }
         state.board.placeError = null;
         setTurn("II", "fight-monster-result", { fightResult: plan });
       });
@@ -1663,6 +1718,13 @@ function renderTurn() {
           ${
             plan.spawnHint
               ? `<p class="tip" style="margin:0.55rem 0 0">${plan.spawnHint}</p>`
+              : ""
+          }
+          ${
+            plan.kind === "defeat"
+              ? `<p class="tip" style="margin:0.55rem 0 0"><strong>Tropy:</strong> żetony tropu i zadania tropienia terenu „${escapeHtml(
+                  plan.terrainLabel || ""
+                )}” wracają do puli <em>u wszystkich graczy</em> (helper wyczyścił tracker). Kilku graczy mogło mieć ten trop naraz — limit 1/teren jest na osobę.</p>`
               : ""
           }
           <p class="note" style="margin:0.55rem 0 0">Dalej: <strong>faza III</strong> (dobór / kupno). Eksploracja to osobny wybór fazy II — nie robisz jej po walce w tej turze.</p>

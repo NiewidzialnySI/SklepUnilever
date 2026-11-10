@@ -3,12 +3,15 @@
  *  więc poniżej: scalone streszczenia z opisów/rozdziałów filmów + oficjalne FAQ.
  */
 
+/** Kolory znaczników / kostek / pierścieni figurek (jak na komponentach przy stole).
+ *  Wilk=brązowy, Gryf=żółty, Niedźwiedź=czerwony, Kot=granat, Żmija=zielony.
+ */
 export const SCHOOLS = [
-  { id: "wilk", name: "Szkoła Wilka", short: "Wilk" },
-  { id: "gryf", name: "Szkoła Gryfa", short: "Gryf" },
-  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedź" },
-  { id: "kot", name: "Szkoła Kota", short: "Kot" },
-  { id: "zmija", name: "Szkoła Żmii", short: "Żmija" },
+  { id: "wilk", name: "Szkoła Wilka", short: "Wilka", color: "#6b4a32" },
+  { id: "gryf", name: "Szkoła Gryfa", short: "Gryfa", color: "#c9a227" },
+  { id: "niedzwiedz", name: "Szkoła Niedźwiedzia", short: "Niedźwiedzia", color: "#9a3b2f" },
+  { id: "kot", name: "Szkoła Kota", short: "Kota", color: "#24344a" },
+  { id: "zmija", name: "Szkoła Żmii", short: "Żmii", color: "#3d6b45" },
 ];
 
 export const SOURCES = [
@@ -112,7 +115,7 @@ export const RULE_CORRECTIONS = [
   },
   {
     title: "Tropy / żeton tropu",
-    body: "Żeton tropu = żeton obszaru odwrócony na symbol terenu (po wykonaniu zadania tropienia). Zadanie: najpierw żeton nazwą do góry + złoto na nim; po wejściu na lokację bierzesz złoto i odwracasz. Trop → często Ty zaczynasz walkę z tym potworem. Max 1 na rodzaj terenu; konflikt → stare znika bez złota (FAQ #10).",
+    body: "Żeton tropu = żeton obszaru odwrócony na symbol terenu (po zadaniu tropienia). Limit per gracz: max 1 na rodzaj terenu (FAQ #10 — nowy tego samego typu usuwa stary bez złota). Kilku graczy może mieć trop tego samego potwora naraz. Po pokonaniu: tropy/zadania tego terenu u wszystkich wracają do puli.",
   },
   {
     title: "Koszt karty z eksploracji",
