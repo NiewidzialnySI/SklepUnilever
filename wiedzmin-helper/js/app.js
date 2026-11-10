@@ -2467,9 +2467,7 @@ function renderBoard() {
       const lose = fatigueForReputation(next);
       const fightAsk =
         next === 4
-          ? isSolo()
-            ? " To 4. reputacja: solo wygrywa tylko przy 3 potworach + atrybucie (źródło = walka z potworem)."
-            : " To 4. reputacja z trofeum walki — gra się kończy (medytacja NIE kończy)."
+          ? " To tylko księgowość trackera — wygraną helper ogłasza po trofeum z walki w przewodniku tury, nie z tego przycisku."
           : "";
       if (
         !window.confirm(
@@ -2480,12 +2478,7 @@ function renderBoard() {
       }
       pl.reputation = next;
       pl.cards = Math.max(0, (pl.cards || 0) - lose);
-      if (next === 4) {
-        const source = isSolo() ? "monster" : "manual";
-        const verdict = checkVictory(pl, { isSolo: isSolo(), source });
-        if (verdict.won) declareVictory(i, { kind: verdict.kind, reason: verdict.reason, source });
-        else if (verdict.reason) window.alert(verdict.reason);
-      }
+      // Tracker nie wywołuje declareVictory — unikamy fake-win bez trofeum walki.
       saveState();
       render();
     });
