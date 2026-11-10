@@ -1073,7 +1073,8 @@ function setTurn(phase, screen, extra = {}) {
   }
   if (extra.clearExplore) exploreDeck = null;
   if (extra.clearFightResult) fightResult = null;
-  if (extra.clearPhase2Done || screen === "hub" || screen === "phase1-start") phase2Done = false;
+  // Nie czyść phase2Done przy hub/fazie I — inaczej zakładka „hub” omija blokadę fazy II.
+  if (extra.clearPhase2Done) phase2Done = false;
   if (extra.markPhase2Done || screen === "fight-monster-result") phase2Done = true;
   state.turn = { phase, screen, moveTo, moveCost, exploreDeck, fightResult, phase2Done };
   const p = activePlayer();
@@ -1098,7 +1099,12 @@ function setTurn(phase, screen, extra = {}) {
 
 function nextPlayer() {
   if (isGameOver()) {
-    setTurn("hub", "hub");
+    setTurn("hub", "hub", {
+      clearPhase2Done: true,
+      clearMove: true,
+      clearExplore: true,
+      clearFightResult: true,
+    });
     return;
   }
   if (isSolo()) {
@@ -1110,7 +1116,12 @@ function nextPlayer() {
     if (next === 0) state.turnNumber = Math.min(999, (state.turnNumber || 1) + 1);
     state.activeIndex = next;
   }
-  setTurn("hub", "hub");
+  setTurn("hub", "hub", {
+    clearPhase2Done: true,
+    clearMove: true,
+    clearExplore: true,
+    clearFightResult: true,
+  });
 }
 
 function soloTurnBadgeHtml() {
@@ -1449,24 +1460,39 @@ function renderTurn() {
     if (!solo) {
       appEl.querySelectorAll("[data-active]").forEach((btn) => {
         btn.addEventListener("click", () => {
-          state.activeIndex = Number(btn.dataset.active);
-          saveState();
-          render();
+          const next = Number(btn.dataset.active);
+          if (next === state.activeIndex) return;
+          // Ręczna zmiana aktywnego = nowa tura helpera dla tej osoby.
+          state.activeIndex = next;
+          setTurn("hub", "hub", {
+            clearPhase2Done: true,
+            clearMove: true,
+            clearExplore: true,
+            clearFightResult: true,
+          });
         });
       });
     }
 
+    const phase2Done = Boolean(state.turn?.phase2Done);
     addTurnButtons([
-      {
-        id: "go-i",
-        label: `Zaczynam fazę I (${escapeHtml(p.name)})`,
-        primary: true,
-        onClick: () => {
-          p.nowDoing = "faza1";
-          saveState();
-          setTurn("I", "phase1-start");
-        },
-      },
+      phase2Done
+        ? {
+            id: "go-iii",
+            label: "Faza II zużyta → idź do fazy III",
+            primary: true,
+            onClick: () => setTurn("III", "phase3"),
+          }
+        : {
+            id: "go-i",
+            label: `Zaczynam fazę I (${escapeHtml(p.name)})`,
+            primary: true,
+            onClick: () => {
+              p.nowDoing = "faza1";
+              saveState();
+              setTurn("I", "phase1-start");
+            },
+          },
       {
         id: "to-board",
         label: "Stół — mapa / reputacja / karty",
@@ -1477,6 +1503,10 @@ function renderTurn() {
   }
 
   if (screen === "phase1-start") {
+    if (state.turn?.phase2Done) {
+      setTurn("III", "phase3");
+      return;
+    }
     turnShell(
       "Faza I — start",
       `
