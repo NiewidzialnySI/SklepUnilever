@@ -24,12 +24,16 @@
 - 18/18 logika setup/walka/spawn/Behelt/victory
 - 18/18 symulacja 3p (szkoły, potwory, fight options, fatigue×4, witcher co-location)
 
-## Otwarte (UI manual / computerUse w toku)
-- Responsywność 390px, reload persistence mid-turn, pełny click-path 3p w przeglądarce
-- Re-audyt po wynikach computerUse / explore
+## UI headless (Puppeteer, 3p)
+- 16/16: setup potwory → tura → eksploracja → blokada fazy II → panel locked → tracker bez win → mobile 390 → persist
+- Fight path: po pokonaniu brak „Pomiń spawn”, alert wymusza numer, potem faza III
 
 ## PASS (wcześniejsze + potwierdzone)
 - phase3DrawHint → 3
 - Behelt Nar blocked, szkoły OK
 - Soft school swap
 - Victory screen + gameOver lock tur
+- Hub nie omija `phase2Done`
+
+## Re-audyt
+Kolejne krytyczne/high z zasadami: **brak**. Pozostałe MED z research/01 (skróty FIGHT_WITCHER/poker) częściowo doprecyzowane; helper nadal upraszcza pełną walkę przy stole.
