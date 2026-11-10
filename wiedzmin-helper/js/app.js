@@ -367,6 +367,11 @@ function playersLabel(n) {
 
 function shell(inner) {
   const scale = loadUiScale();
+  try {
+    document.documentElement.setAttribute("data-view", state.view || "home");
+  } catch (_) {
+    /* ignore */
+  }
   appEl.innerHTML = `
     <header class="topbar">
       <div class="brand">
